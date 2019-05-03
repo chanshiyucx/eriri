@@ -1,0 +1,50 @@
+<template>
+  <div id="menu">
+    <div class="logo">
+      <img src="@/assets/img/app.png" alt="logo" />
+    </div>
+    <router-link to="/">
+      <svg-icon icon-class="home" />
+    </router-link>
+    <router-link to="/about">
+      <svg-icon icon-class="star" />
+    </router-link>
+    <router-link to="/setting">
+      <svg-icon icon-class="setting" />
+    </router-link>
+  </div>
+</template>
+
+<script>
+export default {
+  name: 'Menu'
+}
+</script>
+<style lang="less" scoped>
+#menu {
+  width: 50px;
+  height: 100%;
+  background-color: #b980ae;
+  .logo {
+    width: 50px;
+    height: 50px;
+    text-align: center;
+    img {
+      margin-top: 14px;
+      width: 22px;
+      height: 22px;
+    }
+  }
+  a {
+    display: block;
+    height: 50px;
+    line-height: 50px;
+    text-align: center;
+    font-size: 18px;
+    color: #fff;
+    &.router-link-exact-active {
+      background-color: #f2c047;
+    }
+  }
+}
+</style>

@@ -5,6 +5,7 @@ import {
   createProtocol,
   installVueDevtools
 } from 'vue-cli-plugin-electron-builder/lib'
+
 const isDevelopment = process.env.NODE_ENV !== 'production'
 
 // Keep a global reference of the window object, if you don't, the window will
@@ -21,6 +22,7 @@ function createWindow() {
   win = new BrowserWindow({
     width: 800,
     height: 600,
+    frame: false,
     webPreferences: {
       nodeIntegration: true
     }
@@ -88,7 +90,27 @@ if (isDevelopment) {
   }
 }
 
-// 打开开发者工具
-ipcMain.on('open-devtools', () => {
-  win.openDevTools()
+// 切换开发者工具
+ipcMain.on('toggle-devtools', () => {
+  win.webContents.toggleDevTools()
+})
+
+// 切换窗口大小
+ipcMain.on('toggle-screen', (event, type) => {
+  switch (type) {
+    case 'minimize':
+      win.minimize()
+      break
+    case 'maximize':
+      win.maximize()
+      break
+    case 'close':
+      win.close()
+      break
+    case 'fullscreen':
+      // win.setFullScreen()
+      break
+    default:
+      break
+  }
 })

@@ -1,24 +1,43 @@
 <template>
   <div id="app">
-    <h1>Eriri</h1>
-    <button id="webContents" @click="openDevTool">devtools</button>
-    <div id="nav">
-      <router-link to="/">Home</router-link> |
-      <router-link to="/about">About</router-link>
+    <Menu />
+    <div class="main">
+      <Header />
+      <router-view />
     </div>
-    <router-view />
   </div>
 </template>
 
 <script>
-import { ipcRenderer } from 'electron'
+import Header from '@/components/Header'
+import Menu from '@/components/Menu'
 
 export default {
   name: 'app',
+  components: {
+    Header,
+    Menu
+  },
+  mounted() {
+    // 注册键盘监听事件
+    window.addEventListener('keydown', this.keydown, false)
+  },
   methods: {
-    // 打开开发者工具
-    openDevTool() {
-      ipcRenderer.send('open-devtools')
+    keydown({ keyCode }) {
+      console.log({ keyCode })
+      /**
+       * 123: F12
+       */
+      switch (keyCode) {
+        case 123:
+          this.toggleDevTools()
+          break
+        default:
+          break
+      }
+    },
+    toggleDevTools() {
+      this.$ipcRenderer.send('toggle-devtools')
     }
   }
 }
@@ -26,20 +45,14 @@ export default {
 
 <style lang="less">
 #app {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  height: 100%;
   text-align: center;
-  color: #2c3e50;
-}
-#nav {
-  padding: 30px;
-  a {
-    font-weight: bold;
-    color: #2c3e50;
-    &.router-link-exact-active {
-      color: #42b983;
-    }
+  background-color: #fcfcfc;
+  .main {
+    width: 100%;
   }
 }
 </style>
