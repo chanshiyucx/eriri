@@ -116,7 +116,7 @@ export default {
   .comic-list {
     display: flex;
     flex-wrap: wrap;
-    padding: 0 10px;
+    padding: 10px 10px 0;
     li {
       margin: 5px;
       padding: 4px;

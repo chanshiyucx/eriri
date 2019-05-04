@@ -18,9 +18,9 @@ export default new Router({
       component: () => import('./views/Comic/index.vue')
     },
     {
-      path: '/about',
-      name: 'about',
-      component: () => import('./views/About/index.vue')
+      path: '/setting',
+      name: 'setting',
+      component: () => import('./views/Setting/index.vue')
     }
   ]
 })

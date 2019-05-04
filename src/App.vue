@@ -1,8 +1,8 @@
 <template>
   <div id="app">
-    <Menu />
+    <Menu v-show="!hideMenu" />
     <div class="container">
-      <Header />
+      <Header :hideMenu="hideMenu" />
       <router-view class="main scroll" />
     </div>
   </div>
@@ -18,13 +18,22 @@ export default {
     Header,
     Menu
   },
+  data() {
+    return {
+      hideMenu: false
+    }
+  },
+  watch: {
+    $route(val) {
+      this.hideMenu = val.name === 'comic'
+    }
+  },
   mounted() {
     // 注册键盘监听事件
     window.addEventListener('keydown', this.keydown, false)
   },
   methods: {
     keydown({ keyCode }) {
-      console.log({ keyCode })
       /**
        * 123: F12
        */
