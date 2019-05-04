@@ -113,6 +113,11 @@ export default {
 </script>
 <style lang="less" scoped>
 #home {
+  button {
+    margin-top: 30px;
+    margin-left: 10px;
+    float: left;
+  }
   .comic-list {
     display: flex;
     flex-wrap: wrap;
