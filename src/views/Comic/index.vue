@@ -1,7 +1,7 @@
 <template>
   <div id="comic">
     <Loading v-show="loading" />
-    <ul class="viwer" @click="handleClick">
+    <ul class="viewer" @click="handleClick">
       <li
         v-for="item in pageFile"
         :key="item.filename"
@@ -34,13 +34,13 @@
         <ul class="menu">
           <li @click="switchAdapt">
             <svg-icon
-              :icon-class="adapt === 'height' ? 'rowExpand' : 'columnExpand'"
+              :icon-class="adapt === 'height' ? 'columnExpand' : 'rowExpand'"
             />
-            {{ adapt === 'height' ? '适应宽度' : '适应高度' }}
+            {{ adapt === 'height' ? '适应高度' : '适应宽度' }}
           </li>
           <li @click="switchPage">
-            <svg-icon :icon-class="page === 1 ? 'doublepage' : 'singlepage'" />
-            {{ page === 1 ? '双页模式' : '单页模式' }}
+            <svg-icon :icon-class="page === 1 ? 'singlepage' : 'doublepage'" />
+            {{ page === 1 ? '单页模式' : '双页模式' }}
           </li>
         </ul>
       </div>
@@ -68,7 +68,8 @@ export default {
       pageFile: [],
       inx: 0, // 当前索引
       page: 1, // 单页或者双页模式
-      adapt: 'height' // 适应高度or宽度
+      adapt: 'height', // 适应高度or宽度
+      viewer: null
     }
   },
   computed: {
@@ -97,6 +98,7 @@ export default {
     const { filename, filedir } = this.$route.query
     this.filename = filename
     this.filedir = filedir
+    this.viewer = document.querySelector('.viewer')
     this.loadComic()
   },
   methods: {
@@ -135,10 +137,9 @@ export default {
           })
         })
         Promise.all(seq).then(result => {
-          const viwer = document.querySelector('.viwer')
-          const { clientWidth, clientHeight } = viwer
-          const viwerRadio = clientWidth / 2 / clientHeight
-          const isOver = result.some(o => o > viwerRadio)
+          const { clientWidth, clientHeight } = this.viewer
+          const viewerRadio = clientWidth / 2 / clientHeight
+          const isOver = result.some(o => o > viewerRadio)
           this.pageFile = isOver ? pageFile.slice(0, 1) : pageFile
         })
       } else {
@@ -148,7 +149,7 @@ export default {
     // 点击
     handleClick(event) {
       const { clientX } = event
-      const viewWidth = document.querySelector('.viwer').clientWidth
+      const viewWidth = this.viewer.clientWidth
       const radio = clientX / viewWidth
       if (radio < 0.33) {
         this.inx = Math.max(0, this.inx - this.page)
@@ -175,7 +176,7 @@ export default {
   position: relative;
   height: 100%;
   overflow-y: auto;
-  .viwer {
+  .viewer {
     display: flex;
     justify-content: space-around;
     height: 100%;
