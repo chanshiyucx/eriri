@@ -24,7 +24,8 @@ function createWindow() {
     height: 600,
     frame: false,
     webPreferences: {
-      nodeIntegration: true
+      nodeIntegration: true,
+      webSecurity: false
     }
   })
 
@@ -104,11 +105,11 @@ ipcMain.on('toggle-screen', (event, type) => {
     case 'maximize':
       win.maximize()
       break
+    case 'unmaximize':
+      win.unmaximize()
+      break
     case 'close':
       win.close()
-      break
-    case 'fullscreen':
-      // win.setFullScreen()
       break
     default:
       break

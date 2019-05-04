@@ -2,7 +2,10 @@
   <div class="header">
     <ul>
       <li class="minus" @click="handleScreen('minimize')"></li>
-      <li class="plus" @click="handleScreen('maximize')"></li>
+      <li @click="handleScreen('maximize')">
+        <svg-icon v-if="maximize" icon-class="unmaximize" />
+        <svg-icon v-else icon-class="maximize" />
+      </li>
       <li @click="handleScreen('close')">
         <svg-icon icon-class="close" />
       </li>
@@ -13,10 +16,20 @@
 <script>
 export default {
   name: 'Header',
+  data() {
+    return {
+      maximize: false
+    }
+  },
   methods: {
     // 处理窗口大小
     handleScreen(type) {
-      this.$ipcRenderer.send('toggle-screen', type)
+      let screenType = type
+      if (type === 'maximize') {
+        this.maximize = !this.maximize
+        screenType = this.maximize ? 'maximize' : 'unmaximize'
+      }
+      this.$ipcRenderer.send('toggle-screen', screenType)
     }
   }
 }
@@ -30,9 +43,9 @@ export default {
       width: 34px;
       height: 30px;
       line-height: 30px;
-      font-size: 10px;
+      font-size: 12px;
       text-align: center;
-      color: #aaa;
+      color: #888;
       cursor: pointer;
       &:hover {
         background-color: #ddd;
@@ -43,21 +56,10 @@ export default {
       &::after {
         content: '';
         display: inline-block;
-        width: 12px;
+        width: 13px;
         height: 1px;
-        background-color: #aaa;
+        background-color: #888;
         transform: scaleY(1.3);
-      }
-    }
-    .plus {
-      line-height: 32px;
-      &::after {
-        content: '';
-        display: inline-block;
-        width: 8px;
-        height: 8px;
-        border: 1px solid #aaa;
-        border-radius: 1px;
       }
     }
   }

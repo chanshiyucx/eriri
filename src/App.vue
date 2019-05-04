@@ -1,9 +1,9 @@
 <template>
   <div id="app">
     <Menu />
-    <div class="main">
+    <div class="container">
       <Header />
-      <router-view />
+      <router-view class="main" />
     </div>
   </div>
 </template>
@@ -51,8 +51,27 @@ export default {
   height: 100%;
   text-align: center;
   background-color: #fcfcfc;
+  .container {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+  }
   .main {
     width: 100%;
+    height: calc(100% - 30px);
+    overflow-y: auto;
+    &::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+      background-color: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      border-radius: 3px;
+      background-color: #ccc;
+    }
+    &::-webkit-scrollbar-track {
+      background-color: transparent;
+    }
   }
 }
 </style>

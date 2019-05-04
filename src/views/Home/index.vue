@@ -2,8 +2,12 @@
   <div id="home">
     <button @click="openFolder">选择文件夹</button>
     <ul class="comic-list">
-      <li v-for="item in comicData" :key="item.filename">
-        <img :src="item.coverData" alt />
+      <li
+        v-for="item in comicData"
+        :key="item.filename"
+        @click="gotoViwer(item)"
+      >
+        <img :src="item.coverPath" :alt="item.coverName" />
         <div>{{ item.filename }} - {{ item.imgCount }}</div>
       </li>
     </ul>
@@ -12,7 +16,6 @@
 
 <script>
 import { remote } from 'electron'
-import mimeType from 'mime-types'
 import path from 'path'
 import fs from 'fs'
 
@@ -47,7 +50,7 @@ export default {
     },
     // 加载文件数据
     loadData(key) {
-      this.$dataStore.get(key)
+      return this.$dataStore.get(key)
     },
     // 保存文件数据
     saveData(key, data) {
@@ -78,16 +81,12 @@ export default {
             const comicFiles = fs.readdirSync(filedir)
             const imgCount = comicFiles.length
             const oneComic = { filename, filedir, imgCount }
-            const ext = ['.jpg', '.jpeg', '.png']
+            const ext = ['.jpg', '.jpeg', '.png', '.gif']
             for (let comic of comicFiles) {
               if (ext.includes(path.extname(comic))) {
                 const coverPath = path.join(filedir, comic)
-                const data = fs.readFileSync(coverPath)
                 oneComic.coverPath = coverPath
-                const fileMimeType = mimeType.lookup(coverPath)
-                const prefix = `data:${fileMimeType};base64,`
-                const base64 = Buffer.from(data).toString('base64')
-                oneComic.coverData = `${prefix}${base64}`
+                oneComic.coverName = comic
                 break
               }
             }
@@ -97,6 +96,16 @@ export default {
           this.comicData = comicData
           this.saveData('comicData', comicData)
         })
+      })
+    },
+    // 进入预览
+    gotoViwer(item) {
+      this.$router.push({
+        path: 'comic',
+        query: {
+          filename: item.filename,
+          filedir: item.filedir
+        }
       })
     }
   }
