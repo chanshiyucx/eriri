@@ -3,7 +3,7 @@
     <Menu />
     <div class="container">
       <Header />
-      <router-view class="main" />
+      <router-view class="main scroll" />
     </div>
   </div>
 </template>
@@ -58,20 +58,6 @@ export default {
   }
   .main {
     width: 100%;
-    height: calc(100% - 30px);
-    overflow-y: auto;
-    &::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
-      background-color: transparent;
-    }
-    &::-webkit-scrollbar-thumb {
-      border-radius: 3px;
-      background-color: #ccc;
-    }
-    &::-webkit-scrollbar-track {
-      background-color: transparent;
-    }
   }
 }
 </style>

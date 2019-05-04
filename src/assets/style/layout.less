@@ -35,3 +35,18 @@ ol {
   opacity: 0;
   transform: translateY(30px);
 }
+
+.scroll {
+  &::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+    background-color: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    border-radius: 3px;
+    background-color: #ccc;
+  }
+  &::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+}

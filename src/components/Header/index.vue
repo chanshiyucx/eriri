@@ -36,7 +36,11 @@ export default {
 </script>
 <style lang="less" scoped>
 .header {
-  float: right;
+  position: fixed;
+  top: 0;
+  right: 5px;
+  background-color: #fcfcfc;
+  z-index: 100;
   ul {
     display: flex;
     li {
