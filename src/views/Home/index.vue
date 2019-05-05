@@ -18,6 +18,7 @@
 import { remote } from 'electron'
 import path from 'path'
 import fs from 'fs'
+import { isImg } from '@/utils'
 
 const { dialog } = remote
 
@@ -81,9 +82,8 @@ export default {
             const comicFiles = fs.readdirSync(filedir)
             const imgCount = comicFiles.length
             const oneComic = { filename, filedir, imgCount }
-            const ext = ['.jpg', '.jpeg', '.png', '.gif']
             for (let comic of comicFiles) {
-              if (ext.includes(path.extname(comic))) {
+              if (isImg(comic)) {
                 const coverPath = path.join(filedir, comic)
                 oneComic.coverPath = coverPath
                 oneComic.coverName = comic

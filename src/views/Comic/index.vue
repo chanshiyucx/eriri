@@ -54,6 +54,7 @@ import fs from 'fs'
 import VueSlider from 'vue-slider-component'
 import 'vue-slider-component/theme/antd.css'
 import Loading from '@/components/Loading'
+import { isImg } from '@/utils'
 
 export default {
   name: 'comic',
@@ -110,7 +111,8 @@ export default {
           this.loading = false
           return
         }
-        this.files = files.map(filename => {
+        // 筛选出图片文件
+        this.files = files.filter(isImg).map(filename => {
           const filepath = path.join(this.filedir, filename)
           return {
             filename,

@@ -62,10 +62,10 @@ export default {
     line-height: 30px;
     font-size: 14px;
     text-align: center;
-    color: #888;
+    color: #eee;
     cursor: pointer;
     &:hover {
-      background-color: #ddd;
+      background-color: #888;
     }
   }
   ul {
@@ -77,10 +77,10 @@ export default {
       line-height: 30px;
       font-size: 12px;
       text-align: center;
-      color: #888;
+      color: #eee;
       cursor: pointer;
       &:hover {
-        background-color: #ddd;
+        background-color: #888;
       }
     }
     .minus {
@@ -90,7 +90,7 @@ export default {
         display: inline-block;
         width: 13px;
         height: 1px;
-        background-color: #888;
+        background-color: #eee;
         transform: scaleY(1.3);
       }
     }

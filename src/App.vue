@@ -59,7 +59,7 @@ export default {
   width: 100%;
   height: 100%;
   text-align: center;
-  background-color: #fcfcfc;
+  background-color: #444;
   .container {
     width: 100%;
     height: 100%;

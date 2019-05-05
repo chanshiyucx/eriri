@@ -9,9 +9,6 @@
     <router-link to="/about">
       <svg-icon icon-class="star" />
     </router-link>
-    <router-link to="/setting">
-      <svg-icon icon-class="setting" />
-    </router-link>
   </div>
 </template>
 
@@ -24,7 +21,7 @@ export default {
 #menu {
   width: 50px;
   height: 100%;
-  background-color: #b980ae;
+  background-color: #222;
   .logo {
     width: 50px;
     height: 50px;
