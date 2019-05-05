@@ -40,7 +40,7 @@ export default {
     font-size: 18px;
     color: #fff;
     &.router-link-exact-active {
-      background-color: #f2c047;
+      background-color: #b980ae;
     }
   }
 }

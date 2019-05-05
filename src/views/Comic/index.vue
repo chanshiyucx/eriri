@@ -20,22 +20,21 @@
       <div class="option-mask" @click="option = false"></div>
       <div class="footer">
         <div class="slider">
+          <span>{{ inx }}/{{ files.length }}</span>
           <span>0</span>
           <VueSlider
             class="vue-slider"
             v-model="inx"
-            :min="0"
-            :max="Math.max(files.length - 1, 0)"
+            :min="1"
+            :max="Math.max(files.length, 0)"
             :dotOptions="dotOptions"
-            :processStyle="{ backgroundColor: '#b980ae' }"
+            :processStyle="{ backgroundColor: '#eee' }"
           />
-          <span>{{ files.length - 1 }}</span>
+          <span>{{ files.length }}</span>
         </div>
         <ul class="menu">
           <li @click="switchAdapt">
-            <svg-icon
-              :icon-class="adapt === 'height' ? 'columnExpand' : 'rowExpand'"
-            />
+            <svg-icon :icon-class="adapt === 'height' ? 'columnExpand' : 'rowExpand'" />
             {{ adapt === 'height' ? '适应高度' : '适应宽度' }}
           </li>
           <li @click="switchPage">
@@ -67,20 +66,16 @@ export default {
       filedir: '',
       files: [],
       pageFile: [],
-      inx: 0, // 当前索引
+      inx: 1, // 当前索引
       page: 1, // 单页或者双页模式
       adapt: 'height', // 适应高度or宽度
-      viewer: null
-    }
-  },
-  computed: {
-    dotOptions() {
-      return {
+      viewer: null,
+      dotOptions: {
         style: {
-          borderColor: '#b980ae'
+          borderColor: '#df9dea'
         },
         focusStyle: {
-          boxShadow: '0 0 0 5px rgba(185, 128, 174, .4)'
+          boxShadow: '0 0 0 5px rgba(255, 255, 255, .6)'
         },
         tooltipStyle: {
           color: '#b980ae',
@@ -91,39 +86,57 @@ export default {
     }
   },
   watch: {
-    inx(val) {
-      this.setPageFile(val)
+    inx() {
+      this.setPageFile()
+    }
+  },
+  beforeDestroy() {
+    // 保存进度
+    const comicData = this.$dataStore.get('comicData') || ''
+    if (comicData) {
+      const comic = comicData.find(o => o.filename === this.filename)
+      comic.progress = this.inx
+      console.log(comic)
+      this.$dataStore.set('comicData', comicData)
     }
   },
   mounted() {
-    const { filename, filedir } = this.$route.query
+    const { filename, filedir, progress } = this.$route.query
     this.filename = filename
     this.filedir = filedir
     this.viewer = document.querySelector('.viewer')
-    this.loadComic()
+    this.loadComic().then(() => {
+      this.$nextTick(() => {
+        this.inx = progress || 1
+        this.setPageFile()
+      })
+    })
   },
   methods: {
     // 加载资源
     loadComic() {
-      this.loading = true
-      fs.readdir(this.filedir, (err, files) => {
-        if (err) {
-          this.loading = false
-          return
-        }
-        // 筛选出图片文件
-        this.files = files.filter(isImg).map(filename => {
-          const filepath = path.join(this.filedir, filename)
-          return {
-            filename,
-            filepath
+      return new Promise(resolve => {
+        this.loading = true
+        fs.readdir(this.filedir, (err, files) => {
+          if (err) {
+            this.loading = false
+            return
           }
+          // 筛选出图片文件
+          this.files = files.filter(isImg).map(filename => {
+            const filepath = path.join(this.filedir, filename)
+            return {
+              filename,
+              filepath
+            }
+          })
+          this.loading = false
+          resolve()
         })
-        this.setPageFile(0)
-        this.loading = false
       })
     },
-    setPageFile(val) {
+    setPageFile() {
+      const val = this.inx - 1
       const pageFile = this.files.slice(val, val + this.page)
       // 在双页且适应高度时计算比例，如果有一张宽度超出则只显示一张
       if (this.page === 2 && pageFile.length === 2) {
@@ -154,11 +167,11 @@ export default {
       const viewWidth = this.viewer.clientWidth
       const radio = clientX / viewWidth
       if (radio < 0.33) {
-        this.inx = Math.max(0, this.inx - this.page)
+        this.inx = Math.max(1, this.inx - this.page)
       } else if (radio < 0.66) {
         this.option = true
       } else {
-        this.inx = Math.min(this.files.length - 1, this.inx + this.page)
+        this.inx = Math.min(this.files.length, this.inx + this.page)
       }
     },
     // 切换模式
@@ -168,7 +181,7 @@ export default {
     // 切换单/双页模式
     switchPage() {
       this.page = this.page === 1 ? 2 : 1
-      this.setPageFile(this.inx)
+      this.setPageFile()
     }
   }
 }
@@ -232,7 +245,7 @@ export default {
       width: 100%;
       height: 50px;
       color: #fff;
-      background-color: #f2c047;
+      background-color: #b980ae;
       .slider {
         height: 50px;
         flex: 1;
@@ -241,7 +254,7 @@ export default {
         align-items: center;
         > span {
           display: inline-block;
-          width: 40px;
+          width: 32px;
         }
         .vue-slider {
           flex: 1;

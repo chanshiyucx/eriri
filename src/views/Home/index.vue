@@ -2,13 +2,14 @@
   <div id="home">
     <button @click="openFolder">选择文件夹</button>
     <ul class="comic-list">
-      <li
-        v-for="item in comicData"
-        :key="item.filename"
-        @click="gotoViwer(item)"
-      >
+      <li v-for="item in comicData" :key="item.filename" @click="gotoViwer(item)">
         <img :src="item.coverPath" :alt="item.coverName" />
-        <div>{{ item.filename }} - {{ item.imgCount }}</div>
+        <div class="info">
+          <h3>{{ item.filename }}</h3>
+          <div class="meta">
+            {{ item.progress >= 0 ? `${item.progress + 1}/${item.imgCount}` : '未读' }}
+          </div>
+        </div>
       </li>
     </ul>
   </div>
@@ -45,17 +46,8 @@ export default {
   methods: {
     // 初始化
     init() {
-      this.comicData = this.loadData('comicData') || ''
-      this.selectFolder =
-        this.loadData('selectFolder') || remote.app.getPath('userData')
-    },
-    // 加载文件数据
-    loadData(key) {
-      return this.$dataStore.get(key)
-    },
-    // 保存文件数据
-    saveData(key, data) {
-      this.$dataStore.set(key, data)
+      this.comicData = this.$dataStore.get('comicData') || ''
+      this.selectFolder = this.$dataStore.get('selectFolder') || remote.app.getPath('userData')
     },
     // 打开目录
     openFolder() {
@@ -66,7 +58,7 @@ export default {
         const filePath = dir[0]
         // 保存上次选择的文件夹
         this.selectFolder = filePath
-        this.saveData('selectFolder', filePath)
+        this.$dataStore.set('selectFolder', filePath)
         // 读取选中的目录
         fs.readdir(filePath, (err, files) => {
           if (err) {
@@ -90,11 +82,13 @@ export default {
                 break
               }
             }
+            // 如果没有图片，则排除该文件夹
+            if (!oneComic.coverPath) return
             comicData.push(oneComic)
           })
           this.loading = false
           this.comicData = comicData
-          this.saveData('comicData', comicData)
+          this.$dataStore.set('comicData', comicData)
         })
       })
     },
@@ -104,7 +98,8 @@ export default {
         path: 'comic',
         query: {
           filename: item.filename,
-          filedir: item.filedir
+          filedir: item.filedir,
+          progress: item.progress
         }
       })
     }
@@ -113,24 +108,53 @@ export default {
 </script>
 <style lang="less" scoped>
 #home {
+  button {
+    float: left;
+    margin-top: 30px;
+  }
   .comic-list {
     display: flex;
     flex-wrap: wrap;
     padding: 10px 10px 0;
     li {
-      margin: 5px;
-      padding: 4px;
+      margin: 2px;
+      padding: 6px;
       cursor: pointer;
-      box-shadow: 0 2px 8px #ccc;
-      transition: box-shadow 0.25s ease-in-out;
+      border: 2px solid #444;
+      transition: border 0.25s ease-in-out;
       &:hover {
-        box-shadow: 0 2px 10px #b980ae;
+        border: 2px solid #666;
       }
     }
     img {
-      width: 140px;
+      width: 150px;
       height: 220px;
       object-fit: cover;
+    }
+    .info {
+      margin-top: 5px;
+      width: 150px;
+      text-align: left;
+      color: #eee;
+
+      h3 {
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        font-weight: normal;
+        line-height: 1.2;
+        font-size: 14px;
+        word-break: break-word;
+      }
+      .meta {
+        margin-top: 4px;
+        color: #aaa;
+        font-size: 14px;
+        line-height: 1.6;
+      }
     }
   }
 }
