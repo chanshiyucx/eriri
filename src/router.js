@@ -16,6 +16,11 @@ export default new Router({
       path: '/comic',
       name: 'comic',
       component: () => import('./views/Comic/index.vue')
+    },
+    {
+      path: '/list',
+      name: 'list',
+      component: () => import('./views/List/index.vue')
     }
   ]
 })

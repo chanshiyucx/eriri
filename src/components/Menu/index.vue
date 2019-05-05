@@ -6,7 +6,7 @@
     <router-link to="/">
       <svg-icon icon-class="home" />
     </router-link>
-    <router-link to="/about">
+    <router-link to="/list">
       <svg-icon icon-class="star" />
     </router-link>
   </div>

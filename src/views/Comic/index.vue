@@ -1,13 +1,14 @@
 <template>
   <div id="comic">
     <Loading v-show="loading" />
-    <ul class="viewer" @click="handleClick">
+    <ul
+      :class="['viewer', pageFile.length === 2 && adapt === 'height' && 'center']"
+      @click="handleClick"
+    >
       <li
         v-for="item in pageFile"
         :key="item.filename"
-        :style="{
-          width: pageFile.length === 1 ? '100%' : '50%'
-        }"
+        :style="{ width: pageFile.length === 1 ? '100%' : '50%' }"
       >
         <img
           :class="adapt === 'height' ? 'adapt-height' : 'adapt-width'"
@@ -21,12 +22,12 @@
       <div class="footer">
         <div class="slider">
           <span>{{ inx }}/{{ files.length }}</span>
-          <span>0</span>
+          <span>1</span>
           <VueSlider
             class="vue-slider"
             v-model="inx"
             :min="1"
-            :max="Math.max(files.length, 0)"
+            :max="Math.max(files.length, 1)"
             :dotOptions="dotOptions"
             :processStyle="{ backgroundColor: '#eee' }"
           />
@@ -96,18 +97,17 @@ export default {
     if (comicData) {
       const comic = comicData.find(o => o.filename === this.filename)
       comic.progress = this.inx
-      console.log(comic)
       this.$dataStore.set('comicData', comicData)
     }
   },
   mounted() {
-    const { filename, filedir, progress } = this.$route.query
+    const { filename, filedir, progress = 1 } = this.$route.query
     this.filename = filename
     this.filedir = filedir
     this.viewer = document.querySelector('.viewer')
     this.loadComic().then(() => {
       this.$nextTick(() => {
-        this.inx = progress || 1
+        this.inx = progress
         this.setPageFile()
       })
     })
@@ -210,6 +210,14 @@ export default {
         height: 100%;
         object-fit: contain;
       }
+    }
+  }
+  .center {
+    li:first-child img {
+      float: right;
+    }
+    li:last-child img {
+      float: left;
     }
   }
   .mask {
