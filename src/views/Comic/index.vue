@@ -112,7 +112,6 @@ export default {
     this.loadComic().then(() => {
       this.$nextTick(() => {
         this.inx = progress
-        console.log('filename', filename, filedir, this.inx)
         this.setPageFile()
       })
     })
@@ -141,7 +140,6 @@ export default {
       })
     },
     setPageFile() {
-      console.log('this.inx', this.inx)
       const val = this.inx - 1
       const pageFile = this.files.slice(val, val + this.page)
 
