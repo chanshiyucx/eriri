@@ -9,7 +9,6 @@ import dataStore from './utils/dataStore'
 import './assets/style/layout.less'
 import './assets/icons'
 
-console.log('dataStore', dataStore)
 Vue.config.productionTip = false
 Vue.prototype.$dataStore = dataStore
 Vue.prototype.$ipcRenderer = ipcRenderer

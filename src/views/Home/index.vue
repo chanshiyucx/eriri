@@ -1,5 +1,10 @@
 <template>
   <div id="home">
+    <Loading v-show="loading" />
+    <div v-if="!comicList.length" class="open-folder" @click="openFolder">
+      <svg-icon icon-class="folders" />
+      <span>添加本地文件夹</span>
+    </div>
     <ul class="comic-list">
       <li v-for="item in comicList" :key="item.filename" @click="gotoViwer(item)">
         <img :src="item.coverPath" :alt="item.coverName" />
@@ -13,27 +18,29 @@
 </template>
 
 <script>
+import Loading from '@/components/Loading'
+import mixin from '@/mixins/index.js'
+
 export default {
   name: 'home',
+  components: { Loading },
+  mixins: [mixin],
   data() {
     return {
-      loading: false,
-      list: [], // 所有目录列表
-      curInx: 0, // 当前的目录索引
       comicList: []
     }
   },
+  watch: {
+    list() {
+      this.loadAssets()
+    }
+  },
   mounted() {
-    this.init()
+    this.loadAssets()
   },
   methods: {
     // 初始化
-    init() {
-      // 目录列表
-      this.list = this.$dataStore.get('list') || []
-      // 当前的目录索引
-      this.curInx = this.$dataStore.get('curInx') || 0
-      // 当前的漫画列表
+    loadAssets() {
       this.comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
     },
     // 进入预览
@@ -52,6 +59,26 @@ export default {
 </script>
 <style lang="less" scoped>
 #home {
+  .open-folder {
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin: 100px auto 50px;
+    width: 180px;
+    height: 120px;
+    border-radius: 3px;
+    color: #eee;
+    text-align: center;
+    letter-spacing: 1px;
+    box-shadow: 0 3px 10px #333;
+    background-color: #b980ae;
+    svg {
+      margin-bottom: 10px;
+      font-size: 42px;
+    }
+  }
   .comic-list {
     display: flex;
     flex-wrap: wrap;
