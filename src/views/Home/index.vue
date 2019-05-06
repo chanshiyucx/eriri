@@ -1,102 +1,47 @@
 <template>
   <div id="home">
-    <button @click="openFolder">选择文件夹</button>
+    <Loading v-show="loading" />
+    <div v-if="!comicList.length" class="open-folder" @click="openFolder">
+      <svg-icon icon-class="folders" />
+      <span>添加本地文件夹</span>
+    </div>
     <ul class="comic-list">
-      <li
-        v-for="item in comicData"
-        :key="item.filename"
-        @click="gotoViwer(item)"
-      >
+      <li v-for="item in comicList" :key="item.filename" @click="gotoViwer(item)">
         <img :src="item.coverPath" :alt="item.coverName" />
-        <div>{{ item.filename }} - {{ item.imgCount }}</div>
+        <div class="info">
+          <h3>{{ item.filename }}</h3>
+          <div class="meta">{{ item.progress ? `${item.progress}/${item.imgCount}` : '未读' }}</div>
+        </div>
       </li>
     </ul>
   </div>
 </template>
 
 <script>
-import { remote } from 'electron'
-import path from 'path'
-import fs from 'fs'
-
-const { dialog } = remote
-
-// 打开文件夹
-const options = {
-  title: '选择文件夹',
-  defaultPath: remote.app.getPath('userData'),
-  buttonLabel: '打开',
-  properties: ['openDirectory']
-}
+import Loading from '@/components/Loading'
+import mixin from '@/mixins/index.js'
 
 export default {
   name: 'home',
+  components: { Loading },
+  mixins: [mixin],
   data() {
     return {
-      loading: false,
-      selectFolder: '',
-      comicData: []
+      comicList: []
+    }
+  },
+  watch: {
+    list() {
+      this.loadAssets()
     }
   },
   mounted() {
-    this.init()
+    this.loadAssets()
   },
   methods: {
     // 初始化
-    init() {
-      this.comicData = this.loadData('comicData') || ''
-      this.selectFolder =
-        this.loadData('selectFolder') || remote.app.getPath('userData')
-    },
-    // 加载文件数据
-    loadData(key) {
-      return this.$dataStore.get(key)
-    },
-    // 保存文件数据
-    saveData(key, data) {
-      this.$dataStore.set(key, data)
-    },
-    // 打开目录
-    openFolder() {
-      options.defaultPath = this.selectFolder
-      dialog.showOpenDialog(options, dir => {
-        this.loading = true
-        const comicData = []
-        const filePath = dir[0]
-        // 保存上次选择的文件夹
-        this.selectFolder = filePath
-        this.saveData('selectFolder', filePath)
-        // 读取选中的目录
-        fs.readdir(filePath, (err, files) => {
-          if (err) {
-            this.loading = false
-            return
-          }
-          // 遍历目录下的文件列表
-          files.forEach(filename => {
-            const filedir = path.join(filePath, filename)
-            const stat = fs.statSync(filedir)
-            if (!stat.isDirectory()) return
-            // 如果是文件夹，则读取第一张图片作为封面
-            const comicFiles = fs.readdirSync(filedir)
-            const imgCount = comicFiles.length
-            const oneComic = { filename, filedir, imgCount }
-            const ext = ['.jpg', '.jpeg', '.png', '.gif']
-            for (let comic of comicFiles) {
-              if (ext.includes(path.extname(comic))) {
-                const coverPath = path.join(filedir, comic)
-                oneComic.coverPath = coverPath
-                oneComic.coverName = comic
-                break
-              }
-            }
-            comicData.push(oneComic)
-          })
-          this.loading = false
-          this.comicData = comicData
-          this.saveData('comicData', comicData)
-        })
-      })
+    loadAssets() {
+      this.comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
     },
     // 进入预览
     gotoViwer(item) {
@@ -104,7 +49,8 @@ export default {
         path: 'comic',
         query: {
           filename: item.filename,
-          filedir: item.filedir
+          filedir: item.filedir,
+          progress: item.progress
         }
       })
     }
@@ -113,29 +59,70 @@ export default {
 </script>
 <style lang="less" scoped>
 #home {
-  button {
-    margin-top: 30px;
-    margin-left: 10px;
-    float: left;
+  .open-folder {
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    margin: 100px auto 50px;
+    width: 180px;
+    height: 120px;
+    border-radius: 3px;
+    color: #eee;
+    text-align: center;
+    letter-spacing: 1px;
+    box-shadow: 0 3px 10px #333;
+    background-color: #b980ae;
+    svg {
+      margin-bottom: 10px;
+      font-size: 42px;
+    }
   }
   .comic-list {
     display: flex;
     flex-wrap: wrap;
+    margin: 0 40px;
     padding: 10px 10px 0;
     li {
-      margin: 5px;
-      padding: 4px;
+      margin: 2px;
+      padding: 6px;
       cursor: pointer;
-      box-shadow: 0 2px 8px #ccc;
-      transition: box-shadow 0.25s ease-in-out;
+      border: 2px solid #444;
+      transition: border 0.25s ease-in-out;
       &:hover {
-        box-shadow: 0 2px 10px #b980ae;
+        border: 2px solid #666;
       }
     }
     img {
-      width: 140px;
+      width: 150px;
       height: 220px;
       object-fit: cover;
+    }
+    .info {
+      margin-top: 5px;
+      width: 150px;
+      text-align: left;
+      color: #eee;
+
+      h3 {
+        width: 100%;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        font-weight: normal;
+        line-height: 1.2;
+        font-size: 14px;
+        word-break: break-word;
+      }
+      .meta {
+        margin-top: 4px;
+        color: #aaa;
+        font-size: 14px;
+        line-height: 1.6;
+      }
     }
   }
 }

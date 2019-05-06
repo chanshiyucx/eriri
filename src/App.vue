@@ -1,9 +1,9 @@
 <template>
   <div id="app">
     <Menu v-show="!hideMenu" />
-    <div class="container">
+    <div class="container scroll">
       <Header :hideMenu="hideMenu" />
-      <router-view class="main scroll" />
+      <router-view class="main" />
     </div>
   </div>
 </template>
@@ -59,14 +59,15 @@ export default {
   width: 100%;
   height: 100%;
   text-align: center;
-  background-color: #fcfcfc;
+  background-color: #444;
   .container {
     width: 100%;
     height: 100%;
-    overflow: hidden;
+    overflow-y: auto;
   }
   .main {
     width: 100%;
+    background-color: #444;
   }
 }
 </style>

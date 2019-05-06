@@ -1,13 +1,14 @@
 <template>
   <div id="comic">
     <Loading v-show="loading" />
-    <ul class="viewer" @click="handleClick">
+    <ul
+      :class="['viewer', 'scroll', pageFile.length === 2 && adapt === 'height' && 'center']"
+      @click="handleClick"
+    >
       <li
         v-for="item in pageFile"
         :key="item.filename"
-        :style="{
-          width: pageFile.length === 1 ? '100%' : '50%'
-        }"
+        :style="{ width: pageFile.length === 1 ? '100%' : '50%' }"
       >
         <img
           :class="adapt === 'height' ? 'adapt-height' : 'adapt-width'"
@@ -20,22 +21,21 @@
       <div class="option-mask" @click="option = false"></div>
       <div class="footer">
         <div class="slider">
-          <span>0</span>
+          <span class="progress">{{ inx }}/{{ files.length }}</span>
+          <span>1</span>
           <VueSlider
             class="vue-slider"
             v-model="inx"
-            :min="0"
-            :max="Math.max(files.length - 1, 0)"
+            :min="1"
+            :max="Math.max(files.length, 1)"
             :dotOptions="dotOptions"
-            :processStyle="{ backgroundColor: '#b980ae' }"
+            :processStyle="{ backgroundColor: '#eee' }"
           />
-          <span>{{ files.length - 1 }}</span>
+          <span>{{ files.length }}</span>
         </div>
         <ul class="menu">
           <li @click="switchAdapt">
-            <svg-icon
-              :icon-class="adapt === 'height' ? 'columnExpand' : 'rowExpand'"
-            />
+            <svg-icon :icon-class="adapt === 'height' ? 'columnExpand' : 'rowExpand'" />
             {{ adapt === 'height' ? '适应高度' : '适应宽度' }}
           </li>
           <li @click="switchPage">
@@ -54,6 +54,7 @@ import fs from 'fs'
 import VueSlider from 'vue-slider-component'
 import 'vue-slider-component/theme/antd.css'
 import Loading from '@/components/Loading'
+import { isImg } from '@/utils'
 
 export default {
   name: 'comic',
@@ -66,20 +67,16 @@ export default {
       filedir: '',
       files: [],
       pageFile: [],
-      inx: 0, // 当前索引
+      inx: 1, // 当前索引
       page: 1, // 单页或者双页模式
       adapt: 'height', // 适应高度or宽度
-      viewer: null
-    }
-  },
-  computed: {
-    dotOptions() {
-      return {
+      viewer: null,
+      dotOptions: {
         style: {
-          borderColor: '#b980ae'
+          borderColor: '#df9dea'
         },
         focusStyle: {
-          boxShadow: '0 0 0 5px rgba(185, 128, 174, .4)'
+          boxShadow: '0 0 0 5px rgba(255, 255, 255, .6)'
         },
         tooltipStyle: {
           color: '#b980ae',
@@ -90,39 +87,62 @@ export default {
     }
   },
   watch: {
-    inx(val) {
-      this.setPageFile(val)
+    inx() {
+      this.setPageFile()
+    }
+  },
+  beforeDestroy() {
+    const list = this.$dataStore.get('list') || []
+    const curInx = this.$dataStore.get('curInx') || 0
+    const comicList = list[curInx] ? list[curInx].comicList : []
+    const comic = comicList.find(o => o.filename === this.filename)
+    if (comic) {
+      comic.progress = this.inx
+      this.$dataStore.set('list', list)
     }
   },
   mounted() {
-    const { filename, filedir } = this.$route.query
+    this.adapt = this.$dataStore.get('adapt') || 'height'
+    this.page = this.$dataStore.get('page') || 1
+
+    const { filename, filedir, progress = 1 } = this.$route.query
     this.filename = filename
     this.filedir = filedir
     this.viewer = document.querySelector('.viewer')
-    this.loadComic()
+    this.loadComic().then(() => {
+      this.$nextTick(() => {
+        this.inx = progress
+        this.setPageFile()
+      })
+    })
   },
   methods: {
     // 加载资源
     loadComic() {
-      this.loading = true
-      fs.readdir(this.filedir, (err, files) => {
-        if (err) {
-          this.loading = false
-          return
-        }
-        this.files = files.map(filename => {
-          const filepath = path.join(this.filedir, filename)
-          return {
-            filename,
-            filepath
+      return new Promise(resolve => {
+        this.loading = true
+        fs.readdir(this.filedir, (err, files) => {
+          if (err) {
+            this.loading = false
+            return
           }
+          // 筛选出图片文件
+          this.files = files.filter(isImg).map(filename => {
+            const filepath = path.join(this.filedir, filename)
+            return {
+              filename,
+              filepath
+            }
+          })
+          this.loading = false
+          resolve()
         })
-        this.setPageFile(0)
-        this.loading = false
       })
     },
-    setPageFile(val) {
+    setPageFile() {
+      const val = this.inx - 1
       const pageFile = this.files.slice(val, val + this.page)
+
       // 在双页且适应高度时计算比例，如果有一张宽度超出则只显示一张
       if (this.page === 2 && pageFile.length === 2) {
         const seq = pageFile.map(o => {
@@ -152,21 +172,23 @@ export default {
       const viewWidth = this.viewer.clientWidth
       const radio = clientX / viewWidth
       if (radio < 0.33) {
-        this.inx = Math.max(0, this.inx - this.page)
+        this.inx = Math.max(1, this.inx - this.pageFile.length)
       } else if (radio < 0.66) {
         this.option = true
       } else {
-        this.inx = Math.min(this.files.length - 1, this.inx + this.page)
+        this.inx = Math.min(this.files.length, this.inx + this.pageFile.length)
       }
     },
     // 切换模式
     switchAdapt() {
       this.adapt = this.adapt === 'height' ? 'width' : 'height'
+      this.$dataStore.set('adapt', this.adapt)
     },
     // 切换单/双页模式
     switchPage() {
       this.page = this.page === 1 ? 2 : 1
-      this.setPageFile(this.inx)
+      this.setPageFile()
+      this.$dataStore.set('page', this.page)
     }
   }
 }
@@ -175,7 +197,6 @@ export default {
 #comic {
   position: relative;
   height: 100%;
-  overflow-y: auto;
   .viewer {
     display: flex;
     justify-content: space-around;
@@ -195,6 +216,14 @@ export default {
         height: 100%;
         object-fit: contain;
       }
+    }
+  }
+  .center {
+    li:first-child img {
+      float: right;
+    }
+    li:last-child img {
+      float: left;
     }
   }
   .mask {
@@ -230,8 +259,9 @@ export default {
       width: 100%;
       height: 50px;
       color: #fff;
-      background-color: #f2c047;
+      background-color: #b980ae;
       .slider {
+        margin-right: 10px;
         height: 50px;
         flex: 1;
         display: flex;
@@ -239,9 +269,13 @@ export default {
         align-items: center;
         > span {
           display: inline-block;
-          width: 40px;
+        }
+        .progress {
+          width: 80px;
+          text-align: left;
         }
         .vue-slider {
+          margin: 0 5px;
           flex: 1;
         }
       }

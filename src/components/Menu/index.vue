@@ -6,11 +6,8 @@
     <router-link to="/">
       <svg-icon icon-class="home" />
     </router-link>
-    <router-link to="/about">
+    <router-link to="/list">
       <svg-icon icon-class="star" />
-    </router-link>
-    <router-link to="/setting">
-      <svg-icon icon-class="setting" />
     </router-link>
   </div>
 </template>
@@ -24,15 +21,15 @@ export default {
 #menu {
   width: 50px;
   height: 100%;
-  background-color: #b980ae;
+  background-color: #222;
   .logo {
     width: 50px;
     height: 50px;
     text-align: center;
     img {
-      margin-top: 14px;
-      width: 22px;
-      height: 22px;
+      margin-top: 10px;
+      width: 30px;
+      height: 30px;
     }
   }
   a {
@@ -43,7 +40,7 @@ export default {
     font-size: 18px;
     color: #fff;
     &.router-link-exact-active {
-      background-color: #f2c047;
+      background-color: #b980ae;
     }
   }
 }
