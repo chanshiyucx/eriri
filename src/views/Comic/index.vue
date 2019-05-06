@@ -2,7 +2,7 @@
   <div id="comic">
     <Loading v-show="loading" />
     <ul
-      :class="['viewer', pageFile.length === 2 && adapt === 'height' && 'center']"
+      :class="['viewer', 'scroll', pageFile.length === 2 && adapt === 'height' && 'center']"
       @click="handleClick"
     >
       <li
@@ -92,15 +92,19 @@ export default {
     }
   },
   beforeDestroy() {
-    // 保存进度
-    const comicData = this.$dataStore.get('comicData') || ''
-    if (comicData) {
-      const comic = comicData.find(o => o.filename === this.filename)
+    const list = this.$dataStore.get('list') || []
+    const curInx = this.$dataStore.get('curInx') || 0
+    const comicList = list[curInx] ? list[curInx].comicList : []
+    const comic = comicList.find(o => o.filename === this.filename)
+    if (comic) {
       comic.progress = this.inx
-      this.$dataStore.set('comicData', comicData)
+      this.$dataStore.set('list', list)
     }
   },
   mounted() {
+    this.adapt = this.$dataStore.get('adapt') || 'height'
+    this.page = this.$dataStore.get('page') || 1
+
     const { filename, filedir, progress = 1 } = this.$route.query
     this.filename = filename
     this.filedir = filedir
@@ -108,6 +112,7 @@ export default {
     this.loadComic().then(() => {
       this.$nextTick(() => {
         this.inx = progress
+        console.log('filename', filename, filedir, this.inx)
         this.setPageFile()
       })
     })
@@ -136,8 +141,10 @@ export default {
       })
     },
     setPageFile() {
+      console.log('this.inx', this.inx)
       const val = this.inx - 1
       const pageFile = this.files.slice(val, val + this.page)
+
       // 在双页且适应高度时计算比例，如果有一张宽度超出则只显示一张
       if (this.page === 2 && pageFile.length === 2) {
         const seq = pageFile.map(o => {
@@ -167,21 +174,23 @@ export default {
       const viewWidth = this.viewer.clientWidth
       const radio = clientX / viewWidth
       if (radio < 0.33) {
-        this.inx = Math.max(1, this.inx - this.page)
+        this.inx = Math.max(1, this.inx - this.pageFile.length)
       } else if (radio < 0.66) {
         this.option = true
       } else {
-        this.inx = Math.min(this.files.length, this.inx + this.page)
+        this.inx = Math.min(this.files.length, this.inx + this.pageFile.length)
       }
     },
     // 切换模式
     switchAdapt() {
       this.adapt = this.adapt === 'height' ? 'width' : 'height'
+      this.$dataStore.set('adapt', this.adapt)
     },
     // 切换单/双页模式
     switchPage() {
       this.page = this.page === 1 ? 2 : 1
       this.setPageFile()
+      this.$dataStore.set('page', this.page)
     }
   }
 }
@@ -190,7 +199,6 @@ export default {
 #comic {
   position: relative;
   height: 100%;
-  overflow-y: auto;
   .viewer {
     display: flex;
     justify-content: space-around;

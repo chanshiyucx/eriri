@@ -1,7 +1,7 @@
 <template>
   <div id="home">
     <ul class="comic-list">
-      <li v-for="item in comicData" :key="item.filename" @click="gotoViwer(item)">
+      <li v-for="item in comicList" :key="item.filename" @click="gotoViwer(item)">
         <img :src="item.coverPath" :alt="item.coverName" />
         <div class="info">
           <h3>{{ item.filename }}</h3>
@@ -13,16 +13,14 @@
 </template>
 
 <script>
-import path from 'path'
-import fs from 'fs'
-
 export default {
   name: 'home',
   data() {
     return {
       loading: false,
-      dir: '',
-      comicData: []
+      list: [], // 所有目录列表
+      curInx: 0, // 当前的目录索引
+      comicList: []
     }
   },
   mounted() {
@@ -31,47 +29,12 @@ export default {
   methods: {
     // 初始化
     init() {
-      this.comicData = this.$dataStore.get('comicData') || ''
-    },
-    // 打开目录
-    openFolder() {
-      this.loading = true
-      const comicData = []
-      const filePath = this.dir
-      // 保存上次选择的文件夹
-      this.selectFolder = filePath
-      this.$dataStore.set('selectFolder', filePath)
-      // 读取选中的目录
-      fs.readdir(filePath, (err, files) => {
-        if (err) {
-          this.loading = false
-          return
-        }
-        // 遍历目录下的文件列表
-        files.forEach(filename => {
-          const filedir = path.join(filePath, filename)
-          const stat = fs.statSync(filedir)
-          if (!stat.isDirectory()) return
-          // 如果是文件夹，则读取第一张图片作为封面
-          const comicFiles = fs.readdirSync(filedir)
-          const imgCount = comicFiles.length
-          const oneComic = { filename, filedir, imgCount }
-          for (let comic of comicFiles) {
-            if (isImg(comic)) {
-              const coverPath = path.join(filedir, comic)
-              oneComic.coverPath = coverPath
-              oneComic.coverName = comic
-              break
-            }
-          }
-          // 如果没有图片，则排除该文件夹
-          if (!oneComic.coverPath) return
-          comicData.push(oneComic)
-        })
-        this.loading = false
-        this.comicData = comicData
-        this.$dataStore.set('comicData', comicData)
-      })
+      // 目录列表
+      this.list = this.$dataStore.get('list') || []
+      // 当前的目录索引
+      this.curInx = this.$dataStore.get('curInx') || 0
+      // 当前的漫画列表
+      this.comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
     },
     // 进入预览
     gotoViwer(item) {
@@ -92,6 +55,7 @@ export default {
   .comic-list {
     display: flex;
     flex-wrap: wrap;
+    margin: 0 40px;
     padding: 10px 10px 0;
     li {
       margin: 2px;
