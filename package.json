@@ -15,7 +15,6 @@
   },
   "main": "background.js",
   "dependencies": {
-    "core-js": "^2.6.5",
     "vue": "^2.6.10",
     "vue-router": "^3.0.3",
     "vue-slider-component": "^3.0.31"

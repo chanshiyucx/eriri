@@ -29,7 +29,7 @@ export default {
     return {
       comicList: [],
       timerId: '',
-      container: document.querySelector('.container')
+      container: ''
     }
   },
   watch: {
@@ -40,14 +40,12 @@ export default {
   mounted() {
     this.loadAssets()
 
-    this.container.addEventListener('scroll', this.justifyPos, false)
+    this.container = document.querySelector('#home')
     this.$nextTick(() => {
       const scrollTop = this.$dataStore.get('scrollTop')
       this.container.scrollTop = scrollTop || 0
+      this.container.onscroll = this.justifyPos
     })
-  },
-  beforeDestroy() {
-    this.container.removeEventListener('scroll', this.justifyPos)
   },
   methods: {
     justifyPos() {
