@@ -1,8 +1,7 @@
-import Vue from 'vue'
 import { ipcRenderer } from 'electron'
+import Vue from 'vue'
 import App from './App.vue'
 import router from './router'
-import store from './store'
 import dataStore from './utils/dataStore'
 
 // 全局样式与字体图标
@@ -15,6 +14,5 @@ Vue.prototype.$ipcRenderer = ipcRenderer
 
 new Vue({
   router,
-  store,
   render: h => h(App)
 }).$mount('#app')

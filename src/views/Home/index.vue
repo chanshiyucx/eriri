@@ -27,7 +27,9 @@ export default {
   mixins: [mixin],
   data() {
     return {
-      comicList: []
+      comicList: [],
+      timerId: '',
+      container: document.querySelector('.container')
     }
   },
   watch: {
@@ -37,8 +39,25 @@ export default {
   },
   mounted() {
     this.loadAssets()
+
+    this.container.addEventListener('scroll', this.justifyPos, false)
+    this.$nextTick(() => {
+      const scrollTop = this.$dataStore.get('scrollTop')
+      this.container.scrollTop = scrollTop || 0
+    })
+  },
+  beforeDestroy() {
+    this.container.removeEventListener('scroll', this.justifyPos)
   },
   methods: {
+    justifyPos() {
+      if (this.timerId) clearTimeout(this.timerId)
+      this.timerId = setTimeout(() => {
+        // 获取页面滚动距离之后设置给当前路由的元信息
+        const scrollTop = this.container.scrollTop
+        this.$dataStore.set('scrollTop', scrollTop)
+      }, 300)
+    },
     // 初始化
     loadAssets() {
       this.comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
