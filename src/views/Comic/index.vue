@@ -144,7 +144,7 @@ export default {
     },
     handleScroll(e) {
       const now = new Date()
-      if (now - this.lastScroll < 600) return
+      if (now - this.lastScroll < 500) return
       this.lastScroll = now
       this.changePage(e.wheelDelta > 0 ? 'prev' : 'next')
     },
@@ -314,7 +314,7 @@ export default {
           text-align: left;
         }
         .vue-slider {
-          margin: 0 5px;
+          margin: 0 10px;
           flex: 1;
         }
       }
