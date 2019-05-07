@@ -32,6 +32,9 @@ export default {
     // 注册键盘监听事件
     window.addEventListener('keydown', this.keydown, false)
   },
+  beforeDestroy() {
+    window.removeEventListener('keydown', this.keydown)
+  },
   methods: {
     keydown({ keyCode }) {
       /**

@@ -83,22 +83,13 @@ export default {
           borderColor: '#fff',
           backgroundColor: '#fff'
         }
-      }
+      },
+      lastScroll: new Date()
     }
   },
   watch: {
     inx() {
       this.setPageFile()
-    }
-  },
-  beforeDestroy() {
-    const list = this.$dataStore.get('list') || []
-    const curInx = this.$dataStore.get('curInx') || 0
-    const comicList = list[curInx] ? list[curInx].comicList : []
-    const comic = comicList.find(o => o.filename === this.filename)
-    if (comic) {
-      comic.progress = this.inx
-      this.$dataStore.set('list', list)
     }
   },
   mounted() {
@@ -115,8 +106,48 @@ export default {
         this.setPageFile()
       })
     })
+
+    // 监听翻页
+    window.addEventListener('keydown', this.keydown, false)
+    window.addEventListener('wheel', this.handleScroll, false)
+  },
+  beforeDestroy() {
+    const list = this.$dataStore.get('list') || []
+    const curInx = this.$dataStore.get('curInx') || 0
+    const comicList = list[curInx] ? list[curInx].comicList : []
+    const comic = comicList.find(o => o.filename === this.filename)
+    if (comic) {
+      comic.progress = this.inx
+      this.$dataStore.set('list', list)
+    }
+
+    window.removeEventListener('keydown', this.keydown)
+    window.removeEventListener('wheel', this.handleScroll)
   },
   methods: {
+    keydown({ keyCode }) {
+      console.log(keyCode)
+      /**
+       * 39: ->
+       * 37: <-
+       */
+      switch (keyCode) {
+        case 37:
+          this.changePage('prev')
+          break
+        case 39:
+          this.changePage('next')
+          break
+        default:
+          break
+      }
+    },
+    handleScroll(e) {
+      const now = new Date()
+      if (now - this.lastScroll < 600) return
+      this.lastScroll = now
+      this.changePage(e.wheelDelta > 0 ? 'prev' : 'next')
+    },
     // 加载资源
     loadComic() {
       return new Promise(resolve => {
@@ -172,11 +203,19 @@ export default {
       const viewWidth = this.viewer.clientWidth
       const radio = clientX / viewWidth
       if (radio < 0.33) {
-        this.inx = Math.max(1, this.inx - this.pageFile.length)
+        this.changePage('prev')
       } else if (radio < 0.66) {
         this.option = true
       } else {
+        this.changePage('next')
+      }
+    },
+    // 翻页
+    changePage(type) {
+      if (type === 'next') {
         this.inx = Math.min(this.files.length, this.inx + this.pageFile.length)
+      } else {
+        this.inx = Math.max(1, this.inx - this.pageFile.length)
       }
     },
     // 切换模式
