@@ -3,9 +3,6 @@
     <Header :hideMenu="hideMenu" />
     <Menu v-show="!hideMenu" />
     <router-view class="main scroll" />
-    <!-- <div class="container scroll">
-      
-    </div>-->
   </div>
 </template>
 
@@ -31,7 +28,7 @@ export default {
   },
   mounted() {
     // 注册键盘监听事件
-    window.addEventListener('keydown', this.keydown, false)
+    window.addEventListener('keydown', this.keydown)
   },
   beforeDestroy() {
     window.removeEventListener('keydown', this.keydown)
@@ -62,13 +59,11 @@ export default {
   justify-content: flex-start;
   width: 100%;
   height: 100%;
-  text-align: center;
   background-color: #444;
   .main {
     width: 100%;
     height: 100%;
     overflow-y: auto;
-    background-color: #444;
   }
 }
 </style>

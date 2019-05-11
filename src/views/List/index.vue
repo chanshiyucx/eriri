@@ -42,11 +42,10 @@ export default {
     handleDelete(i) {
       this.list.splice(i, 1)
     },
-    // 设置当前展开目录
+    // 设置首页目录
     setCurInx(i) {
       this.curInx = i
       this.$dataStore.set('curInx', this.curInx)
-      // 跳转到首页
       this.$router.push({ path: '/' })
     }
   }
@@ -115,7 +114,7 @@ export default {
       }
       .path {
         flex: 3;
-        color: #ccc;
+        color: #ddd;
       }
       .trash {
         display: inline-block;
