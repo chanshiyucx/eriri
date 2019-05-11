@@ -17,7 +17,8 @@
   "dependencies": {
     "vue": "^2.6.10",
     "vue-router": "^3.0.3",
-    "vue-slider-component": "^3.0.31"
+    "vue-slider-component": "^3.0.31",
+    "vue-toasted": "^1.1.26"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.7.0",

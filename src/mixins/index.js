@@ -34,7 +34,6 @@ export default {
       try {
         options.defaultPath = this.selectFolder
         dialog.showOpenDialog(options, dir => {
-          this.loading = true
           const filePath = dir[0]
 
           // 保存上次选择的文件夹
@@ -43,9 +42,17 @@ export default {
 
           // 判断目录是否重复
           const inx = this.list.findIndex(o => o.path === filePath)
-          if (inx >= 0) return
+          if (inx >= 0) {
+            this.$toasted.show('该目录已存在！', {
+              position: 'top-center',
+              className: 'toast',
+              duration: 2000
+            })
+            return
+          }
 
           // 读取选中的目录
+          this.loading = true
           fs.readdir(filePath, (err, files) => {
             if (err) {
               this.loading = false
