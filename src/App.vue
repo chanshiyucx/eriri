@@ -2,11 +2,12 @@
   <div id="app">
     <Header :hideMenu="hideMenu" />
     <Menu v-show="!hideMenu" />
-    <router-view class="main scroll" />
+    <keep-alive :exclude="['Comic']" :max="10"> <router-view class="main scroll" /> </keep-alive>
   </div>
 </template>
 
 <script>
+import { ipcRenderer } from 'electron'
 import Header from '@/components/Header'
 import Menu from '@/components/Menu'
 
@@ -47,7 +48,7 @@ export default {
       }
     },
     toggleDevTools() {
-      this.$ipcRenderer.send('toggle-devtools')
+      ipcRenderer.send('toggle-devtools')
     }
   }
 }

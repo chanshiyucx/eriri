@@ -22,7 +22,7 @@ module.exports = {
         },
         win: {
           target: 'nsis',
-          icon: 'public/icons/app.ico'
+          icon: 'public/icon.png'
         }
       }
     }

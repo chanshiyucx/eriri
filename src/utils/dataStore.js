@@ -12,9 +12,7 @@ function parseDataFile(filePath, defaults) {
 
 class DataStore {
   constructor(opts) {
-    const userDataPath = (electron.app || electron.remote.app).getPath(
-      'userData'
-    )
+    const userDataPath = (electron.app || electron.remote.app).getPath('userData')
     this.path = path.join(userDataPath, opts.configName + '.json')
     this.data = parseDataFile(this.path, opts.defaults)
   }

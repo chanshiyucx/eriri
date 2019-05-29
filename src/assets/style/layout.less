@@ -1,7 +1,6 @@
 * {
   margin: 0;
   padding: 0;
-  box-sizing: border-box;
 }
 
 html,
@@ -10,7 +9,7 @@ body {
 }
 
 body {
-  font-family: 'Avenir', Helvetica, Arial, sans-serif;
+  font-family: 'Helvetica', 'PingFang SC', serif;
   user-select: none;
   scroll-behavior: smooth;
   -webkit-font-smoothing: antialiased;
@@ -20,20 +19,6 @@ body {
 ul,
 ol {
   list-style: none;
-}
-
-/* fade-transform */
-.fade-transform-leave-active,
-.fade-transform-enter-active {
-  transition: all 0.5s;
-}
-.fade-transform-enter {
-  opacity: 0;
-  transform: translateY(-30px);
-}
-.fade-transform-leave-to {
-  opacity: 0;
-  transform: translateY(30px);
 }
 
 .scroll {
@@ -49,8 +34,4 @@ ol {
   &::-webkit-scrollbar-track {
     background-color: transparent;
   }
-}
-
-.toast {
-  transform: translate(25px, 35px) !important;
 }

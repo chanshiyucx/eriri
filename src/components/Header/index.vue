@@ -17,6 +17,8 @@
 </template>
 
 <script>
+import { ipcRenderer } from 'electron'
+
 export default {
   name: 'Header',
   props: {
@@ -38,7 +40,7 @@ export default {
         this.maximize = !this.maximize
         screenType = this.maximize ? 'maximize' : 'unmaximize'
       }
-      this.$ipcRenderer.send('toggle-screen', screenType)
+      ipcRenderer.send('toggle-screen', screenType)
     },
     // 返回
     goBack() {

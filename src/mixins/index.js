@@ -42,14 +42,7 @@ export default {
 
           // 判断目录是否重复
           const inx = this.list.findIndex(o => o.path === filePath)
-          if (inx >= 0) {
-            this.$toasted.show('该目录已存在！', {
-              position: 'top-center',
-              className: 'toast',
-              duration: 2000
-            })
-            return
-          }
+          if (inx >= 0) return
 
           // 读取选中的目录
           this.loading = true
