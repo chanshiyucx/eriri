@@ -1,5 +1,5 @@
 <template>
-  <div id="home">
+  <div ref="home" id="home">
     <Loading v-show="loading" />
     <div v-if="!comicList.length" class="open-folder" @click="openFolder">
       <svg-icon icon-class="folders" />
@@ -29,32 +29,33 @@ export default {
     return {
       comicList: [],
       timerId: '',
-      container: ''
+      scrollTop: 0
     }
   },
   watch: {
     list() {
       this.loadAssets()
+    },
+    $route(val) {
+      if (val.name === 'home') {
+        this.$refs.home.scrollTop = this.scrollTop || 0
+      }
     }
   },
   mounted() {
     this.loadAssets()
 
-    this.container = document.querySelector('#home')
     this.$nextTick(() => {
-      const scrollTop = this.$dataStore.get('scrollTop')
-      this.container.scrollTop = scrollTop || 0
-      this.container.onscroll = this.justifyPos
+      this.$refs.home.onscroll = this.justifyPos
     })
   },
   methods: {
     justifyPos() {
-      if (this.timerId) clearTimeout(this.timerId)
+      if (this.timerId) return
       this.timerId = setTimeout(() => {
-        // 获取页面滚动距离之后设置给当前路由的元信息
-        const scrollTop = this.container.scrollTop
-        this.$dataStore.set('scrollTop', scrollTop)
-      }, 300)
+        this.timerId = null
+        this.scrollTop = this.$refs.home.scrollTop
+      }, 500)
     },
     // 初始化
     loadAssets() {

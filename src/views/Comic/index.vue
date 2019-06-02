@@ -235,11 +235,13 @@ export default {
 <style lang="less" scoped>
 #comic {
   position: relative;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   .viewer {
     display: flex;
     justify-content: space-around;
     height: 100%;
+    width: 100%;
     li {
       position: relative;
       img {
@@ -298,6 +300,7 @@ export default {
       width: 100%;
       height: 50px;
       color: #fff;
+      box-sizing: border-box;
       background-color: #b980ae;
       .slider {
         margin-right: 10px;

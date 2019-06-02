@@ -54,7 +54,9 @@ export default {
 <style lang="less" scoped>
 #list {
   padding: 100px 20px;
+  width: 100%;
   height: 100%;
+  box-sizing: border-box;
   .open-folder {
     cursor: pointer;
     display: flex;
@@ -94,6 +96,7 @@ export default {
       width: 100%;
       height: 48px;
       line-height: 48px;
+      box-sizing: border-box;
       transition: background 0.25s ease-in-out;
       &:hover,
       &.active {
