@@ -1,6 +1,5 @@
 <template>
   <div id="list">
-    <Loading v-show="loading" />
     <div class="open-folder" @click="openFolder">
       <svg-icon icon-class="folders" />
       <span>添加本地文件夹</span>
@@ -23,7 +22,7 @@
             <span class="icon" @click.stop="handleRefresh(i)">
               <svg-icon icon-class="refresh" />
             </span>
-            <span class="icon" @click.stop="handleDelete(i)">
+            <span class="icon" @click.stop="handleRemove(i)">
               <svg-icon icon-class="trash" />
             </span>
           </span>
@@ -33,28 +32,35 @@
   </div>
 </template>
 <script>
-import Loading from '@/components/Loading'
-import mixin from '@/mixins/index.js'
-
 export default {
   name: 'List',
-  components: { Loading },
-  mixins: [mixin],
+  props: {
+    list: {
+      type: Array,
+      default: () => []
+    },
+    curInx: {
+      type: Number,
+      default: 0
+    }
+  },
   methods: {
     // 删除目录
-    handleDelete(i) {
-      this.list.splice(i, 1)
+    handleRemove(i) {
+      this.$emit('removeFolder', i)
     },
     // 刷新目录
     handleRefresh(i) {
-      console.log('refresh', this.list[i])
-      this.loadComic(this.list[i].path)
+      this.$emit('loadComic', this.list[i].path)
     },
     // 设置首页目录
     setCurInx(i) {
-      this.curInx = i
-      this.$dataStore.set('curInx', this.curInx)
+      this.$emit('setCurInx', i)
       this.$router.push({ path: '/' })
+    },
+    // 打开文件夹
+    openFolder() {
+      this.$emit('openFolder')
     }
   }
 }

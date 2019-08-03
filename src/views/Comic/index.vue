@@ -59,6 +59,16 @@ import { isImg } from '@/utils'
 export default {
   name: 'Comic',
   components: { VueSlider, Loading },
+  props: {
+    list: {
+      type: Array,
+      default: () => []
+    },
+    curInx: {
+      type: Number,
+      default: 0
+    }
+  },
   data() {
     return {
       loading: false,
@@ -96,12 +106,13 @@ export default {
     this.adapt = this.$dataStore.get('adapt') || 'height'
     this.page = this.$dataStore.get('page') || 1
 
-    const { filename, filedir } = this.$route.query
+    const { filename, filedir, progress = 1 } = this.$route.query
     this.filename = filename
     this.filedir = filedir
     this.viewer = document.querySelector('.viewer')
     this.loadComic().then(() => {
       this.$nextTick(() => {
+        this.inx = progress
         this.setPageFile()
       })
     })
@@ -111,20 +122,24 @@ export default {
     window.addEventListener('wheel', this.handleScroll, false)
   },
   beforeDestroy() {
+    const comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
+    const comic = comicList.find(o => o.filename === this.filename)
+    if (comic) {
+      comic.progress = this.inx
+      const list = [...this.list]
+      this.$emit('setList', list)
+    }
+
     window.removeEventListener('keydown', this.keydown)
     window.removeEventListener('wheel', this.handleScroll)
   },
   methods: {
     keydown({ keyCode }) {
-      /**
-       * 39: ->
-       * 37: <-
-       */
       switch (keyCode) {
-        case 37:
+        case 37: // ->
           this.changePage('prev')
           break
-        case 39:
+        case 39: // <-
           this.changePage('next')
           break
         default:

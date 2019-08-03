@@ -1,6 +1,5 @@
 <template>
   <div ref="home" id="home">
-    <Loading v-show="loading" />
     <div v-if="!comicList.length" class="open-folder" @click="openFolder">
       <svg-icon icon-class="folders" />
       <span>添加本地文件夹</span>
@@ -10,7 +9,10 @@
         <img :src="item.coverPath" :alt="item.coverName" />
         <div class="info">
           <h3>{{ item.filename }}</h3>
-          <div class="meta">共 {{ item.imgCount }} 页</div>
+          <div class="meta">
+            <span>{{ item.progress ? `${item.progress}/${item.imgCount}` : '未读' }}</span>
+            <span>共 {{ item.imgCount }} 页</span>
+          </div>
         </div>
       </li>
     </ul>
@@ -18,13 +20,18 @@
 </template>
 
 <script>
-import Loading from '@/components/Loading'
-import mixin from '@/mixins/index.js'
-
 export default {
   name: 'Home',
-  components: { Loading },
-  mixins: [mixin],
+  props: {
+    list: {
+      type: Array,
+      default: () => []
+    },
+    curInx: {
+      type: Number,
+      default: 0
+    }
+  },
   data() {
     return {
       comicList: [],
@@ -33,8 +40,12 @@ export default {
     }
   },
   watch: {
-    list() {
-      this.loadAssets()
+    list: {
+      immediate: true,
+      deep: true,
+      handler() {
+        this.loadAssets()
+      }
     },
     $route(val) {
       if (val.name === 'home') {
@@ -43,8 +54,6 @@ export default {
     }
   },
   mounted() {
-    this.loadAssets()
-
     this.$nextTick(() => {
       this.$refs.home.onscroll = this.justifyPos
     })
@@ -59,7 +68,8 @@ export default {
     },
     // 初始化
     loadAssets() {
-      this.comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
+      const comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
+      this.comicList = [...comicList]
     },
     // 进入预览
     gotoViwer(item) {
@@ -67,9 +77,14 @@ export default {
         path: 'comic',
         query: {
           filename: item.filename,
-          filedir: item.filedir
+          filedir: item.filedir,
+          progress: item.progress
         }
       })
+    },
+    // 打开文件夹
+    openFolder() {
+      this.$emit('openFolder')
     }
   }
 }
@@ -127,15 +142,17 @@ export default {
         overflow: hidden;
         text-overflow: ellipsis;
         display: -webkit-box;
+        height: 34px;
+        line-height: 17px;
         -webkit-line-clamp: 2;
         -webkit-box-orient: vertical;
         font-weight: normal;
-        line-height: 1.2;
         font-size: 14px;
         word-break: break-word;
       }
       .meta {
-        margin-top: 4px;
+        display: flex;
+        justify-content: space-between;
         color: #aaa;
         font-size: 14px;
         line-height: 1.6;
