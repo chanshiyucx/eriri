@@ -20,7 +20,10 @@
           <span class="path">{{ item.path }}</span>
           <span>
             <span>{{ item.comicCount }} 本漫画</span>
-            <span class="trash" @click.stop="handleDelete(i)">
+            <span class="icon" @click.stop="handleRefresh(i)">
+              <svg-icon icon-class="refresh" />
+            </span>
+            <span class="icon" @click.stop="handleDelete(i)">
               <svg-icon icon-class="trash" />
             </span>
           </span>
@@ -41,6 +44,11 @@ export default {
     // 删除目录
     handleDelete(i) {
       this.list.splice(i, 1)
+    },
+    // 刷新目录
+    handleRefresh(i) {
+      console.log('refresh', this.list[i])
+      this.loadComic(this.list[i].path)
     },
     // 设置首页目录
     setCurInx(i) {
@@ -119,9 +127,9 @@ export default {
         flex: 3;
         color: #ddd;
       }
-      .trash {
+      .icon {
         display: inline-block;
-        width: 40px;
+        width: 34px;
         height: 40px;
         line-height: 40px;
         text-align: center;

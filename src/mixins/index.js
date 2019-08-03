@@ -35,63 +35,72 @@ export default {
         options.defaultPath = this.selectFolder
         dialog.showOpenDialog(options, dir => {
           const filePath = dir[0]
-
-          // 保存上次选择的文件夹
+          // 保存默认选择的文件夹
           this.selectFolder = path.dirname(filePath)
           this.$dataStore.set('selectFolder', this.selectFolder)
-
           // 判断目录是否重复
           const inx = this.list.findIndex(o => o.path === filePath)
           if (inx >= 0) return
 
-          // 读取选中的目录
-          this.loading = true
-          fs.readdir(filePath, (err, files) => {
-            if (err) {
-              this.loading = false
-              return
-            }
-
-            const comicList = []
-            // 遍历目录下的文件列表
-            files.forEach(filename => {
-              const filedir = path.join(filePath, filename)
-
-              // 判断是否为文件夹
-              const stat = fs.statSync(filedir)
-              if (!stat.isDirectory()) return
-
-              // 判断文件夹内是否有图片
-              const comicFiles = fs.readdirSync(filedir).filter(isImg)
-              if (!comicFiles.length) return
-
-              const coverName = comicFiles[0]
-              const coverPath = path.join(filedir, coverName)
-              const oneComic = {
-                filename,
-                filedir,
-                coverName,
-                coverPath,
-                imgCount: comicFiles.length
-              }
-              comicList.push(oneComic)
-            })
-
-            if (comicList.length) {
-              this.list.push({
-                name: path.basename(filePath),
-                path: filePath,
-                comicCount: comicList.length,
-                comicList
-              })
-              this.$dataStore.set('list', this.list)
-            }
-            this.loading = false
-          })
+          this.loadComic(filePath)
         })
       } catch (error) {
         this.loading = false
       }
+    },
+    // 加载漫画
+    loadComic(filePath) {
+      // 读取选中的目录
+      this.loading = true
+      fs.readdir(filePath, (err, files) => {
+        if (err) {
+          this.loading = false
+          return
+        }
+
+        const comicList = []
+        // 遍历目录下的文件列表
+        files.forEach(filename => {
+          const filedir = path.join(filePath, filename)
+
+          // 判断是否为文件夹
+          const stat = fs.statSync(filedir)
+          if (!stat.isDirectory()) return
+
+          // 判断文件夹内是否有图片
+          const comicFiles = fs.readdirSync(filedir).filter(isImg)
+          if (!comicFiles.length) return
+
+          const coverName = comicFiles[0]
+          const coverPath = path.join(filedir, coverName)
+          const oneComic = {
+            filename,
+            filedir,
+            coverName,
+            coverPath,
+            imgCount: comicFiles.length
+          }
+          comicList.push(oneComic)
+        })
+
+        if (comicList.length) {
+          // 判断是刷新还是新增
+          const inx = this.list.findIndex(o => o.path === filePath)
+          if (inx >= 0) {
+            this.list[inx].comicList = comicList
+            this.list[inx].comicCount = comicList.length
+          } else {
+            this.list.push({
+              name: path.basename(filePath),
+              path: filePath,
+              comicCount: comicList.length,
+              comicList
+            })
+          }
+          this.$dataStore.set('list', this.list)
+        }
+        this.loading = false
+      })
     }
   }
 }
