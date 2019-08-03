@@ -37,7 +37,7 @@ import Loading from '@/components/Loading'
 import mixin from '@/mixins/index.js'
 
 export default {
-  name: 'list',
+  name: 'List',
   components: { Loading },
   mixins: [mixin],
   methods: {

@@ -2,7 +2,7 @@
   <div id="app">
     <Header :hideMenu="hideMenu" />
     <Menu v-show="!hideMenu" />
-    <keep-alive :exclude="['comic']" :max="10">
+    <keep-alive :exclude="['Comic']" :max="10">
       <router-view class="main scroll" />
     </keep-alive>
   </div>

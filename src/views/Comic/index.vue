@@ -57,7 +57,7 @@ import Loading from '@/components/Loading'
 import { isImg } from '@/utils'
 
 export default {
-  name: 'comic',
+  name: 'Comic',
   components: { VueSlider, Loading },
   data() {
     return {
@@ -96,13 +96,12 @@ export default {
     this.adapt = this.$dataStore.get('adapt') || 'height'
     this.page = this.$dataStore.get('page') || 1
 
-    const { filename, filedir, progress = 1 } = this.$route.query
+    const { filename, filedir } = this.$route.query
     this.filename = filename
     this.filedir = filedir
     this.viewer = document.querySelector('.viewer')
     this.loadComic().then(() => {
       this.$nextTick(() => {
-        this.inx = progress
         this.setPageFile()
       })
     })
@@ -112,21 +111,11 @@ export default {
     window.addEventListener('wheel', this.handleScroll, false)
   },
   beforeDestroy() {
-    const list = this.$dataStore.get('list') || []
-    const curInx = this.$dataStore.get('curInx') || 0
-    const comicList = list[curInx] ? list[curInx].comicList : []
-    const comic = comicList.find(o => o.filename === this.filename)
-    if (comic) {
-      comic.progress = this.inx
-      this.$dataStore.set('list', list)
-    }
-
     window.removeEventListener('keydown', this.keydown)
     window.removeEventListener('wheel', this.handleScroll)
   },
   methods: {
     keydown({ keyCode }) {
-      console.log(keyCode)
       /**
        * 39: ->
        * 37: <-

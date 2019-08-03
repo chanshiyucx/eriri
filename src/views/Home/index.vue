@@ -10,7 +10,7 @@
         <img :src="item.coverPath" :alt="item.coverName" />
         <div class="info">
           <h3>{{ item.filename }}</h3>
-          <div class="meta">{{ item.progress ? `${item.progress}/${item.imgCount}` : '未读' }}</div>
+          <div class="meta">共 {{ item.imgCount }} 页</div>
         </div>
       </li>
     </ul>
@@ -22,7 +22,7 @@ import Loading from '@/components/Loading'
 import mixin from '@/mixins/index.js'
 
 export default {
-  name: 'home',
+  name: 'Home',
   components: { Loading },
   mixins: [mixin],
   data() {
@@ -67,8 +67,7 @@ export default {
         path: 'comic',
         query: {
           filename: item.filename,
-          filedir: item.filedir,
-          progress: item.progress
+          filedir: item.filedir
         }
       })
     }
