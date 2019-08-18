@@ -1,8 +1,8 @@
 <template>
-  <div id="comic">
+  <div id="comic" ref="comic">
     <Loading v-show="loading" />
     <ul
-      :class="['viewer', 'scroll', pageFile.length === 2 && adapt === 'height' && 'center']"
+      :class="['viewer', pageFile.length === 2 && adapt === 'height' && 'center']"
       @click="handleClick"
     >
       <li
@@ -147,10 +147,14 @@ export default {
       }
     },
     handleScroll(e) {
-      const now = new Date()
-      if (now - this.lastScroll < 500) return
-      this.lastScroll = now
-      this.changePage(e.wheelDelta > 0 ? 'prev' : 'next')
+      if (this.adapt === 'height') {
+        // 适应高度
+        const now = new Date()
+        if (now - this.lastScroll < 500) return
+        this.lastScroll = now
+        this.changePage(e.wheelDelta > 0 ? 'prev' : 'next')
+      }
+      this.option = false
     },
     // 加载资源
     loadComic() {
@@ -216,10 +220,14 @@ export default {
     },
     // 翻页
     changePage(type) {
+      const oldInx = this.inx
       if (type === 'next') {
         this.inx = Math.min(this.files.length, this.inx + this.pageFile.length)
       } else {
         this.inx = Math.max(1, this.inx - this.pageFile.length)
+      }
+      if (oldInx !== this.inx) {
+        this.$refs.comic.scrollTop = 0
       }
     },
     // 切换模式

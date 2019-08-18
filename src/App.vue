@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" ref="app">
     <Loading v-show="loading" />
     <Header :hideMenu="hideMenu" />
     <Menu v-show="!hideMenu" />
