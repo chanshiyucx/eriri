@@ -3,7 +3,7 @@
     <Loading v-show="loading" />
     <Header :hideMenu="hideMenu" />
     <Menu v-show="!hideMenu" />
-    <keep-alive :exclude="['Comic']" :max="10">
+    <keep-alive :exclude="['Comic']">
       <router-view
         class="main scroll"
         :list="list"
@@ -35,6 +35,8 @@ const options = {
   buttonLabel: '打开',
   properties: ['openDirectory']
 }
+
+const delay = time => new Promise(r => setTimeout(r, time))
 
 export default {
   name: 'app',
@@ -73,15 +75,15 @@ export default {
     removeFolder(i) {
       this.list.splice(i, 1)
     },
-    // 设置首页列表
-    setList(list) {
-      this.list = list
-      this.$dataStore.set('list', list)
-    },
     // 设置首页索引
     setCurInx(i) {
       this.curInx = i
       this.$dataStore.set('curInx', this.curInx)
+    },
+    // 设置首页列表
+    setList(list) {
+      this.list = list
+      this.$dataStore.set('list', list)
     },
     // 打开目录
     openFolder() {
@@ -104,9 +106,11 @@ export default {
     },
     // 加载漫画
     loadComic(filePath) {
+      const startTime = +new Date()
+
       // 读取选中的目录
       this.loading = true
-      fs.readdir(filePath, (err, files) => {
+      fs.readdir(filePath, async (err, files) => {
         if (err) {
           this.loading = false
           return
@@ -144,8 +148,10 @@ export default {
             // 刷新保存原来进度
             const oldList = this.list[inx].comicList
             comicList.forEach(o => {
-              const comic = oldList.find(c => c.path === o.path)
-              o.progress = comic && comic.progress ? comic.progress : 0
+              const comic = oldList.find(c => c.filedir === o.filedir)
+              if (comic && comic.progress) {
+                o.progress = comic.progress
+              }
             })
             this.list[inx].comicList = comicList
             this.list[inx].comicCount = comicList.length
@@ -159,6 +165,12 @@ export default {
           }
           this.$dataStore.set('list', this.list)
         }
+        const endTime = +new Date()
+        const time = 1000 - (endTime - startTime)
+        if (time > 100) {
+          await delay(time)
+        }
+
         this.loading = false
       })
     },

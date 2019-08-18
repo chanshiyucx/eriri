@@ -15,6 +15,7 @@
           </div>
         </div>
       </li>
+      <li v-for="i in 10" :key="i" class="empty" />
     </ul>
   </div>
 </template>
@@ -46,6 +47,9 @@ export default {
       handler() {
         this.loadAssets()
       }
+    },
+    curInx() {
+      this.loadAssets()
     },
     $route(val) {
       if (val.name === 'home') {
@@ -91,13 +95,16 @@ export default {
 </script>
 <style lang="less" scoped>
 #home {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
   .open-folder {
     cursor: pointer;
     display: flex;
     flex-direction: column;
     justify-content: center;
     align-items: center;
-    margin: 100px auto 50px;
+    margin: 100px auto 0;
     width: 180px;
     height: 120px;
     border-radius: 3px;
@@ -111,10 +118,12 @@ export default {
       font-size: 42px;
     }
   }
+
   .comic-list {
     display: flex;
     flex-wrap: wrap;
-    margin: 0 40px;
+    justify-content: space-around;
+    margin: 0 30px;
     padding: 10px 10px 0;
     li {
       margin: 2px;
@@ -126,9 +135,15 @@ export default {
         border: 2px solid #666;
       }
     }
+    .empty {
+      margin: 0;
+      padding: 0;
+      width: 172px;
+      height: 0;
+    }
     img {
-      width: 150px;
-      height: 220px;
+      width: 156px;
+      height: 230px;
       object-fit: cover;
     }
     .info {
