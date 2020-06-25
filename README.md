@@ -12,7 +12,7 @@ Feature:
 - 记录阅读进度，更流畅的阅读体验
 - 自适应宽度或高度，支持单/双页模式切换
 
-![首页列表](https://raw.githubusercontent.com/chanshiyucx/poi/master/2019/eriri_%E9%A6%96%E9%A1%B5%E5%88%97%E8%A1%A8.png)
-![添加目录](https://raw.githubusercontent.com/chanshiyucx/poi/master/2019/eriri_%E6%B7%BB%E5%8A%A0%E7%9B%AE%E5%BD%95.png)
-![双页模式](https://raw.githubusercontent.com/chanshiyucx/poi/master/2019/eriri_%E5%8F%8C%E9%A1%B5%E6%A8%A1%E5%BC%8F.png)
-![单页模式](https://raw.githubusercontent.com/chanshiyucx/poi/master/2019/%E5%8D%95%E9%A1%B5%E6%A8%A1%E5%BC%8F.png)
+![首页列表](https://raw.githubusercontent.com/chanshiyucx/yoi/master/2019/Eriri-comic-reader/eriri_首页列表.png)
+![添加目录](https://raw.githubusercontent.com/chanshiyucx/yoi/master/2019/Eriri-comic-reader/eriri_添加目录.png)
+![双页模式](https://raw.githubusercontent.com/chanshiyucx/yoi/master/2019/Eriri-comic-reader/eriri_双页模式.png)
+![单页模式](https://raw.githubusercontent.com/chanshiyucx/yoi/master/2019/Eriri-comic-reader/eriri_单页模式.png)
