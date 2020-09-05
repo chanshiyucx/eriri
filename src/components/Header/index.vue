@@ -57,6 +57,7 @@ export default {
   right: 5px;
   height: 30px;
   z-index: 100;
+  -webkit-app-region: drag;
   .back {
     float: left;
     width: 34px;
@@ -66,6 +67,7 @@ export default {
     text-align: center;
     color: #eee;
     cursor: pointer;
+    -webkit-app-region: no-drag;
     &:hover {
       background-color: #888;
     }
@@ -81,6 +83,7 @@ export default {
       text-align: center;
       color: #eee;
       cursor: pointer;
+      -webkit-app-region: no-drag;
       &:hover {
         background-color: #888;
       }
