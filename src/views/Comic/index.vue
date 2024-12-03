@@ -122,14 +122,7 @@ export default {
     window.addEventListener('wheel', this.handleScroll, false)
   },
   beforeDestroy() {
-    const comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
-    const comic = comicList.find(o => o.filename === this.filename)
-    if (comic) {
-      comic.progress = this.inx
-      const list = [...this.list]
-      this.$emit('setList', list)
-    }
-
+    this.saveProgress();
     window.removeEventListener('keydown', this.keydown)
     window.removeEventListener('wheel', this.handleScroll)
   },
@@ -229,6 +222,7 @@ export default {
       if (oldInx !== this.inx) {
         this.$refs.comic.scrollTop = 0
       }
+      this.saveProgress();
     },
     // 切换模式
     switchAdapt() {
@@ -240,6 +234,16 @@ export default {
       this.page = this.page === 1 ? 2 : 1
       this.setPageFile()
       this.$dataStore.set('page', this.page)
+    },
+    //保存进度
+    saveProgress(){
+      const comicList = this.list[this.curInx] ? this.list[this.curInx].comicList : []
+      const comic = comicList.find(o => o.filename === this.filename)
+      if (comic) {
+        comic.progress = this.inx
+        const list = [...this.list]
+        this.$emit('setList', list)
+      }
     }
   }
 }
