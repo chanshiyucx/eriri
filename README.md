@@ -11,8 +11,3 @@ Feature:
 - 支持导入多个文件夹，实现目录无缝切换
 - 记录阅读进度，更流畅的阅读体验
 - 自适应宽度或高度，支持单/双页模式切换
-
-![首页列表](https://raw.githubusercontent.com/chanshiyucx/yoi/master/2019/Eriri-comic-reader/eriri_首页列表.png)
-![添加目录](https://raw.githubusercontent.com/chanshiyucx/yoi/master/2019/Eriri-comic-reader/eriri_添加目录.png)
-![双页模式](https://raw.githubusercontent.com/chanshiyucx/yoi/master/2019/Eriri-comic-reader/eriri_双页模式.png)
-![单页模式](https://raw.githubusercontent.com/chanshiyucx/yoi/master/2019/Eriri-comic-reader/eriri_单页模式.png)
