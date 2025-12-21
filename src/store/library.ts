@@ -20,6 +20,11 @@ interface LibraryState {
   // Helpers to get comics for a library
   getComicsByLibrary: (libraryId: string) => Comic[]
   replaceComicsForLibrary: (libraryId: string, comics: Comic[]) => void
+  updateComicProgress: (
+    comicId: string,
+    pageIndex: number,
+    total: number,
+  ) => void
 }
 
 export const useLibraryStore = create<LibraryState>()(
@@ -69,6 +74,23 @@ export const useLibraryStore = create<LibraryState>()(
             ...state.comics.filter((c) => c.libraryId !== libraryId),
             ...newComics,
           ],
+        })),
+
+      updateComicProgress: (comicId, pageIndex, total) =>
+        set((state) => ({
+          comics: state.comics.map((c) =>
+            c.id === comicId
+              ? {
+                  ...c,
+                  progress: {
+                    current: pageIndex,
+                    total,
+                    percent: (pageIndex / (total - 1)) * 100,
+                    lastRead: Date.now(),
+                  },
+                }
+              : c,
+          ),
         })),
     }),
     {

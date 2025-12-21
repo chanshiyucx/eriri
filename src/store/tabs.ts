@@ -16,6 +16,7 @@ export interface ComicTab {
 interface TabsState {
   tabs: ComicTab[]
   activeTabId: string // 'home' or comic tab id
+  isImmersive: boolean
 
   // Actions
   addTab: (tab: ComicTab) => void
@@ -23,6 +24,7 @@ interface TabsState {
   setActiveTab: (tabId: string) => void
   getActiveTab: () => ComicTab | null
   clearAllTabs: () => void
+  setImmersive: (isImmersive: boolean) => void
 }
 
 export const useTabsStore = create<TabsState>()(
@@ -30,6 +32,7 @@ export const useTabsStore = create<TabsState>()(
     (set, get) => ({
       tabs: [],
       activeTabId: 'home',
+      isImmersive: false,
 
       addTab: (tab) =>
         set((state) => {
@@ -67,6 +70,8 @@ export const useTabsStore = create<TabsState>()(
       },
 
       clearAllTabs: () => set({ tabs: [], activeTabId: 'home' }),
+
+      setImmersive: (isImmersive) => set({ isImmersive }),
     }),
     {
       name: 'eriri-tabs-storage',
