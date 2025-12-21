@@ -3,5 +3,30 @@
   "identifier": "default",
   "description": "Capability for the main window",
   "windows": ["main"],
-  "permissions": ["core:default", "opener:default"]
+  "permissions": [
+    "core:default",
+    "opener:default",
+    "dialog:default",
+    {
+      "identifier": "fs:allow-read",
+      "params": {
+        "recursive": true,
+        "path": "/"
+      }
+    },
+    {
+      "identifier": "fs:allow-read-dir",
+      "params": {
+        "recursive": true,
+        "path": "/"
+      }
+    },
+    {
+      "identifier": "fs:allow-exists",
+      "params": {
+        "path": "/"
+      }
+    },
+    "fs:default"
+  ]
 }
