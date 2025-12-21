@@ -1,0 +1,36 @@
+@layer base {
+  :root {
+    @apply scroll-smooth;
+  }
+
+  *,
+  ::after,
+  ::before {
+    @apply border-overlay;
+  }
+
+  html {
+    color-scheme: light dark;
+  }
+
+  html[data-theme='light'] {
+    color-scheme: light;
+  }
+
+  html[data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-base text-text;
+  }
+}
+
+/* @layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+} */

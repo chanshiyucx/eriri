@@ -1,0 +1,103 @@
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* @custom-variant dark (&:is(.dark *)); */
+
+/* https://rosepinetheme.com/zh-cn/palette/ingredients/ */
+@theme {
+  --color-base: light-dark(hsl(32deg 57% 95%), hsl(246deg, 24%, 17%));
+  --color-surface: light-dark(hsl(35deg 100% 98%), hsl(248deg, 24%, 20%));
+  --color-overlay: light-dark(hsl(33deg 43% 91%), hsl(248deg, 21%, 26%));
+  --color-muted: light-dark(hsl(257deg 9% 61%), hsl(249deg, 12%, 47%));
+  --color-subtle: light-dark(hsl(248deg 12% 52%), hsl(248deg, 15%, 61%));
+  --color-text: light-dark(hsl(248deg 19% 40%), hsl(245deg, 50%, 91%));
+  --color-love: light-dark(hsl(343deg 35% 55%), hsl(343deg, 76%, 68%));
+  --color-gold: light-dark(hsl(35deg 81% 56%), hsl(35deg, 88%, 72%));
+  --color-rose: light-dark(hsl(3deg 53% 67%), hsl(2deg, 66%, 75%));
+  --color-pine: light-dark(hsl(197deg 53% 34%), hsl(197deg, 48%, 47%));
+  --color-foam: light-dark(hsl(189deg 30% 48%), hsl(189deg, 43%, 73%));
+  --color-iris: light-dark(hsl(268deg 21% 57%), hsl(267deg, 57%, 78%));
+}
+
+/* typography rosepine */
+@theme inline {
+  --tw-prose-body: var(--color-text);
+  --tw-prose-headings: var(--color-text);
+  --tw-prose-lead: var(--color-text);
+  --tw-prose-links: var(--color-iris);
+  --tw-prose-bold: var(--color-text);
+  --tw-prose-counters: var(--color-subtle);
+  --tw-prose-bullets: var(--color-subtle);
+  --tw-prose-hr: var(--color-overlay);
+  --tw-prose-quotes: var(--color-text);
+  --tw-prose-quote-borders: var(--color-overlay);
+  --tw-prose-kbd: var(--color-text);
+  --tw-prose-kbd-shadows: var(--color-text);
+  --tw-prose-captions: var(--color-text);
+  --tw-prose-code: var(--color-rose);
+  --tw-prose-pre-code: var(--color-muted);
+  --tw-prose-pre-bg: var(--color-surface);
+  --tw-prose-th-borders: var(--color-overlay);
+  --tw-prose-td-borders: var(--color-overlay);
+
+  /* invert mode */
+  --tw-prose-invert-body: var(--color-text);
+  --tw-prose-invert-headings: var(--color-text);
+  --tw-prose-invert-lead: var(--color-text);
+  --tw-prose-invert-links: var(--color-iris);
+  --tw-prose-invert-bold: var(--color-text);
+  --tw-prose-invert-counters: var(--color-subtle);
+  --tw-prose-invert-bullets: var(--color-subtle);
+  --tw-prose-invert-hr: var(--color-overlay);
+  --tw-prose-invert-quotes: var(--color-text);
+  --tw-prose-invert-quote-borders: var(--color-overlay);
+  --tw-prose-invert-kbd: var(--color-text);
+  --tw-prose-invert-kbd-shadows: var(--color-text);
+  --tw-prose-invert-captions: var(--color-text);
+  --tw-prose-invert-code: var(--color-rose);
+  --tw-prose-invert-pre-code: var(--color-muted);
+  --tw-prose-invert-pre-bg: var(--color-surface);
+  --tw-prose-invert-th-borders: var(--color-overlay);
+  --tw-prose-invert-td-borders: var(--color-overlay);
+}
+
+/* shadcn ui */
+@theme inline {
+  --radius: 0.625rem;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--color-base);
+  --color-foreground: var(--color-text);
+  --color-card: var(--color-surface);
+  --color-card-foreground: var(--color-text);
+  --color-popover: var(--color-surface);
+  --color-popover-foreground: var(--color-text);
+  --color-primary: var(--color-text);
+  --color-primary-foreground: var(--color-base);
+  --color-secondary: var(--color-overlay);
+  --color-secondary-foreground: var(--color-text);
+  --color-muted: var(--color-overlay);
+  --color-muted-foreground: var(--color-muted);
+  --color-accent: var(--color-overlay);
+  --color-accent-foreground: var(--color-text);
+  --color-destructive: var(--color-love);
+  --color-border: var(--color-overlay);
+  --color-input: var(--color-overlay);
+  --color-ring: var(--color-subtle);
+  --color-chart-1: var(--color-gold);
+  --color-chart-2: var(--color-pine);
+  --color-chart-3: var(--color-iris);
+  --color-chart-4: var(--color-foam);
+  --color-chart-5: var(--color-rose);
+  --color-sidebar: var(--color-surface);
+  --color-sidebar-foreground: var(--color-text);
+  --color-sidebar-primary: var(--color-text);
+  --color-sidebar-primary-foreground: var(--color-base);
+  --color-sidebar-accent: var(--color-overlay);
+  --color-sidebar-accent-foreground: var(--color-text);
+  --color-sidebar-border: var(--color-overlay);
+  --color-sidebar-ring: var(--color-subtle);
+}
