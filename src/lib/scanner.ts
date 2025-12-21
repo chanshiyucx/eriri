@@ -38,7 +38,12 @@ export async function scanLibrary(
                   file.name.toLowerCase().endsWith(ext),
                 ),
             )
-            .sort((a, b) => a.name.localeCompare(b.name))
+            .sort((a, b) =>
+              a.name.localeCompare(b.name, undefined, {
+                numeric: true,
+                sensitivity: 'base',
+              }),
+            )
 
           if (images.length > 0) {
             const coverPath = joinPath(comicPath, images[0].name)
@@ -81,7 +86,12 @@ export async function scanComicImages(
           file.isFile &&
           IMAGE_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext)),
       )
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        }),
+      )
       .map((file) => ({
         url: convertFileSrc(joinPath(comicPath, file.name)),
         filename: file.name,

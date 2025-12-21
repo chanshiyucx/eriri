@@ -5,10 +5,12 @@ import {
   ChevronLeft,
   PanelLeftClose,
   PanelLeftOpen,
+  Play,
   Plus,
   RefreshCw,
   Search,
 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { scanComicImages, scanLibrary } from '@/lib/scanner'
@@ -39,10 +41,84 @@ export function ContentArea({
     selectedLibraryId,
   } = useLibraryStore()
 
-  const { getActiveTab, addTab, setActiveTab } = useTabsStore()
+  const { getActiveTab, addTab, setActiveTab, isImmersive, setImmersive } =
+    useTabsStore()
+  const { updateComicProgress } = useLibraryStore()
+
+  // Reader state
+  const [isReading, setIsReading] = useState(false)
+  const [readingPageIndex, setReadingPageIndex] = useState(0)
 
   // Get active tab data
   const activeTab = getActiveTab()
+
+  // Common comic references
+  const activeComic = activeTab
+    ? comics.find((c) => c.id === activeTab.comicId)
+    : null
+
+  const handleStartReading = (index = 0) => {
+    setReadingPageIndex(index)
+    setIsReading(true)
+  }
+
+  const handleContinueReading = () => {
+    if (activeComic?.progress) {
+      handleStartReading(activeComic.progress.current)
+    } else {
+      handleStartReading(0)
+    }
+  }
+
+  const handleNextPage = useCallback(() => {
+    if (!activeTab) return
+    if (readingPageIndex < activeTab.images.length - 1) {
+      const nextIndex = readingPageIndex + 1
+      setReadingPageIndex(nextIndex)
+      updateComicProgress(activeTab.comicId, nextIndex, activeTab.images.length)
+    }
+  }, [activeTab, readingPageIndex, updateComicProgress])
+
+  const handlePrevPage = useCallback(() => {
+    if (readingPageIndex > 0) {
+      const prevIndex = readingPageIndex - 1
+      setReadingPageIndex(prevIndex)
+      updateComicProgress(
+        activeTab!.comicId,
+        prevIndex,
+        activeTab!.images.length,
+      )
+    }
+  }, [activeTab, readingPageIndex, updateComicProgress])
+
+  const handleExitReader = useCallback(() => {
+    setIsReading(false)
+    setImmersive(false)
+  }, [setImmersive])
+
+  const toggleImmersive = useCallback(() => {
+    setImmersive(!isImmersive)
+  }, [isImmersive, setImmersive])
+
+  // Keyboard navigation
+  useEffect(() => {
+    if (!isReading) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') handleNextPage()
+      if (e.key === 'ArrowLeft') handlePrevPage()
+      if (e.key === 'Escape') handleExitReader()
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [isReading, handleNextPage, handlePrevPage, handleExitReader])
+
+  // Reset reading state when switching tabs
+  useEffect(() => {
+    setIsReading(false)
+    setImmersive(false)
+  }, [activeTab?.id, setImmersive])
 
   // Filter comics by selected library
   const filteredComics = selectedLibraryId
@@ -160,83 +236,208 @@ export function ContentArea({
   }
 
   const pageTransition = {
-    duration: 0.3,
+    duration: 0.2,
     ease: 'easeInOut',
   } as const
 
   return (
-    <div className={cn('flex h-full flex-col', className)} {...props}>
+    <div
+      className={cn(
+        'flex h-full flex-col transition-all duration-300',
+        className,
+      )}
+      {...props}
+    >
       {/* Toolbar */}
-      <div className="flex h-14 items-center justify-between border-b px-4 py-2">
-        <div className="flex items-center gap-2">
-          {/* Toggle Sidebar - Always visible */}
-          <Button variant="ghost" size="icon" onClick={toggleSidebar}>
-            {isCollapsed ? (
-              <PanelLeftOpen className="h-4 w-4" />
-            ) : (
-              <PanelLeftClose className="h-4 w-4" />
-            )}
-          </Button>
-
-          {/* Back Button - Only in detail view */}
-          {activeTab && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBack}
-              title="Back"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => {
-              void handleRefresh()
-            }}
-            disabled={isScanning || (!currentLibrary && !activeTab)}
-            title="Refresh"
-            className="shrink-0"
+      <AnimatePresence>
+        {!isImmersive && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: 'easeInOut' }}
+            className="flex h-10 items-center justify-between overflow-hidden border-b px-4 py-2"
           >
-            <RefreshCw
-              className={cn('h-4 w-4', isScanning && 'animate-spin')}
-            />
-          </Button>
+            <div className="flex items-center gap-2">
+              {/* Toggle Sidebar - Always visible */}
+              <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+                {isCollapsed ? (
+                  <PanelLeftOpen className="h-4 w-4" />
+                ) : (
+                  <PanelLeftClose className="h-4 w-4" />
+                )}
+              </Button>
 
-          {/* Comic Title in Detail View */}
-          {activeTab && (
-            <span className="text-foreground/90 truncate text-sm font-medium">
-              {activeTab.title}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon">
-            <Search className="h-4 w-4" />
-          </Button>
-          {!activeTab && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                void handleImport()
-              }}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          )}
-          <Button variant="ghost" size="icon">
-            <ArrowUpDown className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+              {/* Back Button - Only in detail or reader view */}
+              {(activeTab ?? isReading) && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={isReading ? handleExitReader : handleBack}
+                  title="Back"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+              )}
+
+              {!isReading && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => {
+                    void handleRefresh()
+                  }}
+                  disabled={isScanning || (!currentLibrary && !activeTab)}
+                  title="Refresh"
+                  className="shrink-0"
+                >
+                  <RefreshCw
+                    className={cn('h-4 w-4', isScanning && 'animate-spin')}
+                  />
+                </Button>
+              )}
+
+              {/* Continue Reading Button */}
+              {activeTab && !isReading && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={handleContinueReading}
+                  title="Continue Reading"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                </Button>
+              )}
+
+              {/* Comic Title in Detail/Reader View */}
+              {activeTab && (
+                <span className="text-foreground/90 truncate text-sm font-medium">
+                  {activeTab.title}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              {/* Progress in Reader View */}
+              {isReading && activeTab && (
+                <span className="text-muted-foreground mr-4 font-mono text-xs">
+                  {readingPageIndex + 1} / {activeTab.images.length} (
+                  {Math.round(
+                    (readingPageIndex / (activeTab.images.length - 1)) * 100,
+                  )}
+                  %)
+                </span>
+              )}
+
+              {!isReading && (
+                <>
+                  <Button variant="ghost" size="icon">
+                    <Search className="h-4 w-4" />
+                  </Button>
+                  {!activeTab && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => {
+                        void handleImport()
+                      }}
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="icon">
+                    <ArrowUpDown className="h-4 w-4" />
+                  </Button>
+                </>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Content Grid with Animations */}
-      <ScrollArea className="flex-1 p-6">
+      <ScrollArea
+        className={cn(
+          'flex-1 transition-all duration-300',
+          !isImmersive && !isReading && 'p-6',
+          (isImmersive || isReading) && 'p-0',
+        )}
+      >
         <AnimatePresence mode="wait">
-          {activeTab ? (
+          {isReading && activeTab ? (
+            /* Reader View */
+            <motion.div
+              key="reader"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.2, ease: 'easeInOut' }}
+              className="relative flex h-full items-center justify-center"
+            >
+              <div
+                className="group relative h-full w-full overflow-hidden"
+                onClick={(e) => {
+                  const x = e.clientX
+                  const width = window.innerWidth
+                  // If clicking in the middle 40% area, toggle immersive
+                  if (x > width * 0.3 && x < width * 0.7) {
+                    toggleImmersive()
+                  } else if (x < width / 3) {
+                    handlePrevPage()
+                  } else {
+                    handleNextPage()
+                  }
+                }}
+              >
+                <img
+                  src={activeTab.images[readingPageIndex].url}
+                  alt={`Page ${readingPageIndex + 1}`}
+                  className="h-full w-full object-contain"
+                />
+
+                {/* Navigation Zones Overlay */}
+                <div className="absolute inset-y-0 left-0 w-1/3 cursor-w-resize" />
+                <div className="absolute inset-y-0 right-0 w-1/3 cursor-e-resize" />
+
+                {/* Navigation Hints */}
+                <AnimatePresence>
+                  {!isImmersive && (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    >
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1/2 left-4 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handlePrevPage()
+                        }}
+                        disabled={readingPageIndex === 0}
+                      >
+                        <ChevronLeft className="h-8 w-8" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-1/2 right-4 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleNextPage()
+                        }}
+                        disabled={
+                          readingPageIndex === activeTab.images.length - 1
+                        }
+                      >
+                        <ChevronLeft className="h-8 w-8 rotate-180" />
+                      </Button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            </motion.div>
+          ) : activeTab ? (
             /* Detail View */
             <motion.div
               key="detail"
@@ -248,7 +449,11 @@ export function ContentArea({
               className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
             >
               {activeTab.images.map((image, index) => (
-                <div key={index} className="group flex flex-col gap-2">
+                <div
+                  key={index}
+                  className="group flex cursor-pointer flex-col gap-2"
+                  onClick={() => handleStartReading(index)}
+                >
                   <div className="bg-muted relative aspect-[2/3] w-[128px] overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
                     <img
                       src={image.url}
@@ -256,6 +461,12 @@ export function ContentArea({
                       className="h-full w-full object-cover"
                       loading="lazy"
                     />
+                    {/* Current Page Overlay */}
+                    {activeComic?.progress?.current === index && (
+                      <div className="border-primary bg-primary/10 absolute inset-0 flex items-center justify-center border-2">
+                        <Play className="text-primary fill-primary h-8 w-8 opacity-50" />
+                      </div>
+                    )}
                   </div>
                   <div
                     className="text-foreground/90 truncate text-center text-xs"
@@ -315,8 +526,18 @@ export function ContentArea({
 
                     {/* Progress Badge */}
                     {comic.progress && comic.progress.percent > 0 && (
-                      <div className="absolute right-1 bottom-1 rounded bg-black/70 px-1 py-0.5 text-[10px] text-white">
-                        {Math.round(comic.progress.percent)}%
+                      <div className="absolute inset-x-0 bottom-0 flex flex-col bg-gradient-to-t from-black/80 to-transparent p-1 pt-4">
+                        <div className="flex justify-between text-[10px] font-medium text-white">
+                          <span>{Math.round(comic.progress.percent)}%</span>
+                          <span>{comic.progress.total}P</span>
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/20">
+                          <div
+                            className="bg-primary h-full transition-all"
+                            style={{ width: `${comic.progress.percent}%` }}
+                          />
+                        </div>
                       </div>
                     )}
                   </div>
