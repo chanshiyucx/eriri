@@ -6,23 +6,38 @@ export interface ComicImage {
   filename: string
 }
 
-export interface ComicTab {
+export type TabType = 'comic' | 'book'
+
+export interface BaseTab {
   id: string
-  comicId: string
   title: string
+  type?: TabType // Optional for backward compatibility (default to comic)
+}
+
+export interface ComicTab extends BaseTab {
+  type?: 'comic'
+  comicId: string
   images: ComicImage[]
 }
 
+export interface BookTab extends BaseTab {
+  type: 'book'
+  bookId: string
+  path: string
+}
+
+export type Tab = ComicTab | BookTab
+
 interface TabsState {
-  tabs: ComicTab[]
+  tabs: Tab[]
   activeTabId: string // 'home' or comic tab id
   isImmersive: boolean
 
   // Actions
-  addTab: (tab: ComicTab) => void
+  addTab: (tab: Tab) => void
   removeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
-  getActiveTab: () => ComicTab | null
+  getActiveTab: () => Tab | null
   clearAllTabs: () => void
   setImmersive: (isImmersive: boolean) => void
 }
@@ -37,7 +52,15 @@ export const useTabsStore = create<TabsState>()(
       addTab: (tab) =>
         set((state) => {
           // Check if tab already exists
-          const existingTab = state.tabs.find((t) => t.comicId === tab.comicId)
+          // We need to check both comicId and bookId
+          const existingTab = state.tabs.find((t) => {
+            if (tab.type === 'book') {
+              return (t as BookTab).bookId === tab.bookId
+            } else {
+              return (t as ComicTab).comicId === tab.comicId
+            }
+          })
+
           if (existingTab) {
             // Just switch to existing tab
             return { activeTabId: existingTab.id }
