@@ -386,10 +386,7 @@ export function ContentArea({
 
   return (
     <div
-      className={cn(
-        'bg-surface flex h-full flex-col transition-all duration-300',
-        className,
-      )}
+      className={cn('bg-surface flex h-full flex-col', className)}
       {...props}
     >
       {/* Toolbar */}
@@ -634,7 +631,7 @@ export function ContentArea({
 
       {/* Content Grid with Animations */}
       {activeTab?.type !== 'book' && (
-        <ScrollArea className="flex-1 transition-all duration-300">
+        <ScrollArea className="flex-1">
           <AnimatePresence mode="wait">
             {isReading && activeTab ? (
               /* Reader View */
@@ -777,12 +774,12 @@ export function ContentArea({
                 animate="animate"
                 exit="exit"
                 transition={pageTransition}
-                className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
+                className="flex flex-wrap justify-start gap-6 p-6 pb-4"
               >
                 {processedComics.map((comic) => (
                   <div
                     key={comic.id}
-                    className="group flex w-[128px] cursor-pointer flex-col gap-2"
+                    className="group flex w-[128px] shrink-0 cursor-pointer flex-col gap-2"
                     onClick={() => {
                       void handleComicClick(comic)
                     }}
@@ -821,12 +818,12 @@ export function ContentArea({
                     </div>
 
                     {/* Title */}
-                    <h3
-                      className="text-foreground/90 group-hover:text-primary line-clamp-2 text-sm leading-tight font-medium transition-colors"
+                    <div
+                      className="text-foreground/90 group-hover:text-primary truncate text-sm font-medium transition-colors"
                       title={comic.title}
                     >
                       {comic.title}
-                    </h3>
+                    </div>
                   </div>
                 ))}
               </motion.div>
