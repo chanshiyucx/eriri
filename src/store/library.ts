@@ -11,7 +11,11 @@ interface LibraryState {
   selectedLibraryId: string | null // null = show all
   libraryStates: Record<
     string,
-    { selectedAuthorId: string | null; selectedBookId: string | null }
+    {
+      selectedAuthorId: string | null
+      selectedBookId: string | null
+      selectedComicId: string | null
+    }
   >
 
   addLibrary: (lib: Library) => void
@@ -33,6 +37,7 @@ interface LibraryState {
     state: Partial<{
       selectedAuthorId: string | null
       selectedBookId: string | null
+      selectedComicId: string | null
     }>,
   ) => void
 
@@ -138,6 +143,7 @@ export const useLibraryStore = create<LibraryState>()(
               ...(state.libraryStates[libraryId] || {
                 selectedAuthorId: null,
                 selectedBookId: null,
+                selectedComicId: null,
               }),
               ...newState,
             },
