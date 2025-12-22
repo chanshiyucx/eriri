@@ -1,28 +1,38 @@
 import { open } from '@tauri-apps/plugin-dialog'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  ArrowDownFromLine,
   ArrowUpDown,
+  ArrowUpFromLine,
+  Check,
   ChevronLeft,
   PanelLeftClose,
   PanelLeftOpen,
-  Play,
   Plus,
   RefreshCw,
   Search,
+  StepForward,
+  Undo2,
+  X,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { scanComicImages, scanLibrary } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
+import { useUIStore } from '@/store/ui'
 import { Comic } from '@/types/library'
 
 interface ContentAreaProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed?: boolean
   toggleSidebar?: () => void
 }
+
+type SortKey = 'name' | 'date'
+type SortOrder = 'asc' | 'desc'
 
 export function ContentArea({
   className,
@@ -44,10 +54,18 @@ export function ContentArea({
   const { getActiveTab, addTab, setActiveTab, isImmersive, setImmersive } =
     useTabsStore()
   const { updateComicProgress } = useLibraryStore()
+  const { setSidebarCollapsed, showOnlyInProgress } = useUIStore()
 
   // Reader state
   const [isReading, setIsReading] = useState(false)
   const [readingPageIndex, setReadingPageIndex] = useState(0)
+
+  // Search & Sort state
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchVisible, setIsSearchVisible] = useState(false)
+  const [sortKey, setSortKey] = useState<SortKey>('name')
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
+  const [isSortVisible, setIsSortVisible] = useState(false)
 
   // Get active tab data
   const activeTab = getActiveTab()
@@ -60,6 +78,7 @@ export function ContentArea({
   const handleStartReading = (index = 0) => {
     setReadingPageIndex(index)
     setIsReading(true)
+    setSidebarCollapsed(true)
   }
 
   const handleContinueReading = () => {
@@ -120,15 +139,47 @@ export function ContentArea({
     setImmersive(false)
   }, [activeTab?.id, setImmersive])
 
-  // Filter comics by selected library
-  const filteredComics = selectedLibraryId
-    ? comics.filter((c) => c.libraryId === selectedLibraryId)
-    : comics
+  // Filter and Sort comics
+  const processedComics = useMemo(() => {
+    let result = selectedLibraryId
+      ? comics.filter((c) => c.libraryId === selectedLibraryId)
+      : comics
 
-  // Ensure unique comics
-  const uniqueComics = Array.from(
-    new Map(filteredComics.map((c) => [c.id, c])).values(),
-  )
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase().trim()
+      result = result.filter((c) => c.title.toLowerCase().includes(query))
+    }
+
+    // Filter by reading progress (Continue Reading)
+    if (showOnlyInProgress) {
+      result = result.filter((c) => c.progress && c.progress.percent > 0)
+    }
+
+    // Ensure unique comics before sorting
+    const unique = Array.from(new Map(result.map((c) => [c.id, c])).values())
+
+    // Sort
+    return unique.sort((a, b) => {
+      let comparison = 0
+      if (sortKey === 'name') {
+        comparison = a.title.localeCompare(b.title, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        })
+      } else {
+        comparison = (a.createdAt || 0) - (b.createdAt || 0)
+      }
+      return sortOrder === 'asc' ? comparison : -comparison
+    })
+  }, [
+    comics,
+    selectedLibraryId,
+    searchQuery,
+    sortKey,
+    sortOrder,
+    showOnlyInProgress,
+  ])
 
   const currentLibrary =
     libraries.length > 0 ? libraries[libraries.length - 1] : null
@@ -228,6 +279,15 @@ export function ContentArea({
     setActiveTab('home')
   }
 
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortKey(key)
+      setSortOrder('asc')
+    }
+  }
+
   // Animation variants
   const pageVariants = {
     initial: { opacity: 0, x: 20 },
@@ -256,9 +316,9 @@ export function ContentArea({
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="flex h-10 items-center justify-between overflow-hidden border-b px-4 py-2"
+            className="flex h-10 items-center justify-between border-b px-4"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex flex-1 items-center gap-1 overflow-hidden">
               {/* Toggle Sidebar - Always visible */}
               <Button variant="ghost" size="icon" onClick={toggleSidebar}>
                 {isCollapsed ? (
@@ -276,18 +336,18 @@ export function ContentArea({
                   onClick={isReading ? handleExitReader : handleBack}
                   title="Back"
                 >
-                  <ChevronLeft className="h-4 w-4" />
+                  <Undo2 className="h-4 w-4" />
                 </Button>
               )}
 
-              {!isReading && (
+              {!isReading && !activeTab && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => {
                     void handleRefresh()
                   }}
-                  disabled={isScanning || (!currentLibrary && !activeTab)}
+                  disabled={isScanning || !currentLibrary}
                   title="Refresh"
                   className="shrink-0"
                 >
@@ -305,7 +365,7 @@ export function ContentArea({
                   onClick={handleContinueReading}
                   title="Continue Reading"
                 >
-                  <Play className="h-4 w-4 fill-current" />
+                  <StepForward className="h-4 w-4" />
                 </Button>
               )}
 
@@ -316,7 +376,8 @@ export function ContentArea({
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="relative flex items-center gap-1">
               {/* Progress in Reader View */}
               {isReading && activeTab && (
                 <span className="text-muted-foreground mr-4 font-mono text-xs">
@@ -330,23 +391,142 @@ export function ContentArea({
 
               {!isReading && (
                 <>
-                  <Button variant="ghost" size="icon">
-                    <Search className="h-4 w-4" />
-                  </Button>
                   {!activeTab && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => {
-                        void handleImport()
-                      }}
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
+                    <>
+                      {!isSearchVisible && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setIsSearchVisible(!isSearchVisible)}
+                          className={cn(searchQuery && 'text-primary')}
+                        >
+                          <Search className="h-4 w-4" />
+                        </Button>
+                      )}
+
+                      {/* Search Input - Inline expansion */}
+                      <AnimatePresence>
+                        {isSearchVisible && (
+                          <motion.div
+                            initial={{ width: 40, opacity: 0 }}
+                            animate={{ width: 200, opacity: 1 }}
+                            exit={{ width: 40, opacity: 0 }}
+                            transition={{ duration: 0.2, ease: 'easeInOut' }}
+                            className="bg-background flex items-center gap-2 overflow-hidden rounded-md px-2 py-1"
+                          >
+                            <Input
+                              autoFocus
+                              placeholder="搜索漫画..."
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="bg-overlay! h-6 flex-1 border-none bg-transparent p-1 text-sm shadow-none placeholder:text-base! focus-visible:ring-0"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Escape') {
+                                  setIsSearchVisible(false)
+                                  setSearchQuery('')
+                                }
+                              }}
+                            />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-4 w-4 shrink-0 p-0 hover:bg-transparent"
+                              onClick={() => {
+                                setIsSearchVisible(false)
+                                setSearchQuery('')
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => {
+                          void handleImport()
+                        }}
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+
+                      <div className="relative">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setIsSortVisible(!isSortVisible)}
+                          className={cn(isSortVisible && 'bg-accent')}
+                        >
+                          <ArrowUpDown className="h-4 w-4" />
+                        </Button>
+                        <AnimatePresence>
+                          {isSortVisible && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setIsSortVisible(false)}
+                              />
+                              <motion.div
+                                initial={{ opacity: 0, y: 5, scale: 0.95 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: 5, scale: 0.95 }}
+                                className="bg-popover text-popover-foreground border-border absolute top-full right-0 z-50 mt-1 w-48 rounded-md border p-1 shadow-md"
+                              >
+                                <div className="space-y-1">
+                                  <button
+                                    className="hover:bg-accent hover:text-accent-foreground flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
+                                    onClick={() => {
+                                      toggleSort('name')
+                                    }}
+                                  >
+                                    <div className="w-4 shrink-0">
+                                      {sortKey === 'name' && (
+                                        <Check className="h-3.5 w-3.5" />
+                                      )}
+                                    </div>
+                                    <span className="flex-1">按名称排序</span>
+                                    <div className="flex items-center gap-1 opacity-50">
+                                      {sortKey === 'name' &&
+                                        (sortOrder === 'asc' ? (
+                                          <ArrowDownFromLine className="h-3.5 w-3.5" />
+                                        ) : (
+                                          <ArrowUpFromLine className="h-3.5 w-3.5" />
+                                        ))}
+                                    </div>
+                                  </button>
+                                  <button
+                                    className="hover:bg-accent hover:text-accent-foreground flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
+                                    onClick={() => {
+                                      toggleSort('date')
+                                    }}
+                                  >
+                                    <div className="w-4 shrink-0">
+                                      {sortKey === 'date' && (
+                                        <Check className="h-3.5 w-3.5" />
+                                      )}
+                                    </div>
+                                    <span className="flex-1">
+                                      按创建时间排序
+                                    </span>
+                                    <div className="flex items-center gap-1 opacity-50">
+                                      {sortKey === 'date' &&
+                                        (sortOrder === 'asc' ? (
+                                          <ArrowDownFromLine className="h-3.5 w-3.5" />
+                                        ) : (
+                                          <ArrowUpFromLine className="h-3.5 w-3.5" />
+                                        ))}
+                                    </div>
+                                  </button>
+                                </div>
+                              </motion.div>
+                            </>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </>
                   )}
-                  <Button variant="ghost" size="icon">
-                    <ArrowUpDown className="h-4 w-4" />
-                  </Button>
                 </>
               )}
             </div>
@@ -464,7 +644,7 @@ export function ContentArea({
                     {/* Current Page Overlay */}
                     {activeComic?.progress?.current === index && (
                       <div className="border-primary bg-primary/10 absolute inset-0 flex items-center justify-center border-2">
-                        <Play className="text-primary fill-primary h-8 w-8 opacity-50" />
+                        <StepForward className="text-primary fill-primary h-8 w-8 opacity-50" />
                       </div>
                     )}
                   </div>
@@ -478,7 +658,7 @@ export function ContentArea({
               ))}
             </motion.div>
           ) : /* Library View */
-          uniqueComics.length === 0 ? (
+          processedComics.length === 0 ? (
             <motion.div
               key="empty"
               variants={pageVariants}
@@ -488,8 +668,19 @@ export function ContentArea({
               transition={pageTransition}
               className="text-muted-foreground flex h-full flex-col items-center justify-center"
             >
-              <p>No comics found.</p>
-              <p className="text-sm">Click + to import a folder.</p>
+              <p>{searchQuery ? '未找到匹配的漫画' : '未找到漫画'}</p>
+              {!searchQuery && <p className="text-sm">点击 + 导入文件夹</p>}
+              {searchQuery && (
+                <Button
+                  variant="link"
+                  onClick={() => {
+                    setSearchQuery('')
+                    setIsSearchVisible(false)
+                  }}
+                >
+                  清除搜索
+                </Button>
+              )}
             </motion.div>
           ) : (
             <motion.div
@@ -501,7 +692,7 @@ export function ContentArea({
               transition={pageTransition}
               className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
             >
-              {uniqueComics.map((comic) => (
+              {processedComics.map((comic) => (
                 <div
                   key={comic.id}
                   className="group flex w-[128px] cursor-pointer flex-col gap-2"

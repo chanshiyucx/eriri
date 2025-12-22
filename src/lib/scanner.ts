@@ -1,5 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core'
-import { readDir, type DirEntry } from '@tauri-apps/plugin-fs'
+import { readDir, stat, type DirEntry } from '@tauri-apps/plugin-fs'
 import type { Comic } from '@/types/library'
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'] as const
@@ -26,9 +26,14 @@ export async function scanLibrary(
         const comicPath = joinPath(libraryPath, entry.name)
         const comicId = crypto.randomUUID()
 
-        // Scan for cover image
+        // Scan for cover and metadata
         let cover = ''
+        let createdAt = Date.now()
+
         try {
+          const s = await stat(comicPath)
+          createdAt = s.birthtime?.getTime() ?? s.mtime?.getTime() ?? Date.now()
+
           const files: DirEntry[] = await readDir(comicPath)
           const images = files
             .filter(
@@ -59,6 +64,7 @@ export async function scanLibrary(
           path: comicPath,
           cover,
           libraryId,
+          createdAt,
           progress: {
             current: 0,
             total: 0,

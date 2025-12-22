@@ -1,8 +1,8 @@
 import {
+  BookImage,
   Clock,
   Heart,
   LayoutGrid,
-  Library as LibraryIcon,
   Settings,
   Trash2,
 } from 'lucide-react'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
+import { useUIStore } from '@/store/ui'
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed?: boolean
@@ -19,6 +20,7 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 export function Sidebar({ className, isCollapsed }: SidebarProps) {
   const { libraries, removeLibrary, selectedLibraryId, setSelectedLibrary } =
     useLibraryStore()
+  const { showOnlyInProgress, setShowOnlyInProgress } = useUIStore()
 
   return (
     <div
@@ -33,8 +35,15 @@ export function Sidebar({ className, isCollapsed }: SidebarProps) {
           <div className="space-y-1">
             <SidebarButton
               icon={Clock}
-              label="继续阅读"
+              label="最近阅读"
+              variant={showOnlyInProgress ? 'secondary' : 'ghost'}
               isCollapsed={isCollapsed}
+              onClick={() => {
+                setShowOnlyInProgress(!showOnlyInProgress)
+                if (!showOnlyInProgress) {
+                  setSelectedLibrary(null)
+                }
+              }}
             />
             <SidebarButton
               icon={Heart}
@@ -44,19 +53,32 @@ export function Sidebar({ className, isCollapsed }: SidebarProps) {
             <SidebarButton
               icon={LayoutGrid}
               label="所有资源"
-              variant={selectedLibraryId === null ? 'secondary' : 'ghost'}
+              variant={
+                selectedLibraryId === null && !showOnlyInProgress
+                  ? 'secondary'
+                  : 'ghost'
+              }
               isCollapsed={isCollapsed}
-              onClick={() => setSelectedLibrary(null)}
+              onClick={() => {
+                setSelectedLibrary(null)
+                setShowOnlyInProgress(false)
+              }}
             />
             {libraries.map((lib) => (
               <div key={lib.id} className="group relative">
                 <SidebarButton
-                  icon={LibraryIcon}
+                  icon={BookImage}
                   label={lib.name}
                   variant={selectedLibraryId === lib.id ? 'secondary' : 'ghost'}
                   isCollapsed={isCollapsed}
-                  className="pl-8"
-                  onClick={() => setSelectedLibrary(lib.id)}
+                  className={cn(
+                    'transition-all',
+                    isCollapsed ? 'pl-2' : 'pl-8',
+                  )}
+                  onClick={() => {
+                    setSelectedLibrary(lib.id)
+                    setShowOnlyInProgress(false)
+                  }}
                 />
                 {!isCollapsed && (
                   <Button
@@ -114,18 +136,21 @@ function SidebarButton({
       size={isCollapsed ? 'icon' : 'default'}
       className={cn(
         'w-full transition-all duration-300',
-        isCollapsed ? 'justify-center' : 'justify-start gap-2',
+        isCollapsed ? 'justify-center opacity-0' : 'justify-start gap-2',
         className,
       )}
       title={isCollapsed ? label : undefined}
       {...props}
     >
       <Icon className="h-4 w-4 shrink-0" />
-      {!isCollapsed && (
-        <span className="animate-in fade-in slide-in-from-left-2 truncate duration-300">
-          {label}
-        </span>
-      )}
+      <span
+        className={cn(
+          'overflow-hidden whitespace-nowrap transition-all duration-300 ease-in-out',
+          isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100',
+        )}
+      >
+        {label}
+      </span>
     </Button>
   )
 }
