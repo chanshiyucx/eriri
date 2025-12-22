@@ -18,6 +18,7 @@ import {
 } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
+import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 import { type LibraryType } from '@/types/library'
 
@@ -75,8 +76,11 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
     setScanning,
     replaceComicsForLibrary,
     replaceBooksForLibrary,
+    libraryStates,
+    comics,
   } = useLibraryStore()
   const { showOnlyInProgress, setShowOnlyInProgress } = useUIStore()
+  const { setActiveTab, tabs, addTab } = useTabsStore()
 
   const handleImport = async () => {
     try {
@@ -172,6 +176,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
               onClick={() => {
                 setSelectedLibrary(null)
                 setShowOnlyInProgress(true)
+                setActiveTab('home')
               }}
             />
             <SidebarButton icon={Heart} label="我的收藏" />
@@ -199,6 +204,42 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
                       if (!isInvalid) {
                         setSelectedLibrary(lib.id)
                         setShowOnlyInProgress(false)
+
+                        // Restore state
+                        const savedState = libraryStates[lib.id]
+                        if (
+                          savedState?.selectedComicId &&
+                          lib.type !== 'book'
+                        ) {
+                          const comicId = savedState.selectedComicId
+                          // Check if tab exists
+                          const existingTab = tabs.find(
+                            (t) =>
+                              (t.type === 'comic' || !t.type) &&
+                              t.comicId === comicId,
+                          )
+                          if (existingTab) {
+                            setActiveTab(existingTab.id)
+                          } else {
+                            // Recreate tab
+                            const comic = comics.find((c) => c.id === comicId)
+                            if (comic) {
+                              addTab({
+                                id: crypto.randomUUID(),
+                                title: comic.title,
+                                type: 'comic',
+                                comicId: comic.id,
+                                path: comic.path,
+                                imageCount: comic.pageCount ?? 0,
+                              })
+                              // addTab automatically sets it as active
+                            } else {
+                              setActiveTab('home')
+                            }
+                          }
+                        } else {
+                          setActiveTab('home')
+                        }
                       }
                     }}
                     disabled={isInvalid}

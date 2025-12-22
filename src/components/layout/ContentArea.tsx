@@ -248,6 +248,28 @@ export function ContentArea({
         libraries[libraries.length - 1])
       : null
 
+  // Save active comic state
+  useEffect(() => {
+    if (!currentLibrary || currentLibrary.type === 'book') return
+
+    // If we have an active comic tab that belongs to this library, save it
+    if (activeComicTab?.type === 'comic') {
+      const comic = comics.find((c) => c.id === activeComicTab.comicId)
+      if (comic && comic.libraryId === currentLibrary.id) {
+        setLibraryState(currentLibrary.id, {
+          selectedComicId: comic.id,
+        })
+      }
+    } else if (activeTab === null) {
+      // If we're on the home tab (activeTab is null for home aka no active tab returned by getActiveTab?
+      // check getActiveTab: if home, returns null.
+      // So if activeTab is null, we are on home.
+      setLibraryState(currentLibrary.id, {
+        selectedComicId: null,
+      })
+    }
+  }, [currentLibrary, activeComicTab, activeTab, comics, setLibraryState])
+
   const isBookLibrary = currentLibrary?.type === 'book'
 
   // Restore selected book from persistent state when library changes
@@ -458,7 +480,7 @@ export function ContentArea({
 
               {/* Comic Title in Detail/Reader View */}
               {activeTab && (
-                <span className="text-foreground/90 truncate text-sm font-medium">
+                <span className="ml-2 truncate text-sm font-medium">
                   {activeTab.title}
                 </span>
               )}
@@ -632,7 +654,7 @@ export function ContentArea({
       {/* Content Grid with Animations */}
       {activeTab?.type !== 'book' && (
         <ScrollArea className="flex-1">
-          <AnimatePresence mode="wait">
+          <AnimatePresence>
             {isReading && activeTab ? (
               /* Reader View */
               <motion.div
@@ -729,7 +751,6 @@ export function ContentArea({
                 key="book-library"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
                 className="h-full w-full"
               >
                 <BookLibraryView
@@ -748,7 +769,6 @@ export function ContentArea({
                 variants={pageVariants}
                 initial="initial"
                 animate="animate"
-                exit="exit"
                 transition={pageTransition}
                 className="text-muted-foreground flex h-full flex-col items-center justify-center"
               >
@@ -772,7 +792,6 @@ export function ContentArea({
                 variants={pageVariants}
                 initial="initial"
                 animate="animate"
-                exit="exit"
                 transition={pageTransition}
                 className="flex flex-wrap justify-start gap-6 p-6 pb-4"
               >

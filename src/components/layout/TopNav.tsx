@@ -101,7 +101,7 @@ export function TopNav({
               <div
                 key={tab.id}
                 className={cn(
-                  'bg-surface hover:bg-base group flex max-w-[200px] min-w-[150px] shrink-0 items-center gap-2 rounded-md border px-3 py-1 text-sm transition-colors',
+                  'bg-surface hover:bg-base group flex max-w-[200px] min-w-[150px] shrink-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 text-sm transition-colors',
                   activeTabId === tab.id && 'bg-muted',
                 )}
                 onClick={() => onTabChange(tab.id)}
