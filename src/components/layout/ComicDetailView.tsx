@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion'
 import { StepForward } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { Virtuoso } from 'react-virtuoso'
+import { forwardRef, memo, useEffect, useState } from 'react'
+import { VirtuosoGrid } from 'react-virtuoso'
 import { loadComicImageRange } from '@/lib/scanner'
 
 interface ComicDetailViewProps {
@@ -17,7 +17,7 @@ const imageCache = new Map<
   Map<number, { url: string; filename: string }>
 >()
 
-function ComicThumbnail({
+const ComicThumbnail = memo(function ComicThumbnail({
   comicPath,
   index,
   isCurrentProgress,
@@ -35,12 +35,15 @@ function ComicThumbnail({
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    let mounted = true
     const loadImage = async () => {
       // Check cache first
       const comicCache = imageCache.get(comicPath)
       if (comicCache?.has(index)) {
-        setImageData(comicCache.get(index)!)
-        setLoading(false)
+        if (mounted) {
+          setImageData(comicCache.get(index)!)
+          setLoading(false)
+        }
         return
       }
 
@@ -58,21 +61,28 @@ function ComicThumbnail({
             .get(comicPath)!
             .set(index, { url: img.url, filename: img.filename })
 
-          setImageData({ url: img.url, filename: img.filename })
+          if (mounted) {
+            setImageData({ url: img.url, filename: img.filename })
+          }
         }
       } catch (error) {
         console.error('Failed to load image:', error)
       } finally {
-        setLoading(false)
+        if (mounted) {
+          setLoading(false)
+        }
       }
     }
 
     void loadImage()
+    return () => {
+      mounted = false
+    }
   }, [comicPath, index])
 
   return (
     <div
-      className="group flex cursor-pointer flex-col gap-2"
+      className="group flex w-full cursor-pointer flex-col gap-2 overflow-hidden"
       onClick={() => onStartReading(index)}
     >
       <div className="bg-muted relative aspect-[2/3] w-[128px] overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
@@ -110,7 +120,44 @@ function ComicThumbnail({
       </div>
     </div>
   )
-}
+})
+
+const ListContainer = forwardRef<
+  HTMLDivElement,
+  React.HTMLAttributes<HTMLDivElement>
+>(({ style, children, ...props }, ref) => (
+  <div
+    ref={ref}
+    {...props}
+    style={{
+      display: 'flex',
+      flexWrap: 'wrap',
+      justifyContent: 'flex-start',
+      gap: '1.5rem',
+      padding: '1.5rem',
+      ...style,
+    }}
+  >
+    {children}
+  </div>
+))
+ListContainer.displayName = 'ListContainer'
+
+const ItemContainer = ({
+  children,
+  ...props
+}: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    {...props}
+    style={{
+      display: 'flex',
+      width: '128px',
+      flexShrink: 0,
+    }}
+  >
+    {children}
+  </div>
+)
 
 export function ComicDetailView({
   comicPath,
@@ -125,35 +172,24 @@ export function ComicDetailView({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="h-full w-full"
+      className="h-full w-full p-6"
     >
-      <Virtuoso
+      <VirtuosoGrid
         style={{ height: '100%' }}
         totalCount={imageCount}
-        overscan={10}
-        itemContent={(index) => (
-          <div className="p-3">
-            <ComicThumbnail
-              comicPath={comicPath}
-              index={index}
-              isCurrentProgress={currentProgress === index}
-              onStartReading={onStartReading}
-            />
-          </div>
-        )}
+        overscan={20}
         components={{
-          /* eslint-disable react/prop-types */
-          List: ({ children, ...props }) => (
-            <div
-              {...props}
-              className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
-              style={{ ...props.style, display: 'grid' }}
-            >
-              {children}
-            </div>
-          ),
-          /* eslint-enable react/prop-types */
+          List: ListContainer,
+          Item: ItemContainer,
         }}
+        itemContent={(index) => (
+          <ComicThumbnail
+            comicPath={comicPath}
+            index={index}
+            isCurrentProgress={currentProgress === index}
+            onStartReading={onStartReading}
+          />
+        )}
       />
     </motion.div>
   )
