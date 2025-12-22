@@ -1,12 +1,12 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import { useState } from 'react'
 import { useTabsStore } from '@/store/tabs'
+import { useUIStore } from '@/store/ui'
 import { ContentArea } from './ContentArea'
 import { Sidebar } from './Sidebar'
 import { TopNav } from './TopNav'
 
 export function AppLayout() {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const { isSidebarCollapsed, toggleSidebar } = useUIStore()
   const { tabs, activeTabId, setActiveTab, removeTab, isImmersive } =
     useTabsStore()
 
@@ -55,8 +55,8 @@ export function AppLayout() {
             >
               <Sidebar
                 className="h-full border-r"
-                isCollapsed={isCollapsed}
-                toggleSidebar={() => setIsCollapsed(!isCollapsed)}
+                isCollapsed={isSidebarCollapsed}
+                toggleSidebar={toggleSidebar}
               />
             </motion.div>
           )}
@@ -66,8 +66,8 @@ export function AppLayout() {
         <main className="flex-1 overflow-hidden">
           <ContentArea
             className="h-full"
-            isCollapsed={isCollapsed}
-            toggleSidebar={() => setIsCollapsed(!isCollapsed)}
+            isCollapsed={isSidebarCollapsed}
+            toggleSidebar={toggleSidebar}
           />
         </main>
       </div>

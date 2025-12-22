@@ -23,6 +23,7 @@ export interface Comic {
   cover?: string
   libraryId: string
   pageCount?: number
+  createdAt: number
   // Reading progress
   progress?: {
     current: number // page index
