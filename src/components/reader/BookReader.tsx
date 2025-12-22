@@ -39,8 +39,10 @@ export function BookReader({
   const [, setProgressPercent] = useState(0)
 
   const virtuosoRef = useRef<VirtuosoHandle>(null)
+  const restoredRef = useRef(false)
 
   useEffect(() => {
+    restoredRef.current = false
     let mounted = true
     const load = async () => {
       try {
@@ -70,9 +72,26 @@ export function BookReader({
     }
   }, [bookPath])
 
-  // Restore initial progress
+  // Restore initial progress - use serialized comparison to avoid re-scrolling on object recreation
+  const initialProgressKey = initialProgress
+    ? JSON.stringify({
+        startCharIndex: initialProgress.startCharIndex,
+        percent: initialProgress.percent,
+      })
+    : ''
+
   useEffect(() => {
     if (!content || !virtuosoRef.current) return
+
+    // If we've already restored progress for this book, don't do it again
+    // This prevents the "infinite loop" of progress updates -> prop update -> restore -> scroll
+    if (restoredRef.current) return
+
+    // If no initial progress to restore, mark as restored and we're done
+    if (!initialProgressKey) {
+      restoredRef.current = true
+      return
+    }
 
     // Allow a small delay for Virtuoso to initialize
     const timer = setTimeout(() => {
@@ -106,10 +125,14 @@ export function BookReader({
           behavior: 'auto',
         })
       }
+
+      // Mark as restored after successful scroll
+      restoredRef.current = true
     }, 100)
 
     return () => clearTimeout(timer)
-  }, [content, initialProgress])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [content, initialProgressKey]) // Use serialized key instead of object reference
 
   /*
    * Throttled progress update to ensure performance.
@@ -152,8 +175,8 @@ export function BookReader({
       if (!content) return
 
       const totalLines = content.lines.length
-      // Use the middle of visible range as current position
-      const currentLine = Math.floor((range.startIndex + range.endIndex) / 2)
+      // Use the top of visible range as current position for stable restoration
+      const currentLine = range.startIndex
       const safeLineIndex = Math.min(Math.max(0, currentLine), totalLines - 1)
       const percent = (safeLineIndex / (totalLines - 1)) * 100
 

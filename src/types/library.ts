@@ -14,6 +14,10 @@ export interface Library {
   // For external drive matching
   volumeLabel?: string
   uuid?: string
+  // Validation status
+  isValid?: boolean
+  lastValidated?: number
+  invalidReason?: string
 }
 
 export interface Comic {
