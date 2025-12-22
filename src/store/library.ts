@@ -9,6 +9,10 @@ interface LibraryState {
   books: Book[]
   isScanning: boolean
   selectedLibraryId: string | null // null = show all
+  libraryStates: Record<
+    string,
+    { selectedAuthorId: string | null; selectedBookId: string | null }
+  >
 
   addLibrary: (lib: Library) => void
   removeLibrary: (id: string) => void
@@ -24,6 +28,13 @@ interface LibraryState {
 
   setScanning: (isScanning: boolean) => void
   setSelectedLibrary: (id: string | null) => void
+  setLibraryState: (
+    libraryId: string,
+    state: Partial<{
+      selectedAuthorId: string | null
+      selectedBookId: string | null
+    }>,
+  ) => void
 
   // Helpers
   getComicsByLibrary: (libraryId: string) => Comic[]
@@ -47,6 +58,12 @@ interface LibraryState {
     bookId: string,
     progress: { startCharIndex: number; totalChars: number; percent: number },
   ) => void
+
+  // Library validation
+  validateAllLibraries: () => Promise<void>
+  markLibraryInvalid: (id: string, reason: string) => void
+  markLibraryValid: (id: string) => void
+  reconnectLibrary: (id: string) => Promise<boolean>
 }
 
 export const useLibraryStore = create<LibraryState>()(
@@ -58,6 +75,7 @@ export const useLibraryStore = create<LibraryState>()(
       books: [],
       isScanning: false,
       selectedLibraryId: null,
+      libraryStates: {},
 
       addLibrary: (lib) =>
         set((state) => ({
@@ -70,7 +88,9 @@ export const useLibraryStore = create<LibraryState>()(
           comics: state.comics.filter((c) => c.libraryId !== id),
           authors: state.authors.filter((a) => a.libraryId !== id),
           books: state.books.filter((b) => b.libraryId !== id),
-          // Reset selection if removing selected library
+          libraryStates: Object.fromEntries(
+            Object.entries(state.libraryStates).filter(([key]) => key !== id),
+          ),
           selectedLibraryId:
             state.selectedLibraryId === id ? null : state.selectedLibraryId,
         })),
@@ -109,6 +129,20 @@ export const useLibraryStore = create<LibraryState>()(
       setScanning: (isScanning) => set({ isScanning }),
 
       setSelectedLibrary: (id) => set({ selectedLibraryId: id }),
+
+      setLibraryState: (libraryId, newState) =>
+        set((state) => ({
+          libraryStates: {
+            ...state.libraryStates,
+            [libraryId]: {
+              ...(state.libraryStates[libraryId] || {
+                selectedAuthorId: null,
+                selectedBookId: null,
+              }),
+              ...newState,
+            },
+          },
+        })),
 
       getComicsByLibrary: (libraryId) =>
         get().comics.filter((c) => c.libraryId === libraryId),
@@ -170,6 +204,76 @@ export const useLibraryStore = create<LibraryState>()(
               : b,
           ),
         })),
+
+      // Library validation actions
+      validateAllLibraries: async () => {
+        const { libraries } = get()
+        const { validateLibraries: validateFn } =
+          await import('@/lib/libraryValidator')
+
+        const validationResults = await validateFn(
+          libraries.map((l) => ({ id: l.id, path: l.path })),
+        )
+
+        set((state) => ({
+          libraries: state.libraries.map((lib) => {
+            const result = validationResults.get(lib.id)
+            if (!result) return lib
+
+            return {
+              ...lib,
+              isValid: result.isValid,
+              lastValidated: Date.now(),
+              invalidReason: result.reason,
+            }
+          }),
+        }))
+      },
+
+      markLibraryInvalid: (id, reason) =>
+        set((state) => ({
+          libraries: state.libraries.map((lib) =>
+            lib.id === id
+              ? {
+                  ...lib,
+                  isValid: false,
+                  lastValidated: Date.now(),
+                  invalidReason: reason,
+                }
+              : lib,
+          ),
+        })),
+
+      markLibraryValid: (id) =>
+        set((state) => ({
+          libraries: state.libraries.map((lib) =>
+            lib.id === id
+              ? {
+                  ...lib,
+                  isValid: true,
+                  lastValidated: Date.now(),
+                  invalidReason: undefined,
+                }
+              : lib,
+          ),
+        })),
+
+      reconnectLibrary: async (id) => {
+        const { libraries } = get()
+        const library = libraries.find((l) => l.id === id)
+        if (!library) return false
+
+        const { validateLibraryPath } = await import('@/lib/libraryValidator')
+        const result = await validateLibraryPath(library.path)
+
+        if (result.isValid) {
+          get().markLibraryValid(id)
+          return true
+        } else {
+          get().markLibraryInvalid(id, result.reason ?? '无法访问')
+          return false
+        }
+      },
     }),
     {
       name: 'eriri-library-storage',

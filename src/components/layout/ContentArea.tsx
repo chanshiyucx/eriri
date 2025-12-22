@@ -1,4 +1,3 @@
-import { open } from '@tauri-apps/plugin-dialog'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowDownFromLine,
@@ -8,7 +7,6 @@ import {
   ChevronLeft,
   PanelLeftClose,
   PanelLeftOpen,
-  Plus,
   RefreshCw,
   Search,
   StepForward,
@@ -19,19 +17,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  isBookLibrary as checkIsBookLibrary,
-  scanBookLibrary,
-  scanComicImages,
-  scanLibrary,
-} from '@/lib/scanner'
+import { useComicImagePreloader } from '@/hooks/useComicImagePreloader'
+import { getComicImageCount, scanBookLibrary, scanLibrary } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
-import { Book, Comic, type LibraryType } from '@/types/library'
+import { Book, Comic } from '@/types/library'
 import { BookReader } from '../reader/BookReader'
 import { BookLibraryView } from './BookLibraryView'
+import { ComicDetailView } from './ComicDetailView'
 
 interface ContentAreaProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed?: boolean
@@ -52,20 +47,24 @@ export function ContentArea({
     books,
     libraries,
     selectedLibraryId,
-    addLibrary,
-    addComics,
-    addAuthors,
-    addBooks,
     setScanning,
     isScanning,
     replaceComicsForLibrary,
     replaceBooksForLibrary,
     updateComicProgress,
-    updateBookProgress,
+    libraryStates,
+    setLibraryState,
   } = useLibraryStore()
 
-  const { getActiveTab, addTab, setActiveTab, isImmersive, setImmersive } =
-    useTabsStore()
+  const {
+    getActiveTab,
+    addTab,
+    setActiveTab,
+    isImmersive,
+    setImmersive,
+    tabs,
+    removeTab,
+  } = useTabsStore()
   const { setSidebarCollapsed, showOnlyInProgress } = useUIStore()
 
   // Reader state
@@ -99,6 +98,19 @@ export function ContentArea({
   const activeBook =
     activeTab?.type === 'book'
       ? books.find((b) => b.id === activeTab.bookId)
+      : null
+
+  // Preload images ONLY for comics, not books
+  const { getCurrentImage } = useComicImagePreloader(
+    activeComicTab?.path ?? '',
+    readingPageIndex,
+    activeComicTab?.imageCount ?? 0,
+    2, // preload 2 pages before and after
+  )
+  // Only use preloaded image for comics in reading mode
+  const currentImage =
+    activeComicTab && isReading && activeTab?.type === 'comic'
+      ? getCurrentImage()
       : null
 
   const handleStartReading = (index = 0) => {
@@ -153,6 +165,16 @@ export function ContentArea({
     setActiveTab('home')
     setSidebarCollapsed(false)
   }, [setActiveTab, setSidebarCollapsed])
+
+  const handleBookSelect = (book: Book | null) => {
+    setSelectedBook(book)
+    // Update persistent state
+    if (currentLibrary) {
+      setLibraryState(currentLibrary.id, {
+        selectedBookId: book?.id ?? null,
+      })
+    }
+  }
 
   const toggleImmersive = useCallback(() => {
     setImmersive(!isImmersive)
@@ -228,81 +250,20 @@ export function ContentArea({
 
   const isBookLibrary = currentLibrary?.type === 'book'
 
-  const handleImport = async () => {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        recursive: true,
-        title: 'Select Library Folder',
-      })
-
-      if (selected && typeof selected === 'string') {
-        const existingLibrary = libraries.find((l) => l.path === selected)
-
-        if (existingLibrary) {
-          // Re-scan existing
-          setScanning(true)
-          try {
-            if (existingLibrary.type === 'book') {
-              const { authors, books } = await scanBookLibrary(
-                existingLibrary.path,
-                existingLibrary.id,
-              )
-              replaceBooksForLibrary(existingLibrary.id, authors, books)
-            } else {
-              const newComics = await scanLibrary(
-                existingLibrary.path,
-                existingLibrary.id,
-              )
-              replaceComicsForLibrary(existingLibrary.id, newComics)
-            }
-            console.log('Library re-scanned successfully')
-          } catch (error) {
-            console.error('Failed to re-scan library:', error)
-            alert('Failed to re-scan library: ' + String(error))
-          } finally {
-            setScanning(false)
-          }
-        } else {
-          setScanning(true)
-
-          const libraryId = crypto.randomUUID()
-          const libraryName = selected.split('/').pop() ?? 'Untitled Library'
-
-          const isBook = await checkIsBookLibrary(selected)
-          const newLibrary = {
-            id: libraryId,
-            name: libraryName,
-            path: selected,
-            type: (isBook ? 'book' : 'comic') as LibraryType,
-            createdAt: Date.now(),
-          }
-
-          if (isBook) {
-            const { authors, books } = await scanBookLibrary(
-              selected,
-              libraryId,
-            )
-            addLibrary(newLibrary)
-            addAuthors(authors.map((a) => ({ ...a, libraryId: newLibrary.id })))
-            addBooks(books.map((b) => ({ ...b, libraryId: newLibrary.id })))
-          } else {
-            const scannedComics = await scanLibrary(selected, libraryId)
-            addLibrary(newLibrary)
-            addComics(
-              scannedComics.map((c) => ({ ...c, libraryId: newLibrary.id })),
-            )
-          }
-
-          setScanning(false)
+  // Restore selected book from persistent state when library changes
+  useEffect(() => {
+    if (currentLibrary && isBookLibrary) {
+      const state = libraryStates[currentLibrary.id]
+      if (state?.selectedBookId) {
+        const book = books.find((b) => b.id === state.selectedBookId)
+        if (book) {
+          setSelectedBook(book)
+          return
         }
       }
-    } catch (error) {
-      console.error('Failed to import library:', error)
-      setScanning(false)
+      setSelectedBook(null)
     }
-  }
+  }, [currentLibrary, isBookLibrary, libraryStates, books])
 
   const handleRefreshLibrary = async (libraryId: string) => {
     const library = libraries.find((l) => l.id === libraryId)
@@ -343,21 +304,27 @@ export function ContentArea({
   const handleComicClick = async (comic: Comic) => {
     setScanning(true)
     try {
-      const images = await scanComicImages(comic.path)
+      // Only get the image count for lazy loading
+      const imageCount = await getComicImageCount(comic.path)
 
-      // Create or switch to tab
+      // Check for existing tab with same path and remove it
+      const existingTab = tabs.find((t) => t.path === comic.path)
+      if (existingTab) {
+        removeTab(existingTab.id)
+      }
+
+      // Create new tab
       const tabId = `comic-${comic.id}`
       addTab({
         id: tabId,
         comicId: comic.id,
         title: comic.title,
         path: comic.path,
-        imageCount: images.length,
-        images, // Keep images for backward compatibility
+        imageCount,
         type: 'comic',
       })
     } catch (error) {
-      console.error('Failed to load comic images:', error)
+      console.error('Failed to load comic:', error)
       alert('Failed to load comic')
     } finally {
       setScanning(false)
@@ -365,13 +332,30 @@ export function ContentArea({
   }
 
   const handleBookClick = (book: Book) => {
+    // Check for existing tab with same path and remove it
+    const existingTab = tabs.find((t) => t.path === book.path)
+    if (existingTab) {
+      removeTab(existingTab.id)
+    }
+
+    const tabId = `book-${book.id}`
+
+    // Create new tab
     addTab({
-      id: `book-${book.id}`,
+      id: tabId,
       bookId: book.id,
       title: book.title,
       path: book.path,
       type: 'book',
     })
+
+    // Save selected book to persistent state
+    if (currentLibrary) {
+      setLibraryState(currentLibrary.id, {
+        selectedBookId: book.id,
+      })
+    }
+
     setSidebarCollapsed(true)
   }
 
@@ -390,9 +374,9 @@ export function ContentArea({
 
   // Animation variants
   const pageVariants = {
-    initial: { opacity: 0, x: 20 },
-    animate: { opacity: 1, x: 0 },
-    exit: { opacity: 0, x: -20 },
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0 },
   }
 
   const pageTransition = {
@@ -550,16 +534,6 @@ export function ContentArea({
                         )}
                       </AnimatePresence>
 
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          void handleImport()
-                        }}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-
                       {/* Sort Button - valid for both comics and books now */}
                       <div className="relative">
                         <Button
@@ -643,33 +617,32 @@ export function ContentArea({
         )}
       </AnimatePresence>
 
-      {/* Book Reader */}
+      {/* Book Reader - Preview mode, progress updates disabled */}
       {activeTab?.type === 'book' && (
         <BookReader
           bookPath={activeTab.path}
           initialProgress={activeBook?.progress}
+          mode="preview"
           onExit={handleExitBookReader}
-          onProgressUpdate={(p) => updateBookProgress(activeTab.bookId, p)}
+          onProgressUpdate={(p) => {
+            // Do NOT update progress in preview mode
+            // Progress should only be saved when user actually reads in full mode
+            console.log('Preview mode - ignoring progress update:', p)
+          }}
         />
       )}
 
       {/* Content Grid with Animations */}
       {activeTab?.type !== 'book' && (
-        <ScrollArea
-          className={cn(
-            'flex-1 transition-all duration-300',
-            !isImmersive && !isReading && 'p-6',
-            (isImmersive || isReading || isBookLibrary) && 'p-0',
-          )}
-        >
+        <ScrollArea className="flex-1 transition-all duration-300">
           <AnimatePresence mode="wait">
             {isReading && activeTab ? (
               /* Reader View */
               <motion.div
                 key="reader"
-                initial={{ opacity: 0, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.98 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.2, ease: 'easeInOut' }}
                 className="relative flex h-full items-center justify-center"
               >
@@ -689,8 +662,13 @@ export function ContentArea({
                   }}
                 >
                   <img
-                    src={activeTab.images?.[readingPageIndex]?.url ?? ''}
+                    src={
+                      currentImage?.url ??
+                      activeTab.images?.[readingPageIndex]?.url ??
+                      ''
+                    }
                     alt={
+                      currentImage?.filename ??
                       activeTab.images?.[readingPageIndex]?.filename ??
                       `Page ${readingPageIndex + 1}`
                     }
@@ -740,46 +718,14 @@ export function ContentArea({
                   </AnimatePresence>
                 </div>
               </motion.div>
-            ) : activeTab?.images && activeTab.images.length > 0 ? (
-              /* Detail View */
-              <motion.div
-                key="detail"
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                exit="exit"
-                transition={pageTransition}
-                className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
-              >
-                {activeTab.images.map((image, index) => (
-                  <div
-                    key={index}
-                    className="group flex cursor-pointer flex-col gap-2"
-                    onClick={() => handleStartReading(index)}
-                  >
-                    <div className="bg-muted relative aspect-[2/3] w-[128px] overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
-                      <img
-                        src={image.url}
-                        alt={image.filename}
-                        className="h-full w-full object-cover"
-                        loading="lazy"
-                      />
-                      {/* Current Page Overlay */}
-                      {activeComic?.progress?.current === index && (
-                        <div className="border-primary bg-primary/10 absolute inset-0 flex items-center justify-center border-2">
-                          <StepForward className="text-primary fill-primary h-8 w-8 opacity-50" />
-                        </div>
-                      )}
-                    </div>
-                    <div
-                      className="text-foreground/90 truncate text-center text-xs"
-                      title={image.filename}
-                    >
-                      {image.filename}
-                    </div>
-                  </div>
-                ))}
-              </motion.div>
+            ) : activeTab ? (
+              /* Detail View - Virtualized for performance */
+              <ComicDetailView
+                comicPath={activeTab.path}
+                imageCount={activeTab.imageCount}
+                currentProgress={activeComic?.progress?.current}
+                onStartReading={handleStartReading}
+              />
             ) : /* Library View */
             isBookLibrary && currentLibrary ? (
               <motion.div
@@ -793,7 +739,7 @@ export function ContentArea({
                   libraryId={currentLibrary.id}
                   onBookClick={handleBookClick}
                   selectedBook={selectedBook}
-                  onBookSelect={setSelectedBook}
+                  onBookSelect={handleBookSelect}
                   searchQuery={searchQuery}
                   sortKey={sortKey}
                   sortOrder={sortOrder}

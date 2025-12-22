@@ -1,17 +1,25 @@
+import { open } from '@tauri-apps/plugin-dialog'
 import {
   BookImage,
   Clock,
+  FolderPlus,
   Heart,
-  LayoutGrid,
   LibraryBig,
+  RefreshCw,
   Settings,
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import {
+  isBookLibrary as checkIsBookLibrary,
+  scanBookLibrary,
+  scanLibrary,
+} from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
 import { useUIStore } from '@/store/ui'
+import { type LibraryType } from '@/types/library'
 
 interface SidebarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon: React.ElementType
@@ -54,9 +62,98 @@ interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export function Sidebar({ isCollapsed }: SidebarProps) {
-  const { libraries, removeLibrary, selectedLibraryId, setSelectedLibrary } =
-    useLibraryStore()
+  const {
+    libraries,
+    removeLibrary,
+    selectedLibraryId,
+    setSelectedLibrary,
+    reconnectLibrary,
+    addLibrary,
+    addComics,
+    addAuthors,
+    addBooks,
+    setScanning,
+    replaceComicsForLibrary,
+    replaceBooksForLibrary,
+  } = useLibraryStore()
   const { showOnlyInProgress, setShowOnlyInProgress } = useUIStore()
+
+  const handleImport = async () => {
+    try {
+      const selected = await open({
+        directory: true,
+        multiple: false,
+        recursive: true,
+        title: 'Select Library Folder',
+      })
+
+      if (selected && typeof selected === 'string') {
+        const existingLibrary = libraries.find((l) => l.path === selected)
+
+        if (existingLibrary) {
+          // Re-scan existing
+          setScanning(true)
+          try {
+            if (existingLibrary.type === 'book') {
+              const { authors, books } = await scanBookLibrary(
+                existingLibrary.path,
+                existingLibrary.id,
+              )
+              replaceBooksForLibrary(existingLibrary.id, authors, books)
+            } else {
+              const newComics = await scanLibrary(
+                existingLibrary.path,
+                existingLibrary.id,
+              )
+              replaceComicsForLibrary(existingLibrary.id, newComics)
+            }
+            console.log('Library re-scanned successfully')
+          } catch (error) {
+            console.error('Failed to re-scan library:', error)
+            alert('Failed to re-scan library: ' + String(error))
+          } finally {
+            setScanning(false)
+          }
+        } else {
+          setScanning(true)
+
+          const libraryId = crypto.randomUUID()
+          const libraryName = selected.split('/').pop() ?? 'Untitled Library'
+
+          const isBook = await checkIsBookLibrary(selected)
+          const newLibrary = {
+            id: libraryId,
+            name: libraryName,
+            path: selected,
+            type: (isBook ? 'book' : 'comic') as LibraryType,
+            createdAt: Date.now(),
+            isValid: true,
+          }
+
+          if (isBook) {
+            const { authors, books } = await scanBookLibrary(
+              selected,
+              libraryId,
+            )
+            addLibrary(newLibrary)
+            addAuthors(authors.map((a) => ({ ...a, libraryId: newLibrary.id })))
+            addBooks(books.map((b) => ({ ...b, libraryId: newLibrary.id })))
+          } else {
+            const scannedComics = await scanLibrary(selected, libraryId)
+            addLibrary(newLibrary)
+            addComics(
+              scannedComics.map((c) => ({ ...c, libraryId: newLibrary.id })),
+            )
+          }
+
+          setScanning(false)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to import library:', error)
+      setScanning(false)
+    }
+  }
 
   return (
     <div
@@ -79,45 +176,77 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
             />
             <SidebarButton icon={Heart} label="我的收藏" />
             <SidebarButton
-              icon={LayoutGrid}
-              label="所有资源"
-              variant={
-                selectedLibraryId === null && !showOnlyInProgress
-                  ? 'secondary'
-                  : 'ghost'
-              }
+              icon={FolderPlus}
+              label="导入资源"
               onClick={() => {
-                setSelectedLibrary(null)
-                setShowOnlyInProgress(false)
+                void handleImport()
               }}
             />
-            {libraries.map((lib) => (
-              <div key={lib.id} className="group relative">
-                <SidebarButton
-                  icon={lib.type === 'book' ? LibraryBig : BookImage}
-                  label={lib.name}
-                  variant={selectedLibraryId === lib.id ? 'secondary' : 'ghost'}
-                  onClick={() => {
-                    setSelectedLibrary(lib.id)
-                    setShowOnlyInProgress(false)
-                  }}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-subtle hover:text-love absolute top-1/2 right-1 h-6 w-6 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (confirm(`Remove library "${lib.name}"?`)) {
-                      removeLibrary(lib.id)
+            {libraries.map((lib) => {
+              const isInvalid = lib.isValid === false
+              return (
+                <div key={lib.id} className="group relative">
+                  <SidebarButton
+                    icon={lib.type === 'book' ? LibraryBig : BookImage}
+                    label={lib.name}
+                    variant={
+                      selectedLibraryId === lib.id ? 'secondary' : 'ghost'
                     }
-                  }}
-                  title="Remove Library"
-                >
-                  <Trash2 className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            ))}
+                    className={cn(
+                      isInvalid && 'text-muted-foreground/50 line-through',
+                    )}
+                    onClick={() => {
+                      if (!isInvalid) {
+                        setSelectedLibrary(lib.id)
+                        setShowOnlyInProgress(false)
+                      }
+                    }}
+                    disabled={isInvalid}
+                    title={isInvalid ? `失效: ${lib.invalidReason}` : lib.name}
+                  />
+                  <div className="absolute top-1/2 right-1 flex -translate-y-1/2 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    {/* Reconnect button for invalid libraries */}
+                    {isInvalid && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-subtle hover:text-primary h-6 w-6"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          const run = async () => {
+                            const success = await reconnectLibrary(lib.id)
+                            if (success) {
+                              alert('重连成功！')
+                            } else {
+                              alert(`重连失败: ${lib.invalidReason}`)
+                            }
+                          }
+                          void run()
+                        }}
+                        title="重新连接"
+                      >
+                        <RefreshCw className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                    {/* Delete button */}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-subtle hover:text-love h-6 w-6"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (confirm(`删除库 "${lib.name}"?`)) {
+                          removeLibrary(lib.id)
+                        }
+                      }}
+                      title="删除库"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       </ScrollArea>

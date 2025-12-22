@@ -1,5 +1,5 @@
 import { Book, ChevronRight, FileText, Folder } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
@@ -24,8 +24,13 @@ export function BookLibraryView({
   sortKey = 'name',
   sortOrder = 'asc',
 }: BookLibraryViewProps) {
-  const { getAuthorsByLibrary, getBooksByAuthor, updateBookProgress } =
-    useLibraryStore()
+  const {
+    getAuthorsByLibrary,
+    getBooksByAuthor,
+    updateBookProgress,
+    libraryStates,
+    setLibraryState,
+  } = useLibraryStore()
 
   // Subscribe to all books to trigger re-renders on progress updates
   // We don't use the value directly, just subscribe to ensure reactivity
@@ -40,8 +45,12 @@ export function BookLibraryView({
     return result
   }, [libraryId, getAuthorsByLibrary])
 
-  // Local state for author selection if parent doesn't manage it (it doesn't)
-  const [selectedAuthorId, setSelectedAuthorId] = useState<string | null>(null)
+  // Get persisted state for this library
+  const libraryState = libraryStates[libraryId] || {
+    selectedAuthorId: null,
+    selectedBookId: null,
+  }
+  const { selectedAuthorId } = libraryState
 
   const selectedAuthor = useMemo(
     () => authors.find((a) => a.id === selectedAuthorId) ?? null,
@@ -117,7 +126,10 @@ export function BookLibraryView({
               <button
                 key={author.id}
                 onClick={() => {
-                  setSelectedAuthorId(author.id)
+                  setLibraryState(libraryId, {
+                    selectedAuthorId: author.id,
+                    selectedBookId: null,
+                  })
                   onBookSelect(null)
                 }}
                 className={cn(
