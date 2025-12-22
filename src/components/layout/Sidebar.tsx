@@ -3,6 +3,7 @@ import {
   Clock,
   Heart,
   LayoutGrid,
+  LibraryBig,
   Settings,
   Trash2,
 } from 'lucide-react'
@@ -67,7 +68,7 @@ export function Sidebar({ className, isCollapsed }: SidebarProps) {
             {libraries.map((lib) => (
               <div key={lib.id} className="group relative">
                 <SidebarButton
-                  icon={BookImage}
+                  icon={lib.type === 'book' ? LibraryBig : BookImage}
                   label={lib.name}
                   variant={selectedLibraryId === lib.id ? 'secondary' : 'ghost'}
                   isCollapsed={isCollapsed}

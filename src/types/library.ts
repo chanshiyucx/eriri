@@ -32,3 +32,28 @@ export interface Comic {
     lastRead: number
   }
 }
+
+export interface Author {
+  id: string
+  name: string
+  path: string
+  libraryId: string
+  bookCount: number
+}
+
+export interface Book {
+  id: string
+  title: string
+  path: string
+  authorId: string
+  libraryId: string
+  size: number
+  createdAt: number
+  // Reading progress
+  progress?: {
+    currentChart: number // character count or line
+    totalChars: number
+    percent: number
+    lastRead: number
+  }
+}

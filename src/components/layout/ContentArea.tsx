@@ -19,12 +19,19 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { scanComicImages, scanLibrary } from '@/lib/scanner'
+import {
+  isBookLibrary as checkIsBookLibrary,
+  scanBookLibrary,
+  scanComicImages,
+  scanLibrary,
+} from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
-import { Comic } from '@/types/library'
+import { Book, Comic } from '@/types/library'
+import { BookReader } from '../reader/BookReader'
+import { BookLibraryView } from './BookLibraryView'
 
 interface ContentAreaProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed?: boolean
@@ -42,18 +49,23 @@ export function ContentArea({
 }: ContentAreaProps) {
   const {
     comics,
+    books,
+    libraries,
+    selectedLibraryId,
     addLibrary,
     addComics,
+    addAuthors,
+    addBooks,
     setScanning,
     isScanning,
     replaceComicsForLibrary,
-    libraries,
-    selectedLibraryId,
+    replaceBooksForLibrary,
+    updateComicProgress,
+    updateBookProgress,
   } = useLibraryStore()
 
   const { getActiveTab, addTab, setActiveTab, isImmersive, setImmersive } =
     useTabsStore()
-  const { updateComicProgress } = useLibraryStore()
   const { setSidebarCollapsed, showOnlyInProgress } = useUIStore()
 
   // Reader state
@@ -67,13 +79,25 @@ export function ContentArea({
   const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
   const [isSortVisible, setIsSortVisible] = useState(false)
 
+  // Book Library State
+  const [selectedBook, setSelectedBook] = useState<Book | null>(null)
+
   // Get active tab data
   const activeTab = getActiveTab()
 
   // Common comic references
-  const activeComic = activeTab
-    ? comics.find((c) => c.id === activeTab.comicId)
+  // We need to check if activeTab is a comic tab
+  const activeComicTab =
+    activeTab && activeTab.type !== 'book' ? activeTab : null
+
+  const activeComic = activeComicTab
+    ? comics.find((c) => c.id === activeComicTab.comicId)
     : null
+
+  const activeBook =
+    activeTab?.type === 'book'
+      ? books.find((b) => b.id === activeTab.bookId)
+      : null
 
   const handleStartReading = (index = 0) => {
     setReadingPageIndex(index)
@@ -89,31 +113,44 @@ export function ContentArea({
     }
   }
 
+  const handleStartReadingBook = (book: Book) => {
+    handleBookClick(book)
+  }
+
   const handleNextPage = useCallback(() => {
-    if (!activeTab) return
-    if (readingPageIndex < activeTab.images.length - 1) {
+    if (!activeComicTab) return
+    if (readingPageIndex < activeComicTab.images.length - 1) {
       const nextIndex = readingPageIndex + 1
       setReadingPageIndex(nextIndex)
-      updateComicProgress(activeTab.comicId, nextIndex, activeTab.images.length)
+      updateComicProgress(
+        activeComicTab.comicId,
+        nextIndex,
+        activeComicTab.images.length,
+      )
     }
-  }, [activeTab, readingPageIndex, updateComicProgress])
+  }, [activeComicTab, readingPageIndex, updateComicProgress])
 
   const handlePrevPage = useCallback(() => {
     if (readingPageIndex > 0) {
       const prevIndex = readingPageIndex - 1
       setReadingPageIndex(prevIndex)
       updateComicProgress(
-        activeTab!.comicId,
+        activeComicTab!.comicId,
         prevIndex,
-        activeTab!.images.length,
+        activeComicTab!.images.length,
       )
     }
-  }, [activeTab, readingPageIndex, updateComicProgress])
+  }, [activeComicTab, readingPageIndex, updateComicProgress])
 
   const handleExitReader = useCallback(() => {
     setIsReading(false)
     setImmersive(false)
   }, [setImmersive])
+
+  const handleExitBookReader = useCallback(() => {
+    setActiveTab('home')
+    setSidebarCollapsed(false)
+  }, [setActiveTab, setSidebarCollapsed])
 
   const toggleImmersive = useCallback(() => {
     setImmersive(!isImmersive)
@@ -182,7 +219,12 @@ export function ContentArea({
   ])
 
   const currentLibrary =
-    libraries.length > 0 ? libraries[libraries.length - 1] : null
+    libraries.length > 0
+      ? (libraries.find((l) => l.id === selectedLibraryId) ??
+        libraries[libraries.length - 1])
+      : null
+
+  const isBookLibrary = currentLibrary?.type === 'book'
 
   const handleImport = async () => {
     try {
@@ -190,20 +232,29 @@ export function ContentArea({
         directory: true,
         multiple: false,
         recursive: true,
-        title: 'Select Manga Library Folder',
+        title: 'Select Library Folder',
       })
 
       if (selected && typeof selected === 'string') {
         const existingLibrary = libraries.find((l) => l.path === selected)
 
         if (existingLibrary) {
+          // Re-scan existing
           setScanning(true)
           try {
-            const newComics = await scanLibrary(
-              existingLibrary.path,
-              existingLibrary.id,
-            )
-            replaceComicsForLibrary(existingLibrary.id, newComics)
+            if (existingLibrary.type === 'book') {
+              const { authors, books } = await scanBookLibrary(
+                existingLibrary.path,
+                existingLibrary.id,
+              )
+              replaceBooksForLibrary(existingLibrary.id, authors, books)
+            } else {
+              const newComics = await scanLibrary(
+                existingLibrary.path,
+                existingLibrary.id,
+              )
+              replaceComicsForLibrary(existingLibrary.id, newComics)
+            }
             console.log('Library re-scanned successfully')
           } catch (error) {
             console.error('Failed to re-scan library:', error)
@@ -212,20 +263,56 @@ export function ContentArea({
             setScanning(false)
           }
         } else {
+          // Import new
           setScanning(true)
+
+          // Determine type by scanning for both first?
+          // For now, let's assume it is a comic library unless we find 0 comics and >0 books?
+          // Or we can just prompt?
+          // The prompt says "Import way is same as comic".
+          // Let's try to detect based on file extensions in the root or First level.
+          // Simple heuristic: Try scanning as book library first, if we find authors/books, use it.
+          // Actually, scanBookLibrary scans subfolders as Authors.
+          // scanComicLibrary scans subfolders as Comics.
+          // Structure is similar: Library -> Subfolder (Author or Comic) -> Files.
+          // Differentiator is File Type.
+          // Let's peek.
+
+          // Book scan check logic removed to clean up code
+
           const libraryId = crypto.randomUUID()
           const libraryName = selected.split('/').pop() ?? 'Untitled Library'
 
-          addLibrary({
+          const isBook = await checkIsBookLibrary(selected)
+          const newLibrary = {
             id: libraryId,
             name: libraryName,
             path: selected,
-            type: 'comic',
+            type: isBook ? 'book' : 'comic',
             createdAt: Date.now(),
-          })
+          }
 
-          const newComics = await scanLibrary(selected, libraryId)
-          addComics(newComics)
+          if (isBook) {
+            const { authors, books } = await scanBookLibrary(
+              selected,
+              libraryId,
+            )
+            addLibrary(newLibrary)
+            addAuthors(authors.map((a) => ({ ...a, libraryId: newLibrary.id })))
+            addBooks(books.map((b) => ({ ...b, libraryId: newLibrary.id })))
+          } else {
+            const scannedComics = await scanLibrary(selected, libraryId)
+            // Fallback check (if scanLibrary returns empty but maybe it was a book lib that isBookLibrary missed?)
+            // For now trust isBookLibrary or the explicit flow.
+            // If scannedComics is empty, we could try scanBookLibrary as fallback?
+            // Let's stick to the primary check first.
+
+            addLibrary(newLibrary)
+            addComics(
+              scannedComics.map((c) => ({ ...c, libraryId: newLibrary.id })),
+            )
+          }
+
           setScanning(false)
         }
       }
@@ -235,16 +322,31 @@ export function ContentArea({
     }
   }
 
-  const handleRefresh = async () => {
-    if (!currentLibrary) return
+  const handleRefreshLibrary = async (libraryId: string) => {
+    const library = libraries.find((l) => l.id === libraryId)
+    if (!library) return
 
     try {
       setScanning(true)
-      const newComics = await scanLibrary(
-        currentLibrary.path,
-        currentLibrary.id,
-      )
-      replaceComicsForLibrary(currentLibrary.id, newComics)
+
+      if (library.type === 'book') {
+        const { authors, books } = await scanBookLibrary(
+          library.path,
+          library.id,
+        )
+
+        // Use replace technique or add unique
+        // For refresh we generally want to verify existing and add new.
+        // For now, naive add.
+        addAuthors(authors.map((a) => ({ ...a, libraryId: library.id })))
+        addBooks(books.map((b) => ({ ...b, libraryId: library.id })))
+      } else {
+        const comics = await scanLibrary(library.path, library.id)
+        replaceComicsForLibrary(
+          libraryId,
+          comics.map((c) => ({ ...c, libraryId })),
+        )
+      }
       console.log('Refresh success')
     } catch (error) {
       console.error('Refresh failed', error)
@@ -252,6 +354,11 @@ export function ContentArea({
     } finally {
       setScanning(false)
     }
+  }
+
+  const handleRefresh = async () => {
+    if (!currentLibrary) return
+    await handleRefreshLibrary(currentLibrary.id)
   }
 
   const handleComicClick = async (comic: Comic) => {
@@ -266,6 +373,7 @@ export function ContentArea({
         comicId: comic.id,
         title: comic.title,
         images,
+        type: 'comic',
       })
     } catch (error) {
       console.error('Failed to load comic images:', error)
@@ -273,6 +381,17 @@ export function ContentArea({
     } finally {
       setScanning(false)
     }
+  }
+
+  const handleBookClick = (book: Book) => {
+    addTab({
+      id: `book-${book.id}`,
+      bookId: book.id,
+      title: book.title,
+      path: book.path,
+      type: 'book',
+    })
+    setSidebarCollapsed(true)
   }
 
   const handleBack = () => {
@@ -310,7 +429,7 @@ export function ContentArea({
     >
       {/* Toolbar */}
       <AnimatePresence>
-        {!isImmersive && (
+        {!isImmersive && activeTab?.type !== 'book' && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: 'auto', opacity: 1 }}
@@ -358,16 +477,22 @@ export function ContentArea({
               )}
 
               {/* Continue Reading Button */}
-              {activeTab && !isReading && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleContinueReading}
-                  title="Continue Reading"
-                >
-                  <StepForward className="h-4 w-4" />
-                </Button>
-              )}
+              {(Boolean(activeTab && activeTab.type !== 'book') ||
+                Boolean(isBookLibrary && selectedBook)) &&
+                !isReading && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      if (activeTab) handleContinueReading()
+                      else if (selectedBook)
+                        handleStartReadingBook(selectedBook)
+                    }}
+                    title="Continue Reading"
+                  >
+                    <StepForward className="h-4 w-4" />
+                  </Button>
+                )}
 
               {/* Comic Title in Detail/Reader View */}
               {activeTab && (
@@ -379,7 +504,7 @@ export function ContentArea({
 
             <div className="relative flex items-center gap-1">
               {/* Progress in Reader View */}
-              {isReading && activeTab && (
+              {isReading && activeTab && activeTab.type !== 'book' && (
                 <span className="text-muted-foreground mr-4 font-mono text-xs">
                   {readingPageIndex + 1} / {activeTab.images.length} (
                   {Math.round(
@@ -452,6 +577,7 @@ export function ContentArea({
                         <Plus className="h-4 w-4" />
                       </Button>
 
+                      {/* Sort Button - valid for both comics and books now */}
                       <div className="relative">
                         <Button
                           variant="ghost"
@@ -534,218 +660,248 @@ export function ContentArea({
         )}
       </AnimatePresence>
 
+      {/* Book Reader */}
+      {activeTab?.type === 'book' && (
+        <BookReader
+          bookPath={activeTab.path}
+          initialProgress={activeBook?.progress}
+          onExit={handleExitBookReader}
+          onProgressUpdate={(p) => updateBookProgress(activeTab.bookId, p)}
+        />
+      )}
+
       {/* Content Grid with Animations */}
-      <ScrollArea
-        className={cn(
-          'flex-1 transition-all duration-300',
-          !isImmersive && !isReading && 'p-6',
-          (isImmersive || isReading) && 'p-0',
-        )}
-      >
-        <AnimatePresence mode="wait">
-          {isReading && activeTab ? (
-            /* Reader View */
-            <motion.div
-              key="reader"
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
-              className="relative flex h-full items-center justify-center"
-            >
-              <div
-                className="group relative h-full w-full overflow-hidden"
-                onClick={(e) => {
-                  const x = e.clientX
-                  const width = window.innerWidth
-                  // If clicking in the middle 40% area, toggle immersive
-                  if (x > width * 0.3 && x < width * 0.7) {
-                    toggleImmersive()
-                  } else if (x < width / 3) {
-                    handlePrevPage()
-                  } else {
-                    handleNextPage()
-                  }
-                }}
+      {activeTab?.type !== 'book' && (
+        <ScrollArea
+          className={cn(
+            'flex-1 transition-all duration-300',
+            !isImmersive && !isReading && 'p-6',
+            (isImmersive || isReading || isBookLibrary) && 'p-0',
+          )}
+        >
+          <AnimatePresence mode="wait">
+            {isReading && activeTab ? (
+              /* Reader View */
+              <motion.div
+                key="reader"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                transition={{ duration: 0.2, ease: 'easeInOut' }}
+                className="relative flex h-full items-center justify-center"
               >
-                <img
-                  src={activeTab.images[readingPageIndex].url}
-                  alt={`Page ${readingPageIndex + 1}`}
-                  className="h-full w-full object-contain"
-                />
-
-                {/* Navigation Zones Overlay */}
-                <div className="absolute inset-y-0 left-0 w-1/3 cursor-w-resize" />
-                <div className="absolute inset-y-0 right-0 w-1/3 cursor-e-resize" />
-
-                {/* Navigation Hints */}
-                <AnimatePresence>
-                  {!isImmersive && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-1/2 left-4 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handlePrevPage()
-                        }}
-                        disabled={readingPageIndex === 0}
-                      >
-                        <ChevronLeft className="h-8 w-8" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-1/2 right-4 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          handleNextPage()
-                        }}
-                        disabled={
-                          readingPageIndex === activeTab.images.length - 1
-                        }
-                      >
-                        <ChevronLeft className="h-8 w-8 rotate-180" />
-                      </Button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            </motion.div>
-          ) : activeTab ? (
-            /* Detail View */
-            <motion.div
-              key="detail"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-              className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
-            >
-              {activeTab.images.map((image, index) => (
                 <div
-                  key={index}
-                  className="group flex cursor-pointer flex-col gap-2"
-                  onClick={() => handleStartReading(index)}
+                  className="group relative h-full w-full overflow-hidden"
+                  onClick={(e) => {
+                    const x = e.clientX
+                    const width = window.innerWidth
+                    // If clicking in the middle 40% area, toggle immersive
+                    if (x > width * 0.3 && x < width * 0.7) {
+                      toggleImmersive()
+                    } else if (x < width / 3) {
+                      handlePrevPage()
+                    } else {
+                      handleNextPage()
+                    }
+                  }}
                 >
-                  <div className="bg-muted relative aspect-[2/3] w-[128px] overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
-                    <img
-                      src={image.url}
-                      alt={image.filename}
-                      className="h-full w-full object-cover"
-                      loading="lazy"
-                    />
-                    {/* Current Page Overlay */}
-                    {activeComic?.progress?.current === index && (
-                      <div className="border-primary bg-primary/10 absolute inset-0 flex items-center justify-center border-2">
-                        <StepForward className="text-primary fill-primary h-8 w-8 opacity-50" />
-                      </div>
+                  <img
+                    src={activeTab.images[readingPageIndex].url}
+                    alt={`Page ${readingPageIndex + 1}`}
+                    className="h-full w-full object-contain"
+                  />
+
+                  {/* Navigation Zones Overlay */}
+                  <div className="absolute inset-y-0 left-0 w-1/3 cursor-w-resize" />
+                  <div className="absolute inset-y-0 right-0 w-1/3 cursor-e-resize" />
+
+                  {/* Navigation Hints */}
+                  <AnimatePresence>
+                    {!isImmersive && (
+                      <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                      >
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1/2 left-4 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handlePrevPage()
+                          }}
+                          disabled={readingPageIndex === 0}
+                        >
+                          <ChevronLeft className="h-8 w-8" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-1/2 right-4 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleNextPage()
+                          }}
+                          disabled={
+                            readingPageIndex === activeTab.images.length - 1
+                          }
+                        >
+                          <ChevronLeft className="h-8 w-8 rotate-180" />
+                        </Button>
+                      </motion.div>
                     )}
-                  </div>
-                  <div
-                    className="text-foreground/90 truncate text-center text-xs"
-                    title={image.filename}
-                  >
-                    {image.filename}
-                  </div>
+                  </AnimatePresence>
                 </div>
-              ))}
-            </motion.div>
-          ) : /* Library View */
-          processedComics.length === 0 ? (
-            <motion.div
-              key="empty"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-              className="text-muted-foreground flex h-full flex-col items-center justify-center"
-            >
-              <p>{searchQuery ? '未找到匹配的漫画' : '未找到漫画'}</p>
-              {!searchQuery && <p className="text-sm">点击 + 导入文件夹</p>}
-              {searchQuery && (
-                <Button
-                  variant="link"
-                  onClick={() => {
-                    setSearchQuery('')
-                    setIsSearchVisible(false)
-                  }}
-                >
-                  清除搜索
-                </Button>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="library"
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={pageTransition}
-              className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
-            >
-              {processedComics.map((comic) => (
-                <div
-                  key={comic.id}
-                  className="group flex w-[128px] cursor-pointer flex-col gap-2"
-                  onClick={() => {
-                    void handleComicClick(comic)
-                  }}
-                >
-                  {/* Cover Image Container */}
-                  <div className="bg-muted relative aspect-[2/3] w-full overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
-                    {comic.cover ? (
+              </motion.div>
+            ) : activeTab ? (
+              /* Detail View */
+              <motion.div
+                key="detail"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={pageTransition}
+                className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
+              >
+                {activeTab.images.map((image, index) => (
+                  <div
+                    key={index}
+                    className="group flex cursor-pointer flex-col gap-2"
+                    onClick={() => handleStartReading(index)}
+                  >
+                    <div className="bg-muted relative aspect-[2/3] w-[128px] overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
                       <img
-                        src={comic.cover}
-                        alt={comic.title}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        src={image.url}
+                        alt={image.filename}
+                        className="h-full w-full object-cover"
                         loading="lazy"
                       />
-                    ) : (
-                      <div className="bg-muted-foreground/10 text-muted-foreground flex h-full w-full items-center justify-center text-xs">
-                        No Cover
-                      </div>
-                    )}
-
-                    {/* Progress Badge */}
-                    {comic.progress && comic.progress.percent > 0 && (
-                      <div className="absolute inset-x-0 bottom-0 flex flex-col bg-gradient-to-t from-black/80 to-transparent p-1 pt-4">
-                        <div className="flex justify-between text-[10px] font-medium text-white">
-                          <span>{Math.round(comic.progress.percent)}%</span>
-                          <span>{comic.progress.total}P</span>
+                      {/* Current Page Overlay */}
+                      {activeComic?.progress?.current === index && (
+                        <div className="border-primary bg-primary/10 absolute inset-0 flex items-center justify-center border-2">
+                          <StepForward className="text-primary fill-primary h-8 w-8 opacity-50" />
                         </div>
-                        {/* Progress Bar */}
-                        <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/20">
-                          <div
-                            className="bg-primary h-full transition-all"
-                            style={{ width: `${comic.progress.percent}%` }}
-                          />
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                    <div
+                      className="text-foreground/90 truncate text-center text-xs"
+                      title={image.filename}
+                    >
+                      {image.filename}
+                    </div>
                   </div>
-
-                  {/* Title */}
-                  <h3
-                    className="text-foreground/90 group-hover:text-primary line-clamp-2 text-sm leading-tight font-medium transition-colors"
-                    title={comic.title}
+                ))}
+              </motion.div>
+            ) : /* Library View */
+            isBookLibrary && currentLibrary ? (
+              <motion.div
+                key="book-library"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="h-full w-full"
+              >
+                <BookLibraryView
+                  libraryId={currentLibrary.id}
+                  onBookClick={handleBookClick}
+                  selectedBook={selectedBook}
+                  onBookSelect={setSelectedBook}
+                  searchQuery={searchQuery}
+                  sortKey={sortKey}
+                  sortOrder={sortOrder}
+                />
+              </motion.div>
+            ) : processedComics.length === 0 ? (
+              <motion.div
+                key="empty"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={pageTransition}
+                className="text-muted-foreground flex h-full flex-col items-center justify-center"
+              >
+                <p>{searchQuery ? '未找到匹配的漫画' : '未找到漫画'}</p>
+                {!searchQuery && <p className="text-sm">点击 + 导入文件夹</p>}
+                {searchQuery && (
+                  <Button
+                    variant="link"
+                    onClick={() => {
+                      setSearchQuery('')
+                      setIsSearchVisible(false)
+                    }}
                   >
-                    {comic.title}
-                  </h3>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </ScrollArea>
+                    清除搜索
+                  </Button>
+                )}
+              </motion.div>
+            ) : (
+              <motion.div
+                key="library"
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={pageTransition}
+                className="grid grid-cols-[repeat(auto-fill,128px)] justify-center gap-6 pb-4 sm:justify-start"
+              >
+                {processedComics.map((comic) => (
+                  <div
+                    key={comic.id}
+                    className="group flex w-[128px] cursor-pointer flex-col gap-2"
+                    onClick={() => {
+                      void handleComicClick(comic)
+                    }}
+                  >
+                    {/* Cover Image Container */}
+                    <div className="bg-muted relative aspect-[2/3] w-full overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
+                      {comic.cover ? (
+                        <img
+                          src={comic.cover}
+                          alt={comic.title}
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div className="bg-muted-foreground/10 text-muted-foreground flex h-full w-full items-center justify-center text-xs">
+                          No Cover
+                        </div>
+                      )}
+
+                      {/* Progress Badge */}
+                      {comic.progress && comic.progress.percent > 0 && (
+                        <div className="absolute inset-x-0 bottom-0 flex flex-col bg-gradient-to-t from-black/80 to-transparent p-1 pt-4">
+                          <div className="flex justify-between text-[10px] font-medium text-white">
+                            <span>{Math.round(comic.progress.percent)}%</span>
+                            <span>{comic.progress.total}P</span>
+                          </div>
+                          {/* Progress Bar */}
+                          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/20">
+                            <div
+                              className="bg-primary h-full transition-all"
+                              style={{ width: `${comic.progress.percent}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Title */}
+                    <h3
+                      className="text-foreground/90 group-hover:text-primary line-clamp-2 text-sm leading-tight font-medium transition-colors"
+                      title={comic.title}
+                    >
+                      {comic.title}
+                    </h3>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </ScrollArea>
+      )}
     </div>
   )
 }
