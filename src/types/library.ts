@@ -51,7 +51,7 @@ export interface Book {
   createdAt: number
   // Reading progress
   progress?: {
-    currentChart: number // character count or line
+    startCharIndex: number // character count
     totalChars: number
     percent: number
     lastRead: number

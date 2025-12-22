@@ -54,7 +54,6 @@ export function AppLayout() {
               className="hidden flex-none overflow-hidden md:flex"
             >
               <Sidebar
-                className="h-full border-r"
                 isCollapsed={isSidebarCollapsed}
                 toggleSidebar={toggleSidebar}
               />

@@ -9,14 +9,15 @@ import { cn } from '@/lib/utils'
 interface BookReaderProps {
   bookPath: string
   initialProgress?: {
-    currentChart?: number
+    startCharIndex?: number
     percent?: number
   }
   onExit: () => void
   onProgressUpdate: (progress: {
-    currentChart: number
+    startCharIndex: number
     totalChars: number
     percent: number
+    currentChapterTitle?: string
   }) => void
   mode?: 'full' | 'preview'
 }
@@ -31,9 +32,10 @@ export function BookReader({
   const [content, setContent] = useState<BookContent | null>(null)
   const [loading, setLoading] = useState(true)
   const [showToc, setShowToc] = useState(false)
+  const [currentChapterTitle, setCurrentChapterTitle] = useState<string>('')
 
   // Track reading progress for UI display
-  const [progressPercent, setProgressPercent] = useState(0)
+  const [, setProgressPercent] = useState(0)
 
   const scrollViewportRef = useRef<HTMLDivElement>(null)
 
@@ -55,6 +57,15 @@ export function BookReader({
     void load()
     return () => {
       mounted = false
+      // Flush pending progress when bookPath changes (switching books)
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current)
+        throttleTimeoutRef.current = null
+      }
+      if (latestProgressRef.current) {
+        onProgressUpdateRef.current(latestProgressRef.current)
+        latestProgressRef.current = null
+      }
     }
   }, [bookPath])
 
@@ -66,24 +77,69 @@ export function BookReader({
     const timer = setTimeout(() => {
       if (!scrollViewportRef.current) return
 
-      if (initialProgress?.percent) {
+      if (initialProgress?.startCharIndex) {
+        // Find line by char offset
+        let targetLine = 0
+        if (content.lineStartOffsets) {
+          // Binary search or simple find (simple find is fast enough for <100k lines usually, but binary is safer)
+          // find ind s.t. lineStartOffsets[ind] <= charIndex
+          // Since lineStartOffsets is sorted, we can find the last index that satisfies the condition.
+          // Actually, let's just use simplefindIndex for simplicity first or findLastIndex if available (ES2023).
+          // Fallback: loop
+          for (let i = 0; i < content.lineStartOffsets.length; i++) {
+            if (content.lineStartOffsets[i] > initialProgress.startCharIndex) {
+              targetLine = Math.max(0, i - 1)
+              break
+            }
+            targetLine = i
+          }
+        }
+        const lineParams = document.getElementById(`line-${targetLine}`)
+        if (lineParams) {
+          lineParams.scrollIntoView({ block: 'start' })
+        }
+      } else if (initialProgress?.percent) {
         const targetScroll =
           (initialProgress.percent / 100) *
           scrollViewportRef.current.scrollHeight
         scrollViewportRef.current.scrollTop = targetScroll
-      } else if (initialProgress?.currentChart) {
-        // Fallback to line index if percent is missing
-        const lineParams = document.getElementById(
-          `line-${initialProgress.currentChart}`,
-        )
-        if (lineParams) {
-          lineParams.scrollIntoView()
-        }
       }
     }, 100)
 
     return () => clearTimeout(timer)
   }, [content, initialProgress])
+
+  /*
+   * Throttled progress update to ensure performance.
+   * We use a ref to hold the timeout ID and the latest progress data.
+   */
+  const throttleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestProgressRef = useRef<{
+    startCharIndex: number
+    totalChars: number
+    percent: number
+    currentChapterTitle?: string
+  } | null>(null)
+
+  // Need to persist onProgressUpdate to use in cleanup
+  const onProgressUpdateRef = useRef(onProgressUpdate)
+  useEffect(() => {
+    onProgressUpdateRef.current = onProgressUpdate
+  }, [onProgressUpdate])
+
+  // Cleanup throttle on unmount and ensure last update is sent
+  useEffect(() => {
+    return () => {
+      if (throttleTimeoutRef.current) {
+        clearTimeout(throttleTimeoutRef.current)
+        throttleTimeoutRef.current = null
+      }
+      // If we have pending progress, flush it immediately
+      if (latestProgressRef.current) {
+        onProgressUpdateRef.current(latestProgressRef.current)
+      }
+    }
+  }, [])
 
   const handleScroll = useCallback(
     (event: React.UIEvent<HTMLDivElement>) => {
@@ -94,18 +150,50 @@ export function BookReader({
       const percent = (scrollTop / maxScroll) * 100
       setProgressPercent(percent)
 
-      // Estimate current line based on percentage
-      // This is rough but fast.
-      const totalLines = content?.lines.length ?? 0
-      const estimatedLine = Math.floor((percent / 100) * totalLines)
+      if (!content) return
 
-      onProgressUpdate({
-        currentChart: estimatedLine,
-        totalChars: totalLines,
+      const totalLines = content.lines.length
+      const estimatedLine = Math.floor((percent / 100) * totalLines)
+      const safeLineIndex = Math.min(Math.max(0, estimatedLine), totalLines - 1)
+
+      const startCharIndex = content.lineStartOffsets[safeLineIndex] ?? 0
+      const totalChars =
+        content.lineStartOffsets[content.lineStartOffsets.length - 1] +
+        (content.lines[content.lines.length - 1]?.length || 0)
+
+      // Find current chapter
+      let chapterTitle = ''
+      if (content?.chapters) {
+        const reversedChapters = [...content.chapters].reverse() // Search from end
+        const match = reversedChapters.find((c) => c.lineIndex <= safeLineIndex)
+        if (match) {
+          chapterTitle = match.title
+        }
+      }
+
+      if (chapterTitle !== currentChapterTitle) {
+        setCurrentChapterTitle(chapterTitle)
+      }
+
+      const newProgress = {
+        startCharIndex,
+        totalChars,
         percent,
-      })
+        currentChapterTitle: chapterTitle,
+      }
+
+      // Store latest
+      latestProgressRef.current = newProgress
+
+      // Throttle execution
+      throttleTimeoutRef.current ??= setTimeout(() => {
+        if (latestProgressRef.current) {
+          onProgressUpdateRef.current(latestProgressRef.current)
+        }
+        throttleTimeoutRef.current = null
+      }, 300) // 300ms throttle for more responsive updates
     },
-    [content, onProgressUpdate],
+    [content, currentChapterTitle],
   )
 
   const jumpToChapter = (chapter: Chapter) => {
@@ -178,7 +266,7 @@ export function BookReader({
   }
 
   return (
-    <div className="bg-background text-foreground relative flex h-full w-full overflow-hidden">
+    <div className="bg-surface relative flex h-full w-full overflow-hidden">
       {/* Sidebar TOC - Only in full mode */}
       <AnimatePresence>
         {showToc && mode === 'full' && (
@@ -194,7 +282,7 @@ export function BookReader({
               className="bg-background absolute top-0 bottom-0 left-0 z-50 w-80 border-r shadow-xl"
             >
               <div className="flex items-center justify-between border-b p-4">
-                <h2 className="font-semibold">Table of Contents</h2>
+                <h2 className="font-semibold">目录</h2>
                 <Button
                   variant="ghost"
                   size="icon"
@@ -208,7 +296,7 @@ export function BookReader({
                   {content.chapters.map((chapter, i) => (
                     <button
                       key={i}
-                      className="hover:bg-accent hover:text-accent-foreground truncate rounded-md px-4 py-3 text-left text-sm transition-colors"
+                      className="hover:bg-accent hover:text-accent-foreground cursor-pointer truncate rounded-md px-4 py-3 text-left text-sm transition-colors"
                       onClick={() => jumpToChapter(chapter)}
                     >
                       {chapter.title}
@@ -255,6 +343,13 @@ export function BookReader({
           </div>
         )}
 
+        {/* Preview Header - Only in preview mode */}
+        {mode === 'preview' && currentChapterTitle && (
+          <div className="bg-base text-subtle absolute top-0 z-10 w-full p-2 text-center text-xs font-medium">
+            {currentChapterTitle}
+          </div>
+        )}
+
         {/* Text Scroll Area */}
         <div
           className="scrollbar-hide w-full flex-1 overflow-y-auto"
@@ -277,18 +372,6 @@ export function BookReader({
             {/* Padding at bottom to allow scrolling last line to view */}
             <div className="h-[50vh]" />
           </div>
-        </div>
-
-        {/* Footer Progress - Only in full mode */}
-        <div
-          className={cn(
-            'text-muted-foreground absolute bottom-0 z-10 w-full p-2 text-center text-xs backdrop-blur-sm transition-opacity',
-            mode === 'preview'
-              ? 'opacity-0 hover:opacity-100'
-              : 'opacity-50 hover:opacity-100',
-          )}
-        >
-          <span>{Math.round(progressPercent)}%</span>
         </div>
       </div>
     </div>

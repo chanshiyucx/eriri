@@ -263,22 +263,7 @@ export function ContentArea({
             setScanning(false)
           }
         } else {
-          // Import new
           setScanning(true)
-
-          // Determine type by scanning for both first?
-          // For now, let's assume it is a comic library unless we find 0 comics and >0 books?
-          // Or we can just prompt?
-          // The prompt says "Import way is same as comic".
-          // Let's try to detect based on file extensions in the root or First level.
-          // Simple heuristic: Try scanning as book library first, if we find authors/books, use it.
-          // Actually, scanBookLibrary scans subfolders as Authors.
-          // scanComicLibrary scans subfolders as Comics.
-          // Structure is similar: Library -> Subfolder (Author or Comic) -> Files.
-          // Differentiator is File Type.
-          // Let's peek.
-
-          // Book scan check logic removed to clean up code
 
           const libraryId = crypto.randomUUID()
           const libraryName = selected.split('/').pop() ?? 'Untitled Library'
@@ -302,11 +287,6 @@ export function ContentArea({
             addBooks(books.map((b) => ({ ...b, libraryId: newLibrary.id })))
           } else {
             const scannedComics = await scanLibrary(selected, libraryId)
-            // Fallback check (if scanLibrary returns empty but maybe it was a book lib that isBookLibrary missed?)
-            // For now trust isBookLibrary or the explicit flow.
-            // If scannedComics is empty, we could try scanBookLibrary as fallback?
-            // Let's stick to the primary check first.
-
             addLibrary(newLibrary)
             addComics(
               scannedComics.map((c) => ({ ...c, libraryId: newLibrary.id })),
@@ -422,7 +402,7 @@ export function ContentArea({
   return (
     <div
       className={cn(
-        'flex h-full flex-col transition-all duration-300',
+        'bg-surface flex h-full flex-col transition-all duration-300',
         className,
       )}
       {...props}

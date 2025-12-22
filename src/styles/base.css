@@ -25,12 +25,3 @@
     @apply bg-base text-text;
   }
 }
-
-/* @layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
-  body {
-    @apply bg-background text-foreground;
-  }
-} */

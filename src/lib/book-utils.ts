@@ -9,6 +9,7 @@ export interface Chapter {
 export interface BookContent {
   fullText: string
   lines: string[]
+  lineStartOffsets: number[]
   chapters: Chapter[]
 }
 
@@ -20,9 +21,11 @@ export async function parseBook(path: string): Promise<BookContent> {
     const text = await readTextFile(path)
     const lines = text.split('\n')
     const chapters: Chapter[] = []
+    const lineStartOffsets: number[] = []
 
     let charCount = 0
     lines.forEach((line, index) => {
+      lineStartOffsets.push(charCount)
       const match = CHAPTER_REGEX.exec(line)
       if (match) {
         chapters.push({
@@ -42,6 +45,7 @@ export async function parseBook(path: string): Promise<BookContent> {
     return {
       fullText: text,
       lines,
+      lineStartOffsets,
       chapters,
     }
   } catch (error) {

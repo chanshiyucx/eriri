@@ -27,6 +27,12 @@ export function BookLibraryView({
   const { getAuthorsByLibrary, getBooksByAuthor, updateBookProgress } =
     useLibraryStore()
 
+  // Subscribe to all books to trigger re-renders on progress updates
+  // We don't use the value directly, just subscribe to ensure reactivity
+  const booksVersion = useLibraryStore((state) =>
+    state.books.map((b) => `${b.id}:${b.progress?.percent ?? 0}`).join(','),
+  )
+
   const authors = useMemo(() => {
     const result = getAuthorsByLibrary(libraryId)
     // If sorting logic for authors is needed, add here.
@@ -85,7 +91,15 @@ export function BookLibraryView({
       }
       return sortOrder === 'asc' ? cmp : -cmp
     })
-  }, [selectedAuthor, getBooksByAuthor, searchQuery, sortKey, sortOrder])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedAuthor,
+    getBooksByAuthor,
+    searchQuery,
+    sortKey,
+    sortOrder,
+    booksVersion,
+  ])
 
   // If selectedBook changes (e.g. from outside or initial), we should ensure author is selected?
   // Not strictly necessary if we rely on user clicking author.
@@ -94,7 +108,7 @@ export function BookLibraryView({
     <div className="flex h-full w-full divide-x">
       {/* Column 1: Authors - Fixed 300px */}
       <div className="flex w-[300px] shrink-0 flex-col">
-        <div className="bg-muted/50 text-muted-foreground p-2 text-xs font-medium uppercase">
+        <div className="bg-base text-subtle px-4 py-2 text-xs font-medium uppercase">
           Authors ({authors.length})
         </div>
         <ScrollArea className="flex-1">
@@ -112,7 +126,7 @@ export function BookLibraryView({
                     'bg-accent text-accent-foreground',
                 )}
               >
-                <Folder className="h-4 w-4 shrink-0 text-blue-500" />
+                <Folder className="h-4 w-4 shrink-0" />
                 <span className="flex-1 truncate">{author.name}</span>
                 <span className="text-muted-foreground text-xs">
                   {author.bookCount}
@@ -130,8 +144,8 @@ export function BookLibraryView({
       </div>
 
       {/* Column 2: Books - Fixed 300px */}
-      <div className="bg-background/50 flex w-[300px] shrink-0 flex-col">
-        <div className="bg-muted/50 text-muted-foreground p-2 text-xs font-medium uppercase">
+      <div className="bg-surface flex w-[300px] shrink-0 flex-col">
+        <div className="bg-base text-subtle px-4 py-2 text-xs font-medium uppercase">
           Books {selectedAuthor ? `(${books.length})` : ''}
         </div>
         <ScrollArea className="flex-1">
@@ -151,17 +165,17 @@ export function BookLibraryView({
                       'bg-accent text-accent-foreground',
                   )}
                 >
-                  <Book className="h-4 w-4 shrink-0 text-orange-500" />
-
+                  <Book className="h-4 w-4 shrink-0" />
                   <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                     <span className="truncate font-medium">{book.title}</span>
-                    <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs whitespace-nowrap opacity-70">
+                    <span className="text-subtle flex shrink-0 items-center gap-1 text-xs whitespace-nowrap opacity-70">
                       {book.progress && book.progress.percent > 0 && (
-                        <span>{Math.round(book.progress.percent)}%</span>
+                        <>
+                          <span>{Math.round(book.progress.percent)}%</span>
+                          <span>•</span>
+                        </>
                       )}
-                      <span>•</span>
                       <span>{(book.size / 1024).toFixed(1)}k</span>{' '}
-                      {/* Rough 'k' estimate */}
                     </span>
                   </div>
                 </button>
