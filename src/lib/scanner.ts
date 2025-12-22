@@ -160,7 +160,7 @@ export async function scanBookLibrary(
                 size,
                 createdAt,
                 progress: {
-                  currentChart: 0,
+                  startCharIndex: 0,
                   totalChars: 0,
                   percent: 0,
                   lastRead: Date.now(),

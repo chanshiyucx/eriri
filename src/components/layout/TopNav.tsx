@@ -60,10 +60,7 @@ export function TopNav({
 
   return (
     <div
-      className={cn(
-        'bg-background flex h-10 items-center border-b px-2',
-        className,
-      )}
+      className={cn('bg-base flex h-10 items-center border-b px-2', className)}
       {...props}
     >
       {/* Home Tab - Always visible, non-closable */}
@@ -86,7 +83,7 @@ export function TopNav({
           <Button
             variant="ghost"
             size="icon"
-            className="bg-background/80 absolute left-0 z-10 h-8 w-8 shrink-0 shadow-sm backdrop-blur-sm"
+            className="bg-base absolute left-0 z-10 h-8 w-8 shrink-0"
             onClick={() => scroll('left')}
           >
             <ChevronLeft className="h-4 w-4" />
@@ -104,7 +101,7 @@ export function TopNav({
               <div
                 key={tab.id}
                 className={cn(
-                  'bg-background hover:bg-muted/50 group flex max-w-[200px] min-w-[150px] shrink-0 cursor-pointer items-center gap-2 rounded-md border px-3 py-1 text-sm transition-colors',
+                  'bg-surface hover:bg-base group flex max-w-[200px] min-w-[150px] shrink-0 items-center gap-2 rounded-md border px-3 py-1 text-sm transition-colors',
                   activeTabId === tab.id && 'bg-muted',
                 )}
                 onClick={() => onTabChange(tab.id)}
@@ -131,7 +128,7 @@ export function TopNav({
           <Button
             variant="ghost"
             size="icon"
-            className="bg-background/80 absolute right-0 z-10 h-8 w-8 shrink-0 shadow-sm backdrop-blur-sm"
+            className="bg-base absolute right-0 z-10 h-8 w-8 shrink-0"
             onClick={() => scroll('right')}
           >
             <ChevronRight className="h-4 w-4" />

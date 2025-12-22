@@ -45,7 +45,7 @@ interface LibraryState {
 
   updateBookProgress: (
     bookId: string,
-    progress: { currentChart: number; totalChars: number; percent: number },
+    progress: { startCharIndex: number; totalChars: number; percent: number },
   ) => void
 }
 
