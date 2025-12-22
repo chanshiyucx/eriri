@@ -216,3 +216,60 @@ export async function scanComicImages(
     return []
   }
 }
+
+/**
+ * Get the total count of images in a comic without loading all paths
+ * More efficient than scanComicImages when you only need the count
+ */
+export async function getComicImageCount(comicPath: string): Promise<number> {
+  try {
+    const files: DirEntry[] = await readDir(comicPath)
+    return files.filter(
+      (file) =>
+        file.isFile &&
+        IMAGE_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext)),
+    ).length
+  } catch (error) {
+    console.error('Failed to get comic image count:', error)
+    return 0
+  }
+}
+
+/**
+ * Load a specific range of comic images for virtualization
+ * @param comicPath Path to the comic directory
+ * @param start Starting index (inclusive)
+ * @param count Number of images to load
+ */
+export async function loadComicImageRange(
+  comicPath: string,
+  start: number,
+  count: number,
+): Promise<{ url: string; filename: string; index: number }[]> {
+  try {
+    const files: DirEntry[] = await readDir(comicPath)
+    const imageFiles = files
+      .filter(
+        (file) =>
+          file.isFile &&
+          IMAGE_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext)),
+      )
+      .sort((a, b) =>
+        a.name.localeCompare(b.name, undefined, {
+          numeric: true,
+          sensitivity: 'base',
+        }),
+      )
+
+    const rangeFiles = imageFiles.slice(start, start + count)
+
+    return rangeFiles.map((file, idx) => ({
+      url: convertFileSrc(joinPath(comicPath, file.name)),
+      filename: file.name,
+      index: start + idx,
+    }))
+  } catch (error) {
+    console.error('Failed to load comic image range:', error)
+    return []
+  }
+}

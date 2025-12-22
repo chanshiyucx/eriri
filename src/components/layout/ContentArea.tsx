@@ -29,7 +29,7 @@ import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
-import { Book, Comic } from '@/types/library'
+import { Book, Comic, type LibraryType } from '@/types/library'
 import { BookReader } from '../reader/BookReader'
 import { BookLibraryView } from './BookLibraryView'
 
@@ -88,7 +88,9 @@ export function ContentArea({
   // Common comic references
   // We need to check if activeTab is a comic tab
   const activeComicTab =
-    activeTab && activeTab.type !== 'book' ? activeTab : null
+    activeTab && (activeTab.type === 'comic' || !activeTab.type)
+      ? activeTab
+      : null
 
   const activeComic = activeComicTab
     ? comics.find((c) => c.id === activeComicTab.comicId)
@@ -119,13 +121,13 @@ export function ContentArea({
 
   const handleNextPage = useCallback(() => {
     if (!activeComicTab) return
-    if (readingPageIndex < activeComicTab.images.length - 1) {
+    if (readingPageIndex < activeComicTab.imageCount - 1) {
       const nextIndex = readingPageIndex + 1
       setReadingPageIndex(nextIndex)
       updateComicProgress(
         activeComicTab.comicId,
         nextIndex,
-        activeComicTab.images.length,
+        activeComicTab.imageCount,
       )
     }
   }, [activeComicTab, readingPageIndex, updateComicProgress])
@@ -137,7 +139,7 @@ export function ContentArea({
       updateComicProgress(
         activeComicTab!.comicId,
         prevIndex,
-        activeComicTab!.images.length,
+        activeComicTab!.imageCount,
       )
     }
   }, [activeComicTab, readingPageIndex, updateComicProgress])
@@ -273,7 +275,7 @@ export function ContentArea({
             id: libraryId,
             name: libraryName,
             path: selected,
-            type: isBook ? 'book' : 'comic',
+            type: (isBook ? 'book' : 'comic') as LibraryType,
             createdAt: Date.now(),
           }
 
@@ -315,11 +317,8 @@ export function ContentArea({
           library.id,
         )
 
-        // Use replace technique or add unique
-        // For refresh we generally want to verify existing and add new.
-        // For now, naive add.
-        addAuthors(authors.map((a) => ({ ...a, libraryId: library.id })))
-        addBooks(books.map((b) => ({ ...b, libraryId: library.id })))
+        // Replace existing authors and books for this library
+        replaceBooksForLibrary(library.id, authors, books)
       } else {
         const comics = await scanLibrary(library.path, library.id)
         replaceComicsForLibrary(
@@ -352,7 +351,9 @@ export function ContentArea({
         id: tabId,
         comicId: comic.id,
         title: comic.title,
-        images,
+        path: comic.path,
+        imageCount: images.length,
+        images, // Keep images for backward compatibility
         type: 'comic',
       })
     } catch (error) {
@@ -457,7 +458,7 @@ export function ContentArea({
               )}
 
               {/* Continue Reading Button */}
-              {(Boolean(activeTab && activeTab.type !== 'book') ||
+              {(Boolean(activeComicTab) ||
                 Boolean(isBookLibrary && selectedBook)) &&
                 !isReading && (
                   <Button
@@ -484,15 +485,17 @@ export function ContentArea({
 
             <div className="relative flex items-center gap-1">
               {/* Progress in Reader View */}
-              {isReading && activeTab && activeTab.type !== 'book' && (
-                <span className="text-muted-foreground mr-4 font-mono text-xs">
-                  {readingPageIndex + 1} / {activeTab.images.length} (
-                  {Math.round(
-                    (readingPageIndex / (activeTab.images.length - 1)) * 100,
-                  )}
-                  %)
-                </span>
-              )}
+              {isReading &&
+                activeTab &&
+                (activeTab.type === 'comic' || !activeTab.type) && (
+                  <span className="text-muted-foreground mr-4 font-mono text-xs">
+                    {readingPageIndex + 1} / {activeTab.imageCount} (
+                    {Math.round(
+                      (readingPageIndex / (activeTab.imageCount - 1)) * 100,
+                    )}
+                    %)
+                  </span>
+                )}
 
               {!isReading && (
                 <>
@@ -686,8 +689,11 @@ export function ContentArea({
                   }}
                 >
                   <img
-                    src={activeTab.images[readingPageIndex].url}
-                    alt={`Page ${readingPageIndex + 1}`}
+                    src={activeTab.images?.[readingPageIndex]?.url ?? ''}
+                    alt={
+                      activeTab.images?.[readingPageIndex]?.filename ??
+                      `Page ${readingPageIndex + 1}`
+                    }
                     className="h-full w-full object-contain"
                   />
 
@@ -724,7 +730,7 @@ export function ContentArea({
                             handleNextPage()
                           }}
                           disabled={
-                            readingPageIndex === activeTab.images.length - 1
+                            readingPageIndex === activeTab.imageCount - 1
                           }
                         >
                           <ChevronLeft className="h-8 w-8 rotate-180" />
@@ -734,7 +740,7 @@ export function ContentArea({
                   </AnimatePresence>
                 </div>
               </motion.div>
-            ) : activeTab ? (
+            ) : activeTab?.images && activeTab.images.length > 0 ? (
               /* Detail View */
               <motion.div
                 key="detail"
