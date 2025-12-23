@@ -162,8 +162,8 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   return (
     <div
       className={cn(
-        'bg-base flex h-full flex-col overflow-hidden border-r transition-all duration-300 ease-in-out',
-        isCollapsed ? 'w-0' : 'w-56',
+        'bg-base flex h-full flex-col overflow-hidden transition-all duration-300 ease-in-out',
+        isCollapsed ? 'w-0' : 'w-56 border-r',
       )}
     >
       <ScrollArea className="flex-1 py-4">

@@ -1,23 +1,9 @@
 import { AnimatePresence, motion } from 'framer-motion'
-import {
-  ArrowDownFromLine,
-  ArrowUpDown,
-  ArrowUpFromLine,
-  Check,
-  ChevronLeft,
-  PanelLeftClose,
-  PanelLeftOpen,
-  RefreshCw,
-  Search,
-  StepForward,
-  Undo2,
-  X,
-} from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useCallback, useEffect, useState } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useComicImagePreloader } from '@/hooks/useComicImagePreloader'
+import { useLibraryFiltering } from '@/hooks/useLibraryFiltering'
+import { useLibrarySearch } from '@/hooks/useLibrarySearch'
 import { getComicImageCount, scanBookLibrary, scanLibrary } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
@@ -27,14 +13,12 @@ import { Book, Comic } from '@/types/library'
 import { BookReader } from '../reader/BookReader'
 import { BookLibraryView } from './BookLibraryView'
 import { ComicDetailView } from './ComicDetailView'
+import { ContentToolbar } from './ContentToolbar'
 
 interface ContentAreaProps extends React.HTMLAttributes<HTMLDivElement> {
   isCollapsed?: boolean
   toggleSidebar?: () => void
 }
-
-type SortKey = 'name' | 'date'
-type SortOrder = 'asc' | 'desc'
 
 export function ContentArea({
   className,
@@ -52,6 +36,7 @@ export function ContentArea({
     replaceComicsForLibrary,
     replaceBooksForLibrary,
     updateComicProgress,
+    updateBookProgress,
     libraryStates,
     setLibraryState,
   } = useLibraryStore()
@@ -71,12 +56,20 @@ export function ContentArea({
   const [isReading, setIsReading] = useState(false)
   const [readingPageIndex, setReadingPageIndex] = useState(0)
 
-  // Search & Sort state
-  const [searchQuery, setSearchQuery] = useState('')
-  const [isSearchVisible, setIsSearchVisible] = useState(false)
-  const [sortKey, setSortKey] = useState<SortKey>('name')
-  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
-  const [isSortVisible, setIsSortVisible] = useState(false)
+  // Search & Sort state (Custom Hook)
+  const {
+    searchQuery,
+    setSearchQuery,
+    isSearchVisible,
+    setIsSearchVisible,
+    sortKey,
+    // setSortKey,
+    sortOrder,
+    // setSortOrder,
+    isSortVisible,
+    setIsSortVisible,
+    toggleSort,
+  } = useLibrarySearch()
 
   // Book Library State
   const [selectedBook, setSelectedBook] = useState<Book | null>(null)
@@ -85,7 +78,6 @@ export function ContentArea({
   const activeTab = getActiveTab()
 
   // Common comic references
-  // We need to check if activeTab is a comic tab
   const activeComicTab =
     activeTab && (activeTab.type === 'comic' || !activeTab.type)
       ? activeTab
@@ -200,47 +192,15 @@ export function ContentArea({
     setImmersive(false)
   }, [activeTab?.id, setImmersive])
 
-  // Filter and Sort comics
-  const processedComics = useMemo(() => {
-    let result = selectedLibraryId
-      ? comics.filter((c) => c.libraryId === selectedLibraryId)
-      : comics
-
-    // Filter by search query
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase().trim()
-      result = result.filter((c) => c.title.toLowerCase().includes(query))
-    }
-
-    // Filter by reading progress (Continue Reading)
-    if (showOnlyInProgress) {
-      result = result.filter((c) => c.progress && c.progress.percent > 0)
-    }
-
-    // Ensure unique comics before sorting
-    const unique = Array.from(new Map(result.map((c) => [c.id, c])).values())
-
-    // Sort
-    return unique.sort((a, b) => {
-      let comparison = 0
-      if (sortKey === 'name') {
-        comparison = a.title.localeCompare(b.title, undefined, {
-          numeric: true,
-          sensitivity: 'base',
-        })
-      } else {
-        comparison = (a.createdAt || 0) - (b.createdAt || 0)
-      }
-      return sortOrder === 'asc' ? comparison : -comparison
-    })
-  }, [
+  // Filter and Sort comics (Custom Hook)
+  const processedComics = useLibraryFiltering({
     comics,
     selectedLibraryId,
     searchQuery,
     sortKey,
     sortOrder,
     showOnlyInProgress,
-  ])
+  })
 
   const currentLibrary =
     libraries.length > 0
@@ -261,9 +221,6 @@ export function ContentArea({
         })
       }
     } else if (activeTab === null) {
-      // If we're on the home tab (activeTab is null for home aka no active tab returned by getActiveTab?
-      // check getActiveTab: if home, returns null.
-      // So if activeTab is null, we are on home.
       setLibraryState(currentLibrary.id, {
         selectedComicId: null,
       })
@@ -309,7 +266,6 @@ export function ContentArea({
           comics.map((c) => ({ ...c, libraryId })),
         )
       }
-      console.log('Refresh success')
     } catch (error) {
       console.error('Refresh failed', error)
       alert('Refresh failed: ' + String(error))
@@ -354,502 +310,227 @@ export function ContentArea({
   }
 
   const handleBookClick = (book: Book) => {
-    // Check for existing tab with same path and remove it
-    const existingTab = tabs.find((t) => t.path === book.path)
-    if (existingTab) {
-      removeTab(existingTab.id)
+    const active = getActiveTab()
+    if (active?.id === `book-${book.id}`) {
+      // already active
+      return
     }
 
-    const tabId = `book-${book.id}`
-
-    // Create new tab
     addTab({
-      id: tabId,
+      id: `book-${book.id}`,
+      type: 'book',
       bookId: book.id,
       title: book.title,
       path: book.path,
-      type: 'book',
     })
-
-    // Save selected book to persistent state
-    if (currentLibrary) {
-      setLibraryState(currentLibrary.id, {
-        selectedBookId: book.id,
-      })
-    }
-
-    setSidebarCollapsed(true)
   }
 
   const handleBack = () => {
     setActiveTab('home')
+    setSidebarCollapsed(false)
   }
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortKey(key)
-      setSortOrder('asc')
-    }
-  }
-
-  // Animation variants
-  const pageVariants = {
-    initial: { opacity: 0 },
-    animate: { opacity: 1 },
-    exit: { opacity: 0 },
-  }
-
-  const pageTransition = {
-    duration: 0.2,
-    ease: 'easeInOut',
-  } as const
 
   return (
     <div
       className={cn('bg-surface flex h-full flex-col', className)}
       {...props}
     >
-      {/* Toolbar */}
-      <AnimatePresence>
-        {!isImmersive && activeTab?.type !== 'book' && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.2, ease: 'easeInOut' }}
-            className="flex h-10 items-center justify-between border-b px-4"
-          >
-            <div className="flex flex-1 items-center gap-1 overflow-hidden">
-              {/* Toggle Sidebar - Always visible */}
-              <Button variant="ghost" size="icon" onClick={toggleSidebar}>
-                {isCollapsed ? (
-                  <PanelLeftOpen className="h-4 w-4" />
-                ) : (
-                  <PanelLeftClose className="h-4 w-4" />
-                )}
-              </Button>
+      <ContentToolbar
+        isCollapsed={!!isCollapsed}
+        toggleSidebar={toggleSidebar ?? (() => undefined)}
+        activeTab={activeTab}
+        activeComicTab={activeComicTab}
+        isReading={isReading}
+        handleExitReader={handleExitReader}
+        handleBack={handleBack}
+        isScanning={isScanning}
+        currentLibrary={currentLibrary}
+        handleRefresh={() => void handleRefresh()}
+        handleContinueReading={handleContinueReading}
+        handleStartReadingBook={handleStartReadingBook}
+        selectedBook={selectedBook}
+        isBookLibrary={isBookLibrary}
+        isImmersive={isImmersive}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        isSearchVisible={isSearchVisible}
+        setIsSearchVisible={setIsSearchVisible}
+        sortKey={sortKey}
+        toggleSort={toggleSort}
+        sortOrder={sortOrder}
+        isSortVisible={isSortVisible}
+        setIsSortVisible={setIsSortVisible}
+        readingPageIndex={readingPageIndex}
+      />
 
-              {/* Back Button - Only in detail or reader view */}
-              {(activeTab ?? isReading) && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={isReading ? handleExitReader : handleBack}
-                  title="Back"
-                >
-                  <Undo2 className="h-4 w-4" />
-                </Button>
-              )}
-
-              {!isReading && !activeTab && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => {
-                    void handleRefresh()
-                  }}
-                  disabled={isScanning || !currentLibrary}
-                  title="Refresh"
-                  className="shrink-0"
-                >
-                  <RefreshCw
-                    className={cn('h-4 w-4', isScanning && 'animate-spin')}
+      <div className="relative flex-1 overflow-hidden">
+        <AnimatePresence mode="popLayout">
+          {isReading && activeTab?.type !== 'book' ? (
+            <motion.div
+              key="reader"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="absolute inset-0 z-50 bg-black"
+            >
+              <div
+                className="relative flex h-full w-full cursor-pointer items-center justify-center"
+                onClick={(e) => {
+                  const width = e.currentTarget.clientWidth
+                  const clickX = e.clientX
+                  if (clickX < width * 0.3) {
+                    handlePrevPage()
+                  } else if (clickX > width * 0.7) {
+                    handleNextPage()
+                  } else {
+                    toggleImmersive()
+                  }
+                }}
+              >
+                {currentImage ? (
+                  <img
+                    src={currentImage.url}
+                    alt={currentImage.filename}
+                    className="h-full w-full object-contain"
+                    style={{ maxHeight: '100vh', maxWidth: '100vw' }}
                   />
-                </Button>
-              )}
-
-              {/* Continue Reading Button */}
-              {(Boolean(activeComicTab) ||
-                Boolean(isBookLibrary && selectedBook)) &&
-                !isReading && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => {
-                      if (activeTab) handleContinueReading()
-                      else if (selectedBook)
-                        handleStartReadingBook(selectedBook)
-                    }}
-                    title="Continue Reading"
-                  >
-                    <StepForward className="h-4 w-4" />
-                  </Button>
+                ) : (
+                  <div className="text-muted-foreground flex items-center justify-center">
+                    Loading...
+                  </div>
                 )}
-
-              {/* Comic Title in Detail/Reader View */}
-              {activeTab && (
-                <span className="ml-2 truncate text-sm font-medium">
-                  {activeTab.title}
-                </span>
-              )}
-            </div>
-
-            <div className="relative flex items-center gap-1">
-              {/* Progress in Reader View */}
-              {isReading &&
-                activeTab &&
-                (activeTab.type === 'comic' || !activeTab.type) && (
-                  <span className="text-muted-foreground mr-4 font-mono text-xs">
-                    {readingPageIndex + 1} / {activeTab.imageCount} (
-                    {Math.round(
-                      (readingPageIndex / (activeTab.imageCount - 1)) * 100,
-                    )}
-                    %)
-                  </span>
-                )}
-
-              {!isReading && (
-                <>
-                  {!activeTab && (
-                    <>
-                      {!isSearchVisible && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setIsSearchVisible(!isSearchVisible)}
-                          className={cn(searchQuery && 'text-primary')}
-                        >
-                          <Search className="h-4 w-4" />
-                        </Button>
-                      )}
-
-                      {/* Search Input - Inline expansion */}
-                      <AnimatePresence>
-                        {isSearchVisible && (
-                          <motion.div
-                            initial={{ width: 40, opacity: 0 }}
-                            animate={{ width: 200, opacity: 1 }}
-                            exit={{ width: 40, opacity: 0 }}
-                            transition={{ duration: 0.2, ease: 'easeInOut' }}
-                            className="bg-background flex items-center gap-2 overflow-hidden rounded-md px-2 py-1"
-                          >
-                            <Input
-                              autoFocus
-                              placeholder="搜索漫画..."
-                              value={searchQuery}
-                              onChange={(e) => setSearchQuery(e.target.value)}
-                              className="bg-overlay! h-6 flex-1 border-none bg-transparent p-1 text-sm shadow-none placeholder:text-base! focus-visible:ring-0"
-                              onKeyDown={(e) => {
-                                if (e.key === 'Escape') {
-                                  setIsSearchVisible(false)
-                                  setSearchQuery('')
-                                }
-                              }}
-                            />
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-4 w-4 shrink-0 p-0 hover:bg-transparent"
-                              onClick={() => {
-                                setIsSearchVisible(false)
-                                setSearchQuery('')
-                              }}
-                            >
-                              <X className="h-3 w-3" />
-                            </Button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
-                      {/* Sort Button - valid for both comics and books now */}
-                      <div className="relative">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setIsSortVisible(!isSortVisible)}
-                          className={cn(isSortVisible && 'bg-accent')}
-                        >
-                          <ArrowUpDown className="h-4 w-4" />
-                        </Button>
-                        <AnimatePresence>
-                          {isSortVisible && (
-                            <>
-                              <div
-                                className="fixed inset-0 z-40"
-                                onClick={() => setIsSortVisible(false)}
-                              />
-                              <motion.div
-                                initial={{ opacity: 0, y: 5, scale: 0.95 }}
-                                animate={{ opacity: 1, y: 0, scale: 1 }}
-                                exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                                className="bg-popover text-popover-foreground border-border absolute top-full right-0 z-50 mt-1 w-48 rounded-md border p-1 shadow-md"
-                              >
-                                <div className="space-y-1">
-                                  <button
-                                    className="hover:bg-accent hover:text-accent-foreground flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
-                                    onClick={() => {
-                                      toggleSort('name')
-                                    }}
-                                  >
-                                    <div className="w-4 shrink-0">
-                                      {sortKey === 'name' && (
-                                        <Check className="h-3.5 w-3.5" />
-                                      )}
-                                    </div>
-                                    <span className="flex-1">按名称排序</span>
-                                    <div className="flex items-center gap-1 opacity-50">
-                                      {sortKey === 'name' &&
-                                        (sortOrder === 'asc' ? (
-                                          <ArrowDownFromLine className="h-3.5 w-3.5" />
-                                        ) : (
-                                          <ArrowUpFromLine className="h-3.5 w-3.5" />
-                                        ))}
-                                    </div>
-                                  </button>
-                                  <button
-                                    className="hover:bg-accent hover:text-accent-foreground flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm"
-                                    onClick={() => {
-                                      toggleSort('date')
-                                    }}
-                                  >
-                                    <div className="w-4 shrink-0">
-                                      {sortKey === 'date' && (
-                                        <Check className="h-3.5 w-3.5" />
-                                      )}
-                                    </div>
-                                    <span className="flex-1">
-                                      按创建时间排序
-                                    </span>
-                                    <div className="flex items-center gap-1 opacity-50">
-                                      {sortKey === 'date' &&
-                                        (sortOrder === 'asc' ? (
-                                          <ArrowDownFromLine className="h-3.5 w-3.5" />
-                                        ) : (
-                                          <ArrowUpFromLine className="h-3.5 w-3.5" />
-                                        ))}
-                                    </div>
-                                  </button>
-                                </div>
-                              </motion.div>
-                            </>
-                          )}
-                        </AnimatePresence>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Book Reader - Preview mode, progress updates disabled */}
-      {activeTab?.type === 'book' && (
-        <BookReader
-          bookPath={activeTab.path}
-          initialProgress={activeBook?.progress}
-          mode="preview"
-          onExit={handleExitBookReader}
-          onProgressUpdate={(p) => {
-            // Do NOT update progress in preview mode
-            // Progress should only be saved when user actually reads in full mode
-            console.log('Preview mode - ignoring progress update:', p)
-          }}
-        />
-      )}
-
-      {/* Content Grid with Animations */}
-      {activeTab?.type !== 'book' && (
-        <ScrollArea className="flex-1">
-          <AnimatePresence>
-            {isReading && activeTab ? (
-              /* Reader View */
+              </div>
+            </motion.div>
+          ) : activeTab ? (
+            activeTab.type === 'book' ? (
               <motion.div
-                key="reader"
+                key={activeTab.id}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, ease: 'easeInOut' }}
-                className="relative flex h-full items-center justify-center"
+                transition={{ duration: 0.2 }}
+                className="bg-background h-full w-full"
               >
-                <div
-                  className="group relative h-full w-full overflow-hidden"
-                  onClick={(e) => {
-                    const x = e.clientX
-                    const width = window.innerWidth
-                    // If clicking in the middle 40% area, toggle immersive
-                    if (x > width * 0.3 && x < width * 0.7) {
-                      toggleImmersive()
-                    } else if (x < width / 3) {
-                      handlePrevPage()
-                    } else {
-                      handleNextPage()
+                {activeBook ? (
+                  <BookReader
+                    bookPath={activeBook.path}
+                    initialProgress={activeBook.progress}
+                    onExit={handleExitBookReader}
+                    onProgressUpdate={(p) =>
+                      updateBookProgress(activeBook.id, p)
                     }
-                  }}
-                >
-                  <img
-                    src={
-                      currentImage?.url ??
-                      activeTab.images?.[readingPageIndex]?.url ??
-                      ''
-                    }
-                    alt={
-                      currentImage?.filename ??
-                      activeTab.images?.[readingPageIndex]?.filename ??
-                      `Page ${readingPageIndex + 1}`
-                    }
-                    className="h-full w-full object-contain"
                   />
-
-                  {/* Navigation Zones Overlay */}
-                  <div className="absolute inset-y-0 left-0 w-1/3 cursor-w-resize" />
-                  <div className="absolute inset-y-0 right-0 w-1/3 cursor-e-resize" />
-
-                  {/* Navigation Hints */}
-                  <AnimatePresence>
-                    {!isImmersive && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                      >
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-1/2 left-4 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handlePrevPage()
-                          }}
-                          disabled={readingPageIndex === 0}
-                        >
-                          <ChevronLeft className="h-8 w-8" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="absolute top-1/2 right-4 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleNextPage()
-                          }}
-                          disabled={
-                            readingPageIndex === activeTab.imageCount - 1
-                          }
-                        >
-                          <ChevronLeft className="h-8 w-8 rotate-180" />
-                        </Button>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
+                ) : (
+                  <div className="text-muted-foreground flex h-full items-center justify-center">
+                    Book not found
+                  </div>
+                )}
               </motion.div>
-            ) : activeTab ? (
-              /* Detail View - Virtualized for performance */
+            ) : (
               <ComicDetailView
                 comicPath={activeTab.path}
                 imageCount={activeTab.imageCount}
                 currentProgress={activeComic?.progress?.current}
                 onStartReading={handleStartReading}
               />
-            ) : /* Library View */
-            isBookLibrary && currentLibrary ? (
-              <motion.div
-                key="book-library"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="h-full w-full"
-              >
-                <BookLibraryView
-                  libraryId={currentLibrary.id}
-                  onBookClick={handleBookClick}
-                  selectedBook={selectedBook}
-                  onBookSelect={handleBookSelect}
-                  searchQuery={searchQuery}
-                  sortKey={sortKey}
-                  sortOrder={sortOrder}
-                />
-              </motion.div>
-            ) : processedComics.length === 0 ? (
-              <motion.div
-                key="empty"
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                transition={pageTransition}
-                className="text-muted-foreground flex h-full flex-col items-center justify-center"
-              >
-                <p>{searchQuery ? '未找到匹配的漫画' : '未找到漫画'}</p>
-                {!searchQuery && <p className="text-sm">点击 + 导入文件夹</p>}
-                {searchQuery && (
-                  <Button
-                    variant="link"
-                    onClick={() => {
-                      setSearchQuery('')
-                      setIsSearchVisible(false)
-                    }}
-                  >
-                    清除搜索
-                  </Button>
-                )}
-              </motion.div>
-            ) : (
-              <motion.div
-                key="library"
-                variants={pageVariants}
-                initial="initial"
-                animate="animate"
-                transition={pageTransition}
-                className="flex flex-wrap justify-start gap-6 p-6 pb-4"
-              >
-                {processedComics.map((comic) => (
-                  <div
-                    key={comic.id}
-                    className="group flex w-[128px] shrink-0 cursor-pointer flex-col gap-2"
-                    onClick={() => {
-                      void handleComicClick(comic)
-                    }}
-                  >
-                    {/* Cover Image Container */}
-                    <div className="bg-muted relative aspect-[2/3] w-full overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
-                      {comic.cover ? (
-                        <img
-                          src={comic.cover}
-                          alt={comic.title}
-                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="bg-muted-foreground/10 text-muted-foreground flex h-full w-full items-center justify-center text-xs">
-                          No Cover
-                        </div>
-                      )}
-
-                      {/* Progress Badge */}
-                      {comic.progress && comic.progress.percent > 0 && (
-                        <div className="absolute inset-x-0 bottom-0 flex flex-col bg-gradient-to-t from-black/80 to-transparent p-1 pt-4">
-                          <div className="flex justify-between text-[10px] font-medium text-white">
-                            <span>{Math.round(comic.progress.percent)}%</span>
-                            <span>{comic.progress.total}P</span>
+            )
+          ) : isBookLibrary ? (
+            <motion.div
+              key="book-library"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="h-full w-full"
+            >
+              <BookLibraryView
+                libraryId={currentLibrary.id}
+                selectedBook={selectedBook}
+                onBookSelect={handleBookSelect}
+                onBookClick={handleBookClick}
+              />
+            </motion.div>
+          ) : processedComics.length === 0 ? (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="text-muted-foreground flex h-full flex-col items-center justify-center gap-4"
+            >
+              <div className="text-lg">No comics found</div>
+              {searchQuery && (
+                <div className="text-sm">
+                  Try adjusting your search or filters
+                </div>
+              )}
+            </motion.div>
+          ) : (
+            <motion.div
+              key="library"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="h-full w-full"
+            >
+              <ScrollArea className="h-full w-full">
+                <div className="flex flex-wrap justify-start gap-6 p-6 pb-4">
+                  {processedComics.map((comic) => (
+                    <div
+                      key={comic.id}
+                      className="group flex w-[128px] shrink-0 cursor-pointer flex-col gap-2"
+                      onClick={() => void handleComicClick(comic)}
+                    >
+                      <div className="bg-muted relative aspect-[2/3] w-full overflow-hidden rounded-md shadow-md transition-all group-hover:scale-105 group-hover:shadow-xl">
+                        {comic.cover ? (
+                          <img
+                            src={comic.cover}
+                            alt={comic.title}
+                            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <div className="bg-primary/5 flex h-full w-full items-center justify-center">
+                            <span className="text-primary/20 text-4xl font-bold">
+                              {comic.title[0]}
+                            </span>
                           </div>
-                          {/* Progress Bar */}
-                          <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-white/20">
+                        )}
+                        <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
+                          <div className="text-[10px] font-medium text-white">
+                            {comic.progress && comic.progress.percent > 0
+                              ? `${Math.round(comic.progress.percent)}%`
+                              : '0%'}
+                          </div>
+                          <div className="text-[10px] font-medium text-white">
+                            {comic.pageCount ?? 0}P
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        {comic.progress && comic.progress.percent > 0 && (
+                          <div className="bg-background/30 absolute inset-x-0 bottom-0 h-1">
                             <div
-                              className="bg-primary h-full transition-all"
-                              style={{ width: `${comic.progress.percent}%` }}
+                              className="bg-primary h-full transition-all duration-300"
+                              style={{
+                                width: `${comic.progress.percent}%`,
+                              }}
                             />
                           </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                      <div
+                        className="text-foreground/90 group-hover:text-primary truncate text-sm font-medium transition-colors"
+                        title={comic.title}
+                      >
+                        {comic.title}
+                      </div>
                     </div>
-
-                    {/* Title */}
-                    <div
-                      className="text-foreground/90 group-hover:text-primary truncate text-sm font-medium transition-colors"
-                      title={comic.title}
-                    >
-                      {comic.title}
-                    </div>
-                  </div>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </ScrollArea>
-      )}
+                  ))}
+                </div>
+              </ScrollArea>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   )
 }

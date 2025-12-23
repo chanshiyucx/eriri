@@ -145,11 +145,6 @@ export function BookLibraryView({
                 <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />
               </button>
             ))}
-            {authors.length === 0 && (
-              <div className="text-muted-foreground p-4 text-center text-sm">
-                No authors found.
-              </div>
-            )}
           </div>
         </ScrollArea>
       </div>
@@ -157,14 +152,10 @@ export function BookLibraryView({
       {/* Column 2: Books - Fixed 300px */}
       <div className="bg-surface flex w-[300px] shrink-0 flex-col">
         <div className="bg-base text-subtle px-4 py-2 text-xs font-medium uppercase">
-          Books {selectedAuthor ? `(${books.length})` : ''}
+          Books ({books.length})
         </div>
         <ScrollArea className="flex-1">
-          {!selectedAuthor ? (
-            <div className="text-muted-foreground flex h-full items-center justify-center p-4 text-sm">
-              Select an author
-            </div>
-          ) : (
+          {selectedAuthor && (
             <div className="flex flex-col gap-1 p-2">
               {books.map((book) => (
                 <button
