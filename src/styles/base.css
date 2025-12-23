@@ -24,4 +24,27 @@
   body {
     @apply bg-base text-text;
   }
+
+  /* Layout Transitions */
+  /* .layout-transition {
+    @apply transition-all duration-300 ease-in-out;
+  } */
+
+  /* TopNav Transitions */
+  /* .topnav-visible {
+    @apply h-10 opacity-100;
+  }
+
+  .topnav-hidden {
+    @apply h-0 overflow-hidden opacity-0;
+  } */
+
+  /* Sidebar Transitions */
+  /* .sidebar-visible {
+    @apply w-auto opacity-100;
+  }
+
+  .sidebar-hidden {
+    @apply w-0 overflow-hidden opacity-0;
+  } */
 }

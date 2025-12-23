@@ -331,7 +331,7 @@ export function ContentArea({
   }
 
   return (
-    <div
+    <main
       className={cn('bg-surface flex h-full flex-col', className)}
       {...props}
     >
@@ -479,7 +479,7 @@ export function ContentArea({
                       className="group flex w-[128px] shrink-0 cursor-pointer flex-col gap-2"
                       onClick={() => void handleComicClick(comic)}
                     >
-                      <div className="bg-muted relative aspect-[2/3] w-full overflow-hidden rounded-md shadow-md transition-all group-hover:scale-105 group-hover:shadow-xl">
+                      <div className="bg-muted relative aspect-[2/3] w-full overflow-hidden rounded-sm shadow-md transition-all group-hover:scale-105 group-hover:shadow-xl">
                         {comic.cover ? (
                           <img
                             src={comic.cover}
@@ -531,6 +531,6 @@ export function ContentArea({
           )}
         </AnimatePresence>
       </div>
-    </div>
+    </main>
   )
 }
