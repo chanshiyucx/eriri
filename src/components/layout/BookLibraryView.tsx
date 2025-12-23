@@ -133,7 +133,7 @@ export function BookLibraryView({
                   onBookSelect(null)
                 }}
                 className={cn(
-                  'hover:bg-base flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                  'hover:bg-base flex items-center gap-2 rounded-sm px-3 py-2 text-left text-sm transition-colors',
                   selectedAuthorId === author.id && 'bg-base',
                 )}
               >
@@ -162,7 +162,7 @@ export function BookLibraryView({
                   key={book.id}
                   onClick={() => onBookSelect(book)}
                   className={cn(
-                    'hover:bg-base flex items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors',
+                    'hover:bg-base flex items-center gap-2 rounded-sm px-3 py-2 text-left text-sm transition-colors',
                     selectedBook?.id === book.id && 'bg-base',
                   )}
                 >

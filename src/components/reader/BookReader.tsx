@@ -298,7 +298,7 @@ export function BookReader({
                   {content.chapters.map((chapter, i) => (
                     <button
                       key={i}
-                      className="hover:bg-accent hover:text-accent-foreground cursor-pointer truncate rounded-md px-4 py-3 text-left text-sm transition-colors"
+                      className="hover:bg-accent hover:text-accent-foreground cursor-pointer truncate rounded-sm px-4 py-3 text-left text-sm transition-colors"
                       onClick={() => jumpToChapter(chapter)}
                     >
                       {chapter.title}

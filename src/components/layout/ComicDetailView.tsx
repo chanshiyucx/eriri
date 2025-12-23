@@ -85,7 +85,7 @@ const ComicThumbnail = memo(function ComicThumbnail({
       className="group flex w-full cursor-pointer flex-col gap-2 overflow-hidden"
       onClick={() => onStartReading(index)}
     >
-      <div className="bg-muted relative aspect-[2/3] w-[128px] overflow-hidden rounded-md shadow-md transition-all group-hover:shadow-lg">
+      <div className="bg-muted relative aspect-[2/3] w-[128px] overflow-hidden rounded-sm shadow-md transition-all group-hover:shadow-lg">
         {loading ? (
           <div className="bg-muted-foreground/10 flex h-full w-full items-center justify-center">
             <div className="text-muted-foreground animate-pulse text-xs">

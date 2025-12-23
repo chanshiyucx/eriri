@@ -106,7 +106,7 @@ export function ContentToolbar({
         >
           <div className="flex flex-1 items-center gap-1 overflow-hidden">
             {/* Toggle Sidebar - Always visible */}
-            <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+            <Button size="icon" onClick={toggleSidebar}>
               {isCollapsed ? (
                 <PanelLeftOpen className="h-4 w-4" />
               ) : (
@@ -117,7 +117,6 @@ export function ContentToolbar({
             {/* Back Button - Only in detail or reader view */}
             {(activeTab ?? isReading) && (
               <Button
-                variant="ghost"
                 size="icon"
                 onClick={isReading ? handleExitReader : handleBack}
                 title="Back"
@@ -128,7 +127,6 @@ export function ContentToolbar({
 
             {!isReading && !activeTab && (
               <Button
-                variant="ghost"
                 size="icon"
                 onClick={handleRefresh}
                 disabled={isScanning || !currentLibrary}
@@ -146,7 +144,6 @@ export function ContentToolbar({
               Boolean(isBookLibrary && selectedBook)) &&
               !isReading && (
                 <Button
-                  variant="ghost"
                   size="icon"
                   onClick={() => {
                     if (activeTab) handleContinueReading()
@@ -176,7 +173,6 @@ export function ContentToolbar({
                   <>
                     {!isSearchVisible && (
                       <Button
-                        variant="ghost"
                         size="icon"
                         onClick={() => setIsSearchVisible(!isSearchVisible)}
                         className={cn(searchQuery && 'text-primary')}
@@ -193,14 +189,14 @@ export function ContentToolbar({
                           animate={{ width: 200, opacity: 1 }}
                           exit={{ width: 40, opacity: 0 }}
                           transition={{ duration: 0.2, ease: 'easeInOut' }}
-                          className="bg-background flex items-center gap-2 overflow-hidden rounded-md px-2 py-1"
+                          className="bg-background flex items-center gap-2 overflow-hidden rounded-sm px-2 py-1"
                         >
                           <Input
                             autoFocus
                             placeholder="搜索漫画..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-overlay! h-6 flex-1 border-none bg-transparent p-1 text-sm shadow-none placeholder:text-base! focus-visible:ring-0"
+                            className="h-6 w-20"
                             onKeyDown={(e) => {
                               if (e.key === 'Escape') {
                                 setIsSearchVisible(false)
@@ -209,7 +205,6 @@ export function ContentToolbar({
                             }}
                           />
                           <Button
-                            variant="ghost"
                             size="icon"
                             className="h-4 w-4 shrink-0 p-0 hover:bg-transparent"
                             onClick={() => {
@@ -226,7 +221,6 @@ export function ContentToolbar({
                     {/* Sort Button */}
                     <div className="relative">
                       <Button
-                        variant="ghost"
                         size="icon"
                         onClick={() => setIsSortVisible(!isSortVisible)}
                         className={cn(isSortVisible && 'bg-accent')}
@@ -244,7 +238,7 @@ export function ContentToolbar({
                               initial={{ opacity: 0, y: 5, scale: 0.95 }}
                               animate={{ opacity: 1, y: 0, scale: 1 }}
                               exit={{ opacity: 0, y: 5, scale: 0.95 }}
-                              className="bg-popover text-popover-foreground border-border absolute top-full right-0 z-50 mt-1 w-48 rounded-md border p-1 shadow-md"
+                              className="bg-popover text-popover-foreground border-border absolute top-full right-0 z-50 mt-1 w-48 rounded-sm border p-1 shadow-md"
                             >
                               <div className="space-y-1">
                                 <button

@@ -25,25 +25,16 @@ import { type LibraryType } from '@/types/library'
 interface SidebarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   icon: React.ElementType
   label: string
-  variant?:
-    | 'default'
-    | 'destructive'
-    | 'outline'
-    | 'secondary'
-    | 'ghost'
-    | 'link'
 }
 
 function SidebarButton({
   icon: Icon,
   label,
-  variant = 'ghost',
   className,
   ...props
 }: SidebarButtonProps) {
   return (
     <Button
-      variant={variant}
       size="default"
       className={cn(
         'w-full justify-start gap-2 transition-all duration-300',
@@ -172,7 +163,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
             <SidebarButton
               icon={Clock}
               label="最近阅读"
-              variant={showOnlyInProgress ? 'secondary' : 'ghost'}
+              className={cn(showOnlyInProgress && 'bg-secondary')}
               onClick={() => {
                 setSelectedLibrary(null)
                 setShowOnlyInProgress(true)
@@ -194,10 +185,8 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
                   <SidebarButton
                     icon={lib.type === 'book' ? LibraryBig : BookImage}
                     label={lib.name}
-                    variant={
-                      selectedLibraryId === lib.id ? 'secondary' : 'ghost'
-                    }
                     className={cn(
+                      selectedLibraryId === lib.id && 'bg-secondary',
                       isInvalid && 'text-muted-foreground/50 line-through',
                     )}
                     onClick={() => {
@@ -249,7 +238,6 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
                     {/* Reconnect button for invalid libraries */}
                     {isInvalid && (
                       <Button
-                        variant="ghost"
                         size="icon"
                         className="text-subtle hover:text-primary h-6 w-6"
                         onClick={(e) => {
@@ -271,7 +259,6 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
                     )}
                     {/* Delete button */}
                     <Button
-                      variant="ghost"
                       size="icon"
                       className="text-subtle hover:text-love h-6 w-6"
                       onClick={(e) => {
