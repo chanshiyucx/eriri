@@ -14,7 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { isBookLibrary, scanBookLibrary, scanComicLibrary } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
-import { useTabsStore } from '@/store/tabs'
+// import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 import { LibraryType, type Library } from '@/types/library'
 
@@ -54,9 +54,9 @@ export function Sidebar() {
     addLibrary,
     setScanning,
     isScanning,
-    updateLibrary,
+    updateLibraryComicOrAuthor,
   } = useLibraryStore()
-  const { setActiveTab } = useTabsStore()
+  // const { setActiveTab } = useTabsStore()
 
   const handleImport = async () => {
     try {
@@ -76,13 +76,13 @@ export function Sidebar() {
             existingLibrary.path,
             existingLibrary.id,
           )
-          updateLibrary(existingLibrary.id, { authors })
+          updateLibraryComicOrAuthor(existingLibrary.id, { authors })
         } else {
           const comics = await scanComicLibrary(
             existingLibrary.path,
             existingLibrary.id,
           )
-          updateLibrary(existingLibrary.id, { comics })
+          updateLibraryComicOrAuthor(existingLibrary.id, { comics })
         }
       } else {
         const libraryId = crypto.randomUUID()
@@ -114,7 +114,7 @@ export function Sidebar() {
 
   const handleSelect = (library: Library) => {
     setSelectedLibraryId(library.id)
-    setActiveTab('home')
+    // setActiveTab('home')
   }
 
   const handleRefresh = async (library: Library) => {
@@ -127,10 +127,10 @@ export function Sidebar() {
       setScanning(true)
       if (library.type === LibraryType.book) {
         const authors = await scanBookLibrary(library.path, library.id)
-        updateLibrary(library.id, { authors })
+        updateLibraryComicOrAuthor(library.id, { authors })
       } else {
         const comics = await scanComicLibrary(library.path, library.id)
-        updateLibrary(library.id, { comics })
+        updateLibraryComicOrAuthor(library.id, { comics })
       }
     } catch (error) {
       console.error('Refresh failed', error)
@@ -163,7 +163,7 @@ export function Sidebar() {
             label="最近阅读"
             onClick={() => {
               setSelectedLibraryId(null)
-              setActiveTab('home')
+              // setActiveTab('home')
             }}
           />
           <SidebarButton
@@ -171,7 +171,7 @@ export function Sidebar() {
             label="我的收藏"
             onClick={() => {
               setSelectedLibraryId(null)
-              setActiveTab('home')
+              // setActiveTab('home')
             }}
           />
           <SidebarButton

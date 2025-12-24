@@ -1,9 +1,10 @@
 import { useMemo } from 'react'
 import { useLibraryStore } from '@/store/library'
-import { useTabsStore } from '@/store/tabs'
+// import { useTabsStore } from '@/store/tabs'
 // import { useUIStore } from '@/store/ui'
 import { LibraryType } from '@/types/library'
 import { BookLibrary } from './BookLibrary'
+import { ComicLibrary } from './ComicLibrary'
 import { ContentToolbar } from './ContentToolbar'
 
 // import { TabContent } from './TabContent'
@@ -11,11 +12,11 @@ import { ContentToolbar } from './ContentToolbar'
 export function ContentArea() {
   const { libraries, selectedLibraryId } = useLibraryStore()
 
-  const { getActiveTab } = useTabsStore()
+  // const { getActiveTab } = useTabsStore()
   // const { showOnlyInProgress } = useUIStore()
 
   // Derived State
-  const activeTab = getActiveTab()
+  // const activeTab = getActiveTab()
 
   const selectedLibrary = useMemo(
     () => libraries.find((l) => l.id === selectedLibraryId),
@@ -32,20 +33,11 @@ export function ContentArea() {
         {/* ... */}
 
         {/* Home / Library View - Render only if NO active tab */}
-        {!activeTab &&
-          selectedLibrary &&
+        {selectedLibrary &&
           (selectedLibrary.type === LibraryType.book ? (
             <BookLibrary />
           ) : (
-            <></>
-            // <ComicLibrary
-            //   libraryId={currentLibrary.id}
-            //   searchQuery={searchQuery}
-            //   sortKey={sortKey}
-            //   sortOrder={sortOrder}
-            //   showOnlyInProgress={showOnlyInProgress}
-            //   onComicClick={handleComicClick}
-            // />
+            <ComicLibrary />
           ))}
       </div>
     </main>

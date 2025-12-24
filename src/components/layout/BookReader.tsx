@@ -16,7 +16,7 @@ BookLine.displayName = 'BookLine'
 const BookHeader = memo(() => <div className="h-16" />)
 BookHeader.displayName = 'BookHeader'
 
-const BookFooter = memo(() => <div className="h-[50vh]" />)
+const BookFooter = memo(() => <div className="h-32" />)
 BookFooter.displayName = 'BookFooter'
 
 const VIRTUOSO_COMPONENTS = {
@@ -241,7 +241,6 @@ const BookReader = memo(({ libraryId, authorId, bookId }: BookReaderProps) => {
         </div>
 
         <Virtuoso
-          key={bookId}
           ref={virtuosoRef}
           className="h-full w-full flex-1"
           data={memoizedLines}
