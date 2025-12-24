@@ -1,12 +1,70 @@
 import { PanelLeftClose, PanelLeftOpen, StepForward } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+// import { useLibraryStore } from '@/store/library'
+// import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 
 export function ContentToolbar() {
   const { isSidebarCollapsed, toggleSidebar } = useUIStore()
 
+  // const { libraries, selectedLibraryId, findBook, findComic } =
+  //   useLibraryStore()
+  // const { getActiveTab, updateTabState, setImmersive, addTab } = useTabsStore()
+
   const handleContinueReading = () => {
-    console.log('handleContinueReading')
+    // const activeTab = getActiveTab()
+    // 1. If we have an active tab (Detail View), enter Read Mode
+    // if (activeTab) {
+    //   if (activeTab.mode === 'detail') {
+    //     const update = { mode: 'read' } as const
+    //     if (activeTab.type === 'comic') {
+    //       // Identify missing progress? Usually handled by component,
+    //       // but we can try to find the comic to sync progress if needed.
+    //       // For now, just switching mode is enough as the Reader should handle init.
+    //     }
+    //     updateTabState(activeTab.id, update)
+    //     setImmersive(true)
+    //     // Auto collapse sidebar for better experience
+    //     useUIStore.getState().setSidebarCollapsed(true)
+    //   }
+    //   return
+    // }
+    // // 2. If we are in Library View, find the last read item
+    // if (selectedLibraryId) {
+    //   const library = libraries.find((l) => l.id === selectedLibraryId)
+    //   if (!library?.status) return
+    //   const { bookId, authorId, comicId } = library.status
+    //   if (library.type === 'book' && bookId && authorId) {
+    //     const book = findBook(library.id, authorId, bookId)
+    //     if (book) {
+    //       addTab({
+    //         id: `book-${book.id}`,
+    //         type: 'book',
+    //         title: book.title,
+    //         path: book.path,
+    //         mode: 'read',
+    //         // bookId/authorId? Tab doesn't stricly require them but helpful for context
+    //       })
+    //       setImmersive(true)
+    //       useUIStore.getState().setSidebarCollapsed(true)
+    //     }
+    //   } else if (library.type === 'comic' && comicId) {
+    //     const comic = findComic(library.id, comicId)
+    //     if (comic) {
+    //       addTab({
+    //         id: `comic-${comic.id}`,
+    //         type: 'comic',
+    //         title: comic.title,
+    //         path: comic.path,
+    //         mode: 'read',
+    //         readingPageIndex: comic.progress?.current ?? 0,
+    //         imageCount: comic.pageCount,
+    //       })
+    //       setImmersive(true)
+    //       useUIStore.getState().setSidebarCollapsed(true)
+    //     }
+    //   }
+    // }
   }
 
   // -- Actions --

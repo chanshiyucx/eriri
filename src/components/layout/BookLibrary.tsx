@@ -30,10 +30,12 @@ export function BookLibrary() {
 
   const handleSelectAuthor = (authorId: string) => {
     console.log('handleSelectAuthor---', authorId)
+    if (authorId === status.authorId) return
     updateLibrary(id, { status: { authorId } })
   }
 
   const handleSelectBook = (bookId: string) => {
+    if (bookId === status.bookId) return
     updateLibrary(id, { status: { authorId: status.authorId, bookId } })
   }
 
