@@ -3,7 +3,7 @@ import { readTextFile } from '@tauri-apps/plugin-fs'
 export interface Chapter {
   title: string
   lineIndex: number
-  charIndex: number // Approximate, if needed
+  charIndex: number
 }
 
 export interface BookContent {

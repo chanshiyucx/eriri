@@ -5,49 +5,44 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useTabsStore, type Tab } from '@/store/tabs'
 
-const TabItem = memo(
-  ({
-    tab,
-    isActive,
-    onSelect,
-    onRemove,
-  }: {
-    tab: Tab
-    isActive: boolean
-    onSelect: (id: string) => void
-    onRemove: (id: string) => void
-  }) => {
-    const handleClick = useCallback(() => {
-      onSelect(tab.id)
-    }, [onSelect, tab.id])
+interface TabItemProps {
+  tab: Tab
+  isActive: boolean
+  onSelect: (id: string) => void
+  onRemove: (id: string) => void
+}
 
-    const handleRemove = useCallback(
-      (e: React.MouseEvent) => {
-        e.stopPropagation()
-        onRemove(tab.id)
-      },
-      [onRemove, tab.id],
-    )
+const TabItem = memo(({ tab, isActive, onSelect, onRemove }: TabItemProps) => {
+  const handleClick = useCallback(() => {
+    onSelect(tab.id)
+  }, [onSelect, tab.id])
 
-    return (
-      <div
-        className={cn(
-          'bg-surface hover:bg-overlay group flex max-w-[200px] min-w-[150px] cursor-pointer items-center gap-2 rounded-sm px-3 py-1 text-sm transition-colors',
-          isActive && 'bg-overlay',
-        )}
-        onClick={handleClick}
+  const handleRemove = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      onRemove(tab.id)
+    },
+    [onRemove, tab.id],
+  )
+
+  return (
+    <div
+      className={cn(
+        'bg-surface hover:bg-overlay group flex max-w-[200px] min-w-[150px] cursor-pointer items-center gap-2 rounded-sm px-3 py-1 text-sm transition-colors',
+        isActive && 'bg-overlay',
+      )}
+      onClick={handleClick}
+    >
+      <span className="flex-1 truncate">{tab.title}</span>
+      <Button
+        className="h-4 w-4 bg-transparent opacity-0 group-hover:opacity-100 hover:bg-transparent"
+        onClick={handleRemove}
       >
-        <span className="flex-1 truncate">{tab.title}</span>
-        <Button
-          className="h-4 w-4 bg-transparent opacity-0 group-hover:opacity-100 hover:bg-transparent"
-          onClick={handleRemove}
-        >
-          <X className="h-3 w-3" />
-        </Button>
-      </div>
-    )
-  },
-)
+        <X className="h-3 w-3" />
+      </Button>
+    </div>
+  )
+})
 
 TabItem.displayName = 'TabItem'
 
@@ -133,7 +128,6 @@ export function TopNav() {
     })
   }, [])
 
-  // 稳定化滚动回调
   const handleScrollLeft = useCallback(() => scroll('left'), [scroll])
   const handleScrollRight = useCallback(() => scroll('right'), [scroll])
 

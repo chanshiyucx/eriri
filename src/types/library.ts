@@ -1,23 +1,23 @@
-export type LibraryType = 'comic' | 'book'
+export const LibraryType = {
+  book: 'book',
+  comic: 'comic',
+} as const
 
-export interface ComicImage {
-  url: string
-  filename: string
-}
+export type LibraryType = (typeof LibraryType)[keyof typeof LibraryType]
 
 export interface Library {
   id: string
   name: string
   path: string
   type: LibraryType
-  createdAt: number
-  // For external drive matching
-  volumeLabel?: string
-  uuid?: string
-  // Validation status
-  isValid?: boolean
   lastValidated?: number
-  invalidReason?: string
+  comics?: Comic[]
+  authors?: Author[]
+  status?: {
+    comicId?: string
+    authorId?: string
+    bookId?: string
+  }
 }
 
 export interface Comic {
@@ -28,9 +28,8 @@ export interface Comic {
   libraryId: string
   pageCount?: number
   createdAt: number
-  // Reading progress
   progress?: {
-    current: number // page index
+    current: number
     total: number
     percent: number
     lastRead: number
@@ -42,7 +41,7 @@ export interface Author {
   name: string
   path: string
   libraryId: string
-  bookCount: number
+  books?: Book[]
 }
 
 export interface Book {
@@ -53,11 +52,15 @@ export interface Book {
   libraryId: string
   size: number
   createdAt: number
-  // Reading progress
   progress?: {
-    startCharIndex: number // character count
+    startCharIndex: number
     totalChars: number
     percent: number
     lastRead: number
   }
+}
+
+export interface Image {
+  url: string
+  filename: string
 }

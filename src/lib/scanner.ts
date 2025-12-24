@@ -1,9 +1,27 @@
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { readDir, stat, type DirEntry } from '@tauri-apps/plugin-fs'
+import { v5 as uuidv5 } from 'uuid'
 import type { Author, Book, Comic } from '@/types/library'
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif'] as const
 const BOOK_EXTENSIONS = ['txt'] as const
+
+// Namespace for UUID v5 generation (randomly generated once)
+const NAMESPACE = uuidv5.URL
+
+const isBookFile = (file: DirEntry): boolean => {
+  return (
+    file.isFile &&
+    BOOK_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
+  )
+}
+
+const isComicFile = (file: DirEntry): boolean => {
+  return (
+    file.isFile &&
+    IMAGE_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext))
+  )
+}
 
 const joinPath = (...parts: string[]): string => {
   return parts
@@ -14,172 +32,84 @@ const joinPath = (...parts: string[]): string => {
     .join('/')
 }
 
+const removeExtension = (filename: string): string => {
+  return filename.replace(/\.[^/.]+$/, '')
+}
+
 export async function isBookLibrary(libraryPath: string): Promise<boolean> {
   try {
     const entries = await readDir(libraryPath)
-    // Check first directory
     const firstDir = entries.find((e) => e.isDirectory)
     if (!firstDir) return false
 
     const subEntries = await readDir(joinPath(libraryPath, firstDir.name))
-    // Check if first file is txt (simplistic but requested)
-    // Check if any file is txt
-    const hasTxt = subEntries.some(
-      (e) => e.isFile && e.name.toLowerCase().endsWith('.txt'),
-    )
-    if (hasTxt) {
-      return true
-    }
+    return subEntries.some(isBookFile)
   } catch (e) {
     console.error('Failed to check book library type', e)
   }
   return false
 }
 
-export async function scanLibrary(
-  libraryPath: string,
-  libraryId: string,
-): Promise<Comic[]> {
-  const newComics: Comic[] = []
-  try {
-    const entries: DirEntry[] = await readDir(libraryPath)
-
-    for (const entry of entries) {
-      if (entry.isDirectory) {
-        const comicPath = joinPath(libraryPath, entry.name)
-        const comicId = crypto.randomUUID()
-
-        // Scan for cover and metadata
-        let cover = ''
-        let createdAt = Date.now()
-
-        try {
-          const s = await stat(comicPath)
-          createdAt = s.birthtime?.getTime() ?? s.mtime?.getTime() ?? Date.now()
-
-          const files: DirEntry[] = await readDir(comicPath)
-          const images = files
-            .filter(
-              (file) =>
-                file.isFile &&
-                IMAGE_EXTENSIONS.some((ext) =>
-                  file.name.toLowerCase().endsWith(ext),
-                ),
-            )
-            .sort((a, b) =>
-              a.name.localeCompare(b.name, undefined, {
-                numeric: true,
-                sensitivity: 'base',
-              }),
-            )
-
-          if (images.length > 0) {
-            const coverPath = joinPath(comicPath, images[0].name)
-            cover = convertFileSrc(coverPath)
-          }
-        } catch (err) {
-          console.error(`Failed to scan comic ${entry.name}`, err)
-        }
-
-        newComics.push({
-          id: comicId,
-          title: entry.name,
-          path: comicPath,
-          cover,
-          libraryId,
-          createdAt,
-          progress: {
-            current: 0,
-            total: 0,
-            percent: 0,
-            lastRead: Date.now(),
-          },
-        })
-      }
-    }
-  } catch (error) {
-    console.error('Failed to scan library:', error)
-    throw error
-  }
-  return newComics
-}
-
 export async function scanBookLibrary(
   libraryPath: string,
   libraryId: string,
-): Promise<{ authors: Author[]; books: Book[] }> {
-  // No heuristic here, just scanning.
-  // The caller (ContentArea) decides when to call this based on isBookLibrary check usually?
-  // Current logic in ContentArea calls this as fallback.
-  // The user asked "How to identify import is comic or book lib".
-  // I will export an `detectLibraryType` helper or simple `isBookLibrary` check and use it in ContentArea.
+): Promise<Author[]> {
   const authors: Author[] = []
-  const books: Book[] = []
 
   try {
     const entries: DirEntry[] = await readDir(libraryPath)
-
     for (const entry of entries) {
-      if (entry.isDirectory) {
-        const authorName = entry.name
-        const authorPath = joinPath(libraryPath, authorName)
-        const authorId = crypto.randomUUID()
+      if (!entry.isDirectory) continue
 
-        let bookCount = 0
+      const authorName = entry.name
+      const authorPath = joinPath(libraryPath, authorName)
+      const authorId = uuidv5(authorPath, NAMESPACE)
+      try {
+        const authorFiles: DirEntry[] = await readDir(authorPath)
+        const books: Book[] = []
 
-        try {
-          const authorFiles: DirEntry[] = await readDir(authorPath)
+        for (const file of authorFiles) {
+          if (!isBookFile(file)) continue
 
-          for (const file of authorFiles) {
-            if (
-              file.isFile &&
-              BOOK_EXTENSIONS.some((ext) =>
-                file.name.toLowerCase().endsWith(ext),
-              )
-            ) {
-              const bookPath = joinPath(authorPath, file.name)
-              const bookId = crypto.randomUUID()
-              let size = 0
-              let createdAt = Date.now()
+          const bookPath = joinPath(authorPath, file.name)
+          const bookId = uuidv5(bookPath, NAMESPACE)
+          let size = 0
+          let createdAt = Date.now()
 
-              try {
-                const s = await stat(bookPath)
-                size = s.size
-                createdAt =
-                  s.birthtime?.getTime() ?? s.mtime?.getTime() ?? Date.now()
-              } catch (e) {
-                console.error(`Failed to stat book ${file.name}`, e)
-              }
-
-              books.push({
-                id: bookId,
-                title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
-                path: bookPath,
-                authorId,
-                libraryId,
-                size,
-                createdAt,
-                progress: {
-                  startCharIndex: 0,
-                  totalChars: 0,
-                  percent: 0,
-                  lastRead: Date.now(),
-                },
-              })
-              bookCount++
-            }
+          try {
+            const s = await stat(bookPath)
+            size = s.size
+            createdAt =
+              s.birthtime?.getTime() ?? s.mtime?.getTime() ?? Date.now()
+          } catch (e) {
+            console.error(`Failed to stat book ${file.name}`, e)
           }
 
-          authors.push({
-            id: authorId,
-            name: authorName,
-            path: authorPath,
+          books.push({
+            id: bookId,
+            title: removeExtension(file.name),
+            path: bookPath,
+            authorId,
             libraryId,
-            bookCount,
+            size,
+            createdAt,
+            progress: {
+              startCharIndex: 0,
+              totalChars: 0,
+              percent: 0,
+              lastRead: Date.now(),
+            },
           })
-        } catch (err) {
-          console.error(`Failed to scan author ${authorName}`, err)
         }
+        authors.push({
+          id: authorId,
+          name: authorName,
+          path: authorPath,
+          libraryId,
+          books,
+        })
+      } catch (err) {
+        console.error(`Failed to scan author ${authorName}`, err)
       }
     }
   } catch (error) {
@@ -187,7 +117,66 @@ export async function scanBookLibrary(
     throw error
   }
 
-  return { authors, books }
+  return authors
+}
+
+export async function scanComicLibrary(
+  libraryPath: string,
+  libraryId: string,
+): Promise<Comic[]> {
+  const comics: Comic[] = []
+  try {
+    const entries: DirEntry[] = await readDir(libraryPath)
+
+    for (const entry of entries) {
+      if (!entry.isDirectory) continue
+
+      const comicName = entry.name
+      const comicPath = joinPath(libraryPath, comicName)
+      const comicId = uuidv5(comicPath, NAMESPACE)
+      let cover = ''
+      let createdAt = Date.now()
+
+      try {
+        const s = await stat(comicPath)
+        createdAt = s.birthtime?.getTime() ?? s.mtime?.getTime() ?? Date.now()
+
+        const files: DirEntry[] = await readDir(comicPath)
+        const images = files.filter(isComicFile).sort((a, b) =>
+          a.name.localeCompare(b.name, undefined, {
+            numeric: true,
+            sensitivity: 'base',
+          }),
+        )
+
+        if (images.length > 0) {
+          const coverPath = joinPath(comicPath, images[0].name)
+          cover = convertFileSrc(coverPath)
+        }
+      } catch (err) {
+        console.error(`Failed to scan comic ${comicName}`, err)
+      }
+
+      comics.push({
+        id: comicId,
+        title: comicName,
+        path: comicPath,
+        cover,
+        libraryId,
+        createdAt,
+        progress: {
+          current: 0,
+          total: 0,
+          percent: 0,
+          lastRead: Date.now(),
+        },
+      })
+    }
+  } catch (error) {
+    console.error('Failed to scan library:', error)
+    throw error
+  }
+  return comics
 }
 
 export async function scanComicImages(
@@ -217,10 +206,6 @@ export async function scanComicImages(
   }
 }
 
-/**
- * Get the total count of images in a comic without loading all paths
- * More efficient than scanComicImages when you only need the count
- */
 export async function getComicImageCount(comicPath: string): Promise<number> {
   try {
     const files: DirEntry[] = await readDir(comicPath)
@@ -235,12 +220,6 @@ export async function getComicImageCount(comicPath: string): Promise<number> {
   }
 }
 
-/**
- * Load a specific range of comic images for virtualization
- * @param comicPath Path to the comic directory
- * @param start Starting index (inclusive)
- * @param count Number of images to load
- */
 export async function loadComicImageRange(
   comicPath: string,
   start: number,
@@ -248,18 +227,12 @@ export async function loadComicImageRange(
 ): Promise<{ url: string; filename: string; index: number }[]> {
   try {
     const files: DirEntry[] = await readDir(comicPath)
-    const imageFiles = files
-      .filter(
-        (file) =>
-          file.isFile &&
-          IMAGE_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext)),
-      )
-      .sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, {
-          numeric: true,
-          sensitivity: 'base',
-        }),
-      )
+    const imageFiles = files.filter(isComicFile).sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      }),
+    )
 
     const rangeFiles = imageFiles.slice(start, start + count)
 

@@ -2,4 +2,5 @@
 
 @import './theme.css';
 @import './base.css';
+@import './utilities.css';
 @import 'tw-animate-css';

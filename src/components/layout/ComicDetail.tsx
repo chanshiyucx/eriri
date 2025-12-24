@@ -1,14 +1,16 @@
 import { motion } from 'framer-motion'
 import { StepForward } from 'lucide-react'
-import { forwardRef, memo, useEffect, useState } from 'react'
-import { VirtuosoGrid } from 'react-virtuoso'
+import { forwardRef, memo, useEffect, useRef, useState } from 'react'
+import { VirtuosoGrid, VirtuosoGridHandle } from 'react-virtuoso'
 import { loadComicImageRange } from '@/lib/scanner'
 
-interface ComicDetailViewProps {
+interface ComicDetailProps {
   comicPath: string
   imageCount: number
   currentProgress?: number
   onStartReading: (index: number) => void
+  initialScrollTop?: number
+  onScrollPositionChange?: (scrollTop: number) => void
 }
 
 // Cache for loaded image ranges
@@ -164,7 +166,21 @@ export function ComicDetailView({
   imageCount,
   currentProgress = 0,
   onStartReading,
-}: ComicDetailViewProps) {
+  initialScrollTop = 0,
+  onScrollPositionChange,
+}: ComicDetailProps) {
+  const virtuosoRef = useRef<VirtuosoGridHandle>(null)
+
+  // Restore scroll position
+  useEffect(() => {
+    if (initialScrollTop > 0 && virtuosoRef.current) {
+      // Delay slightly to ensure layout
+      setTimeout(() => {
+        virtuosoRef.current?.scrollTo({ top: initialScrollTop })
+      }, 100)
+    }
+  }, [initialScrollTop]) // Run only on mount (for this instance), but linter wants dependency
+
   return (
     <motion.div
       key="detail"
@@ -174,6 +190,7 @@ export function ComicDetailView({
       className="h-full w-full p-6"
     >
       <VirtuosoGrid
+        ref={virtuosoRef}
         style={{ height: '100%' }}
         totalCount={imageCount}
         overscan={20}
@@ -189,6 +206,10 @@ export function ComicDetailView({
             onStartReading={onStartReading}
           />
         )}
+        onScroll={(e) => {
+          const target = e.currentTarget as HTMLElement
+          onScrollPositionChange?.(target.scrollTop)
+        }}
       />
     </motion.div>
   )
