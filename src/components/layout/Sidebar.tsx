@@ -1,4 +1,4 @@
-import { open } from '@tauri-apps/plugin-dialog'
+import { ask, open } from '@tauri-apps/plugin-dialog'
 import {
   BookImage,
   Clock,
@@ -9,20 +9,16 @@ import {
   Settings,
   Trash2,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button, type ButtonProps } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import {
-  isBookLibrary as checkIsBookLibrary,
-  scanBookLibrary,
-  scanLibrary,
-} from '@/lib/scanner'
+import { isBookLibrary, scanBookLibrary, scanComicLibrary } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
-import { type LibraryType } from '@/types/library'
+import { LibraryType, type Library } from '@/types/library'
 
-interface SidebarButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+type SidebarButtonProps = ButtonProps & {
   icon: React.ElementType
   label: string
 }
@@ -35,43 +31,32 @@ function SidebarButton({
 }: SidebarButtonProps) {
   return (
     <Button
-      size="default"
       className={cn(
-        'w-full justify-start gap-2 transition-all duration-300',
+        'h-10 w-full justify-start gap-2 p-2 transition-all duration-300',
         className,
       )}
       {...props}
     >
-      <Icon className="h-4 w-4 shrink-0" />
-      <span className="whitespace-nowrap">{label}</span>
+      <Icon className="h-4 w-4" />
+      <span>{label}</span>
     </Button>
   )
 }
 
-interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {
-  isCollapsed?: boolean
-  toggleSidebar?: () => void
-}
+export function Sidebar() {
+  const { isSidebarCollapsed } = useUIStore()
 
-export function Sidebar({ isCollapsed }: SidebarProps) {
   const {
     libraries,
     removeLibrary,
     selectedLibraryId,
-    setSelectedLibrary,
-    reconnectLibrary,
+    setSelectedLibraryId,
     addLibrary,
-    addComics,
-    addAuthors,
-    addBooks,
     setScanning,
-    replaceComicsForLibrary,
-    replaceBooksForLibrary,
-    libraryStates,
-    comics,
+    isScanning,
+    updateLibrary,
   } = useLibraryStore()
-  const { showOnlyInProgress, setShowOnlyInProgress } = useUIStore()
-  const { setActiveTab, tabs, addTab } = useTabsStore()
+  const { setActiveTab } = useTabsStore()
 
   const handleImport = async () => {
     try {
@@ -81,205 +66,161 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
         recursive: true,
         title: 'Select Library Folder',
       })
+      if (!selected || typeof selected !== 'string') return
 
-      if (selected && typeof selected === 'string') {
-        const existingLibrary = libraries.find((l) => l.path === selected)
-
-        if (existingLibrary) {
-          // Re-scan existing
-          setScanning(true)
-          try {
-            if (existingLibrary.type === 'book') {
-              const { authors, books } = await scanBookLibrary(
-                existingLibrary.path,
-                existingLibrary.id,
-              )
-              replaceBooksForLibrary(existingLibrary.id, authors, books)
-            } else {
-              const newComics = await scanLibrary(
-                existingLibrary.path,
-                existingLibrary.id,
-              )
-              replaceComicsForLibrary(existingLibrary.id, newComics)
-            }
-            console.log('Library re-scanned successfully')
-          } catch (error) {
-            console.error('Failed to re-scan library:', error)
-            alert('Failed to re-scan library: ' + String(error))
-          } finally {
-            setScanning(false)
-          }
+      setScanning(true)
+      const existingLibrary = libraries.find((l) => l.path === selected)
+      if (existingLibrary) {
+        if (existingLibrary.type === LibraryType.book) {
+          const authors = await scanBookLibrary(
+            existingLibrary.path,
+            existingLibrary.id,
+          )
+          updateLibrary(existingLibrary.id, { authors })
         } else {
-          setScanning(true)
-
-          const libraryId = crypto.randomUUID()
-          const libraryName = selected.split('/').pop() ?? 'Untitled Library'
-
-          const isBook = await checkIsBookLibrary(selected)
-          const newLibrary = {
-            id: libraryId,
-            name: libraryName,
-            path: selected,
-            type: (isBook ? 'book' : 'comic') as LibraryType,
-            createdAt: Date.now(),
-            isValid: true,
-          }
-
-          if (isBook) {
-            const { authors, books } = await scanBookLibrary(
-              selected,
-              libraryId,
-            )
-            addLibrary(newLibrary)
-            addAuthors(authors.map((a) => ({ ...a, libraryId: newLibrary.id })))
-            addBooks(books.map((b) => ({ ...b, libraryId: newLibrary.id })))
-          } else {
-            const scannedComics = await scanLibrary(selected, libraryId)
-            addLibrary(newLibrary)
-            addComics(
-              scannedComics.map((c) => ({ ...c, libraryId: newLibrary.id })),
-            )
-          }
-
-          setScanning(false)
+          const comics = await scanComicLibrary(
+            existingLibrary.path,
+            existingLibrary.id,
+          )
+          updateLibrary(existingLibrary.id, { comics })
         }
+      } else {
+        const libraryId = crypto.randomUUID()
+        const libraryName = selected.split('/').pop() ?? 'Untitled Library'
+
+        const isBook = await isBookLibrary(selected)
+        const library: Library = {
+          id: libraryId,
+          name: libraryName,
+          path: selected,
+          type: isBook ? LibraryType.book : LibraryType.comic,
+        }
+
+        console.log('isBook--', isBook)
+        if (isBook) {
+          library.authors = await scanBookLibrary(selected, libraryId)
+        } else {
+          library.comics = await scanComicLibrary(selected, libraryId)
+        }
+        addLibrary(library)
       }
     } catch (error) {
       console.error('Failed to import library:', error)
+      alert('Failed to import library: ' + String(error))
+    } finally {
       setScanning(false)
     }
+  }
+
+  const handleSelect = (library: Library) => {
+    setSelectedLibraryId(library.id)
+    setActiveTab('home')
+  }
+
+  const handleRefresh = async (library: Library) => {
+    const yes = await ask(`确认刷新库 "${library.name}"?`, {
+      title: '刷新库',
+      kind: 'warning',
+    })
+    if (!yes) return
+    try {
+      setScanning(true)
+      if (library.type === LibraryType.book) {
+        const authors = await scanBookLibrary(library.path, library.id)
+        updateLibrary(library.id, { authors })
+      } else {
+        const comics = await scanComicLibrary(library.path, library.id)
+        updateLibrary(library.id, { comics })
+      }
+    } catch (error) {
+      console.error('Refresh failed', error)
+      alert('Refresh failed: ' + String(error))
+    } finally {
+      setScanning(false)
+    }
+  }
+
+  const handleRemove = async (library: Library) => {
+    const yes = await ask(`确认删除库 "${library.name}"?`, {
+      title: '删除库',
+      kind: 'warning',
+    })
+    if (!yes) return
+    removeLibrary(library.id)
   }
 
   return (
     <div
       className={cn(
-        'bg-base flex h-full flex-col overflow-hidden transition-all duration-300 ease-in-out',
-        isCollapsed ? 'w-0' : 'w-56 border-r',
+        'bg-base flex h-full flex-col transition-all duration-300 ease-in-out',
+        isSidebarCollapsed ? 'w-0' : 'w-56 border-r',
       )}
     >
-      <ScrollArea className="flex-1 py-4">
-        <div className="px-3 py-2">
-          <div className="space-y-1">
-            <SidebarButton
-              icon={Clock}
-              label="最近阅读"
-              className={cn(showOnlyInProgress && 'bg-secondary')}
-              onClick={() => {
-                setSelectedLibrary(null)
-                setShowOnlyInProgress(true)
-                setActiveTab('home')
-              }}
-            />
-            <SidebarButton icon={Heart} label="我的收藏" />
-            <SidebarButton
-              icon={FolderPlus}
-              label="导入资源"
-              onClick={() => {
-                void handleImport()
-              }}
-            />
-            {libraries.map((lib) => {
-              const isInvalid = lib.isValid === false
-              return (
-                <div key={lib.id} className="group relative">
-                  <SidebarButton
-                    icon={lib.type === 'book' ? LibraryBig : BookImage}
-                    label={lib.name}
-                    className={cn(
-                      selectedLibraryId === lib.id && 'bg-secondary',
-                      isInvalid && 'text-muted-foreground/50 line-through',
-                    )}
+      <ScrollArea className="flex-1">
+        <div className="space-y-1 p-4">
+          <SidebarButton
+            icon={Clock}
+            label="最近阅读"
+            onClick={() => {
+              setSelectedLibraryId(null)
+              setActiveTab('home')
+            }}
+          />
+          <SidebarButton
+            icon={Heart}
+            label="我的收藏"
+            onClick={() => {
+              setSelectedLibraryId(null)
+              setActiveTab('home')
+            }}
+          />
+          <SidebarButton
+            icon={FolderPlus}
+            label="导入资源"
+            disabled={isScanning}
+            onClick={() => {
+              void handleImport()
+            }}
+          />
+          {libraries.map((lib) => {
+            return (
+              <div key={lib.id} className="group relative">
+                <SidebarButton
+                  icon={lib.type === LibraryType.book ? LibraryBig : BookImage}
+                  label={lib.name}
+                  className={cn(selectedLibraryId === lib.id && 'bg-overlay')}
+                  onClick={() => {
+                    handleSelect(lib)
+                  }}
+                />
+                <div className="absolute top-1/2 right-1 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                  <Button
+                    className="text-subtle bg-overlay hover:text-rose h-6 w-6"
                     onClick={() => {
-                      if (!isInvalid) {
-                        setSelectedLibrary(lib.id)
-                        setShowOnlyInProgress(false)
-
-                        // Restore state
-                        const savedState = libraryStates[lib.id]
-                        if (
-                          savedState?.selectedComicId &&
-                          lib.type !== 'book'
-                        ) {
-                          const comicId = savedState.selectedComicId
-                          // Check if tab exists
-                          const existingTab = tabs.find(
-                            (t) =>
-                              (t.type === 'comic' || !t.type) &&
-                              t.comicId === comicId,
-                          )
-                          if (existingTab) {
-                            setActiveTab(existingTab.id)
-                          } else {
-                            // Recreate tab
-                            const comic = comics.find((c) => c.id === comicId)
-                            if (comic) {
-                              addTab({
-                                id: crypto.randomUUID(),
-                                title: comic.title,
-                                type: 'comic',
-                                comicId: comic.id,
-                                path: comic.path,
-                                imageCount: comic.pageCount ?? 0,
-                              })
-                              // addTab automatically sets it as active
-                            } else {
-                              setActiveTab('home')
-                            }
-                          }
-                        } else {
-                          setActiveTab('home')
-                        }
-                      }
+                      void handleRefresh(lib)
                     }}
-                    disabled={isInvalid}
-                    title={isInvalid ? `失效: ${lib.invalidReason}` : lib.name}
-                  />
-                  <div className="absolute top-1/2 right-1 flex -translate-y-1/2 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    {/* Reconnect button for invalid libraries */}
-                    {isInvalid && (
-                      <Button
-                        size="icon"
-                        className="text-subtle hover:text-primary h-6 w-6"
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          const run = async () => {
-                            const success = await reconnectLibrary(lib.id)
-                            if (success) {
-                              alert('重连成功！')
-                            } else {
-                              alert(`重连失败: ${lib.invalidReason}`)
-                            }
-                          }
-                          void run()
-                        }}
-                        title="重新连接"
-                      >
-                        <RefreshCw className="h-3.5 w-3.5" />
-                      </Button>
-                    )}
-                    {/* Delete button */}
-                    <Button
-                      size="icon"
-                      className="text-subtle hover:text-love h-6 w-6"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        if (confirm(`删除库 "${lib.name}"?`)) {
-                          removeLibrary(lib.id)
-                        }
-                      }}
-                      title="删除库"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                    disabled={isScanning}
+                    title="刷新库"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    className="text-subtle bg-overlay hover:text-rose h-6 w-6"
+                    onClick={() => {
+                      void handleRemove(lib)
+                    }}
+                    title="删除库"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
-              )
-            })}
-          </div>
+              </div>
+            )
+          })}
         </div>
       </ScrollArea>
 
-      <div className="mt-auto flex flex-col gap-2 p-4">
+      <div className="p-4">
         <SidebarButton icon={Settings} label="设置" />
       </div>
     </div>
