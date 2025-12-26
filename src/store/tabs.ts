@@ -1,5 +1,7 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { immer } from 'zustand/middleware/immer'
+import { createIDBStorage } from '@/lib/storage'
 import { LibraryType } from '@/types/library'
 
 export interface Tab {
@@ -17,61 +19,54 @@ export interface Tab {
 interface TabsState {
   tabs: Tab[]
   activeTab: string
+  getActiveTab: () => Tab | null
   addTab: (tab: Tab) => void
   removeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
-  getActiveTab: () => Tab | null
   clearAllTabs: () => void
 }
 
 export const useTabsStore = create<TabsState>()(
   persist(
-    (set, get) => ({
+    immer((set, get) => ({
       tabs: [],
       activeTab: '',
+
+      getActiveTab: () => {
+        const state = get()
+        return state.tabs.find((t) => t.path === state.activeTab) ?? null
+      },
+
       addTab: (newTab) =>
         set((state) => {
           const existingTabIndex = state.tabs.findIndex(
             (t) => t.path === newTab.path,
           )
-          const updatedTabs = [...state.tabs]
 
           if (existingTabIndex !== -1) {
-            get().setActiveTab(newTab.path)
+            state.activeTab = newTab.path
           } else {
-            updatedTabs.push(newTab)
-          }
-          return {
-            tabs: updatedTabs,
+            state.tabs.push(newTab)
+            state.activeTab = newTab.path
           }
         }),
 
       removeTab: (tabPath) =>
         set((state) => {
-          const newTabs = state.tabs.filter((t) => t.path !== tabPath)
-          const newActiveTab =
-            state.activeTab === tabPath || !newTabs.length
-              ? ''
-              : state.activeTab
+          state.tabs = state.tabs.filter((t) => t.path !== tabPath)
 
-          return {
-            tabs: newTabs,
-            activeTab: newActiveTab,
+          if (state.activeTab === tabPath || state.tabs.length === 0) {
+            state.activeTab = ''
           }
         }),
 
-      setActiveTab: (tabPath) =>
-        set(() => ({
-          activeTab: tabPath,
-        })),
-      getActiveTab: () => {
-        const state = get()
-        return state.tabs.find((t) => t.path === state.activeTab) ?? null
-      },
+      setActiveTab: (tabPath) => set({ activeTab: tabPath }),
+
       clearAllTabs: () => set({ tabs: [], activeTab: '' }),
-    }),
+    })),
     {
       name: 'eriri-tabs-storage',
+      storage: createJSONStorage(() => createIDBStorage()),
     },
   ),
 )

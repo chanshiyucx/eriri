@@ -1,6 +1,8 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { immer } from 'zustand/middleware/immer'
 import { scanComicImages } from '@/lib/scanner'
+import { createIDBStorage } from '@/lib/storage'
 import type { Author, Book, Comic, Image, Library } from '@/types/library'
 
 const MAX_CACHE_SIZE = 30
@@ -76,7 +78,7 @@ interface LibraryState {
 
 export const useLibraryStore = create<LibraryState>()(
   persist(
-    (set, get) => ({
+    immer((set, get) => ({
       libraries: [],
       comicImagesCache: [],
       selectedLibraryId: null,
@@ -85,190 +87,155 @@ export const useLibraryStore = create<LibraryState>()(
       getLibrary: (id) => get().libraries.find((l) => l.id === id),
 
       addLibrary: (lib) =>
-        set((state) => ({
-          libraries: [...state.libraries, lib],
-        })),
+        set((state) => {
+          state.libraries.push(lib)
+        }),
 
       removeLibrary: (id) =>
-        set((state) => ({
-          libraries: state.libraries.filter((l) => l.id !== id),
-          selectedLibraryId:
-            state.selectedLibraryId === id ? null : state.selectedLibraryId,
-        })),
+        set((state) => {
+          state.libraries = state.libraries.filter((l) => l.id !== id)
+          if (state.selectedLibraryId === id) {
+            state.selectedLibraryId = null
+          }
+        }),
 
       updateLibrary: (id, data) =>
         set((state) => {
-          return {
-            libraries: state.libraries.map((lib) =>
-              lib.id === id ? { ...lib, ...data } : lib,
-            ),
+          const lib = state.libraries.find((l) => l.id === id)
+          if (lib) {
+            Object.assign(lib, data)
           }
         }),
 
       setSelectedLibraryId: (id) => set({ selectedLibraryId: id }),
-
       setScanning: (isScanning) => set({ isScanning }),
 
       findComic: (libraryId, comicId) => {
         const lib = get().libraries.find((l) => l.id === libraryId)
-        if (!lib?.comics) return undefined
-        return lib.comics.find((c) => c.id === comicId)
+        return lib?.comics?.find((c) => c.id === comicId)
       },
 
       findBook: (libraryId, authorId, bookId) => {
         const lib = get().libraries.find((l) => l.id === libraryId)
-        if (!lib?.authors) return undefined
-
-        const author = lib.authors.find((a) => a.id === authorId)
-        if (!author?.books) return undefined
-
-        return author.books.find((b) => b.id === bookId)
+        const author = lib?.authors?.find((a) => a.id === authorId)
+        return author?.books?.find((b) => b.id === bookId)
       },
 
       updateComicProgress: (libraryId, comicId, pageIndex, total) =>
         set((state) => {
-          const libraryIndex = state.libraries.findIndex(
-            (l) => l.id === libraryId,
-          )
-          if (libraryIndex === -1) return state
+          const lib = state.libraries.find((l) => l.id === libraryId)
+          const comic = lib?.comics?.find((c) => c.id === comicId)
 
-          const lib = state.libraries[libraryIndex]
-          if (!lib.comics) return state
-
-          const comicIndex = lib.comics.findIndex((c) => c.id === comicId)
-          if (comicIndex === -1) return state
-
-          const newComics = [...lib.comics]
-          newComics[comicIndex] = {
-            ...newComics[comicIndex],
-            progress: {
+          if (comic) {
+            comic.progress = {
               current: pageIndex,
               total,
               percent: (pageIndex / (total - 1)) * 100,
               lastRead: Date.now(),
-            },
+            }
           }
-
-          const updatedLib = { ...lib, comics: newComics }
-          const newLibraries = [...state.libraries]
-          newLibraries[libraryIndex] = updatedLib
-
-          return { libraries: newLibraries }
         }),
 
       updateBookProgress: (libraryId, authorId, bookId, progress) =>
         set((state) => {
-          const libraryIndex = state.libraries.findIndex(
-            (l) => l.id === libraryId,
-          )
-          if (libraryIndex === -1) return state
+          const lib = state.libraries.find((l) => l.id === libraryId)
+          const author = lib?.authors?.find((a) => a.id === authorId)
+          const book = author?.books?.find((b) => b.id === bookId)
 
-          const lib = state.libraries[libraryIndex]
-          if (!lib.authors) return state
-
-          const authorIndex = lib.authors.findIndex((a) => a.id === authorId)
-          if (authorIndex === -1) return state
-
-          const author = lib.authors[authorIndex]
-          if (!author.books) return state
-
-          const bookIndex = author.books.findIndex((b) => b.id === bookId)
-          if (bookIndex === -1) return state
-
-          const newBooks = [...author.books]
-          newBooks[bookIndex] = {
-            ...newBooks[bookIndex],
-            progress: {
+          if (book) {
+            book.progress = {
               ...progress,
               lastRead: Date.now(),
-            },
+            }
           }
+        }),
 
-          const newAuthors = [...lib.authors]
-          newAuthors[authorIndex] = {
-            ...author,
-            books: newBooks,
-          }
+      updateBookStarred: (libraryId, authorId, bookId, starred) =>
+        set((state) => {
+          const lib = state.libraries.find((l) => l.id === libraryId)
+          const author = lib?.authors?.find((a) => a.id === authorId)
+          const book = author?.books?.find((b) => b.id === bookId)
+          if (book) book.starred = starred
+        }),
 
-          const updatedLib = { ...lib, authors: newAuthors }
-          const newLibraries = [...state.libraries]
-          newLibraries[libraryIndex] = updatedLib
+      updateComicStarred: (libraryId, comicId, starred) =>
+        set((state) => {
+          const lib = state.libraries.find((l) => l.id === libraryId)
+          const comic = lib?.comics?.find((c) => c.id === comicId)
+          if (comic) comic.starred = starred
+        }),
 
-          return { libraries: newLibraries }
+      updateComicImageStarred: (comicId, filename, starred) =>
+        set((state) => {
+          const cache = state.comicImagesCache.find(
+            (c) => c.comicId === comicId,
+          )
+          const image = cache?.images.find((i) => i.filename === filename)
+          if (image) image.starred = starred
         }),
 
       updateLibraryComicOrAuthor: (id, { comics, authors }) =>
         set((state) => {
-          const libraryIndex = state.libraries.findIndex((l) => l.id === id)
-          if (libraryIndex === -1) return state
-
-          const currentLib = state.libraries[libraryIndex]
-          const updatedLib = { ...currentLib }
-          let newComicImagesCache = state.comicImagesCache
+          const lib = state.libraries.find((l) => l.id === id)
+          if (!lib) return
 
           if (comics) {
-            // Merge comics preserving progress
-            updatedLib.comics = comics.map((newComic) => {
-              const existingComic = currentLib.comics?.find(
-                (c) => c.id === newComic.id,
-              )
-              if (existingComic?.progress) {
-                return { ...newComic, progress: existingComic.progress }
+            const existingComicsMap = new Map(lib.comics?.map((c) => [c.id, c]))
+
+            lib.comics = comics.map((newComic) => {
+              const existing = existingComicsMap.get(newComic.id)
+              if (existing?.progress) {
+                newComic.progress = existing.progress
+                newComic.starred = existing.starred
               }
               return newComic
             })
 
-            // Clean up cache
-            const newComicIds = comics.map((c) => c.id)
-            newComicImagesCache = newComicImagesCache.filter(
-              (cache) => !newComicIds.includes(cache.comicId),
+            const newComicIds = new Set(comics.map((c) => c.id))
+            state.comicImagesCache = state.comicImagesCache.filter(
+              (cache) => !newComicIds.has(cache.comicId),
             )
           }
 
           if (authors) {
-            // Merge authors and their books preserving progress
-            updatedLib.authors = authors.map((newAuthor) => {
-              const existingAuthor = currentLib.authors?.find(
-                (a) => a.id === newAuthor.id,
+            const existingAuthorsMap = new Map(
+              lib.authors?.map((a) => [a.id, a]),
+            )
+
+            lib.authors = authors.map((newAuthor) => {
+              const existingAuthor = existingAuthorsMap.get(newAuthor.id)
+              if (!existingAuthor?.books) return newAuthor
+
+              const existingBooksMap = new Map(
+                existingAuthor.books.map((b) => [b.id, b]),
               )
 
-              if (!existingAuthor?.books) {
-                return newAuthor
+              if (newAuthor.books) {
+                newAuthor.books = newAuthor.books.map((newBook) => {
+                  const existingBook = existingBooksMap.get(newBook.id)
+                  if (existingBook?.progress) {
+                    newBook.progress = existingBook.progress
+                    newBook.starred = existingBook.starred
+                  }
+                  return newBook
+                })
               }
-
-              const updatedBooks = newAuthor.books?.map((newBook) => {
-                const existingBook = existingAuthor.books?.find(
-                  (b) => b.id === newBook.id,
-                )
-                if (existingBook?.progress) {
-                  return { ...newBook, progress: existingBook.progress }
-                }
-                return newBook
-              })
-
-              return { ...newAuthor, books: updatedBooks }
+              return newAuthor
             })
-          }
-
-          const newLibraries = [...state.libraries]
-          newLibraries[libraryIndex] = updatedLib
-
-          return {
-            libraries: newLibraries,
-            comicImagesCache: newComicImagesCache,
           }
         }),
 
       getComicImages: async (libraryId, comicId) => {
-        const cache = get().comicImagesCache
-        const item = cache.find((c) => c.comicId === comicId)
-        if (item) {
-          set((state) => ({
-            comicImagesCache: state.comicImagesCache.map((c) =>
-              c.comicId === comicId ? { ...c, timestamp: Date.now() } : c,
-            ),
-          }))
-          return item.images
+        const cache = get().comicImagesCache.find((c) => c.comicId === comicId)
+
+        if (cache) {
+          set((state) => {
+            const item = state.comicImagesCache.find(
+              (c) => c.comicId === comicId,
+            )
+            if (item) item.timestamp = Date.now()
+          })
+          return cache.images
         }
 
         const comic = get().findComic(libraryId, comicId)
@@ -276,31 +243,24 @@ export const useLibraryStore = create<LibraryState>()(
 
         try {
           const images = await scanComicImages(comic.path)
-          get().addComicImages(comicId, images)
-          // Update page count of the comic
+
           set((state) => {
-            const libraryIndex = state.libraries.findIndex(
-              (l) => l.id === libraryId,
-            )
-            if (libraryIndex === -1) return { libraries: state.libraries }
+            state.comicImagesCache.push({
+              comicId,
+              images,
+              timestamp: Date.now(),
+            })
 
-            const lib = state.libraries[libraryIndex]
-            if (!lib.comics) return { libraries: state.libraries }
-
-            const comicIndex = lib.comics.findIndex((c) => c.id === comicId)
-            if (comicIndex === -1) return { libraries: state.libraries }
-
-            const newComics = [...lib.comics]
-            newComics[comicIndex] = {
-              ...newComics[comicIndex],
-              pageCount: images.length,
+            if (state.comicImagesCache.length > MAX_CACHE_SIZE) {
+              state.comicImagesCache.sort((a, b) => b.timestamp - a.timestamp)
+              state.comicImagesCache.length = MAX_CACHE_SIZE
             }
 
-            const updatedLib = { ...lib, comics: newComics }
-            const newLibraries = [...state.libraries]
-            newLibraries[libraryIndex] = updatedLib
-
-            return { libraries: newLibraries }
+            const lib = state.libraries.find((l) => l.id === libraryId)
+            const c = lib?.comics?.find((item) => item.id === comicId)
+            if (c) {
+              c.pageCount = images.length
+            }
           })
 
           return images
@@ -312,109 +272,33 @@ export const useLibraryStore = create<LibraryState>()(
 
       addComicImages: (comicId, images) =>
         set((state) => {
-          let newCache = [...state.comicImagesCache]
-          const existingIndex = newCache.findIndex((c) => c.comicId === comicId)
-
-          if (existingIndex !== -1) {
-            newCache[existingIndex] = { comicId, images, timestamp: Date.now() }
-          } else {
-            newCache.push({ comicId, images, timestamp: Date.now() })
-          }
-
-          if (newCache.length > MAX_CACHE_SIZE) {
-            newCache.sort((a, b) => b.timestamp - a.timestamp)
-            newCache = newCache.slice(0, MAX_CACHE_SIZE)
-          }
-
-          return { comicImagesCache: newCache }
-        }),
-
-      updateBookStarred: (libraryId, authorId, bookId, starred) =>
-        set((state) => {
-          const libraryIndex = state.libraries.findIndex(
-            (l) => l.id === libraryId,
-          )
-          if (libraryIndex === -1) return state
-
-          const lib = state.libraries[libraryIndex]
-          if (!lib.authors) return state
-
-          const authorIndex = lib.authors.findIndex((a) => a.id === authorId)
-          if (authorIndex === -1) return state
-
-          const author = lib.authors[authorIndex]
-          if (!author.books) return state
-
-          const bookIndex = author.books.findIndex((b) => b.id === bookId)
-          if (bookIndex === -1) return state
-
-          const newBooks = [...author.books]
-          newBooks[bookIndex] = { ...newBooks[bookIndex], starred }
-
-          const newAuthors = [...lib.authors]
-          newAuthors[authorIndex] = { ...author, books: newBooks }
-
-          const updatedLib = { ...lib, authors: newAuthors }
-          const newLibraries = [...state.libraries]
-          newLibraries[libraryIndex] = updatedLib
-
-          return { libraries: newLibraries }
-        }),
-
-      updateComicStarred: (libraryId, comicId, starred) =>
-        set((state) => {
-          const libraryIndex = state.libraries.findIndex(
-            (l) => l.id === libraryId,
-          )
-          if (libraryIndex === -1) return state
-
-          const lib = state.libraries[libraryIndex]
-          if (!lib.comics) return state
-
-          const comicIndex = lib.comics.findIndex((c) => c.id === comicId)
-          if (comicIndex === -1) return state
-
-          const newComics = [...lib.comics]
-          newComics[comicIndex] = { ...newComics[comicIndex], starred }
-
-          const updatedLib = { ...lib, comics: newComics }
-          const newLibraries = [...state.libraries]
-          newLibraries[libraryIndex] = updatedLib
-
-          return { libraries: newLibraries }
-        }),
-
-      updateComicImageStarred: (comicId, filename, starred) =>
-        set((state) => {
           const cacheIndex = state.comicImagesCache.findIndex(
             (c) => c.comicId === comicId,
           )
-          if (cacheIndex === -1) return state
+          const newItem = { comicId, images, timestamp: Date.now() }
 
-          const cacheItem = state.comicImagesCache[cacheIndex]
-          const imageIndex = cacheItem.images.findIndex(
-            (i) => i.filename === filename,
-          )
-          if (imageIndex === -1) return state
+          if (cacheIndex !== -1) {
+            state.comicImagesCache[cacheIndex] = newItem
+          } else {
+            state.comicImagesCache.push(newItem)
+          }
 
-          const newImages = [...cacheItem.images]
-          newImages[imageIndex] = { ...newImages[imageIndex], starred }
-
-          const newCache = [...state.comicImagesCache]
-          newCache[cacheIndex] = { ...cacheItem, images: newImages }
-
-          return { comicImagesCache: newCache }
+          if (state.comicImagesCache.length > MAX_CACHE_SIZE) {
+            state.comicImagesCache.sort((a, b) => b.timestamp - a.timestamp)
+            state.comicImagesCache.length = MAX_CACHE_SIZE
+          }
         }),
 
       removeComicImages: (comicId) =>
-        set((state) => ({
-          comicImagesCache: state.comicImagesCache.filter(
+        set((state) => {
+          state.comicImagesCache = state.comicImagesCache.filter(
             (c) => c.comicId !== comicId,
-          ),
-        })),
-    }),
+          )
+        }),
+    })),
     {
       name: 'eriri-library-storage',
+      storage: createJSONStorage(() => createIDBStorage()),
     },
   ),
 )

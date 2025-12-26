@@ -78,7 +78,7 @@ const ComicImage = memo(
       />
 
       <Button
-        className="absolute top-3 right-3 h-6 w-6 bg-transparent hover:bg-transparent"
+        className="absolute top-3 right-3 h-8 w-8 bg-transparent hover:bg-transparent"
         onClick={(e) => {
           e.stopPropagation()
           void onStar(image)
@@ -86,7 +86,7 @@ const ComicImage = memo(
       >
         <Star
           className={cn(
-            'text-love h-5 w-5 opacity-0',
+            'text-love h-6 w-6 opacity-0',
             image.starred ? 'fill-gold opacity-100' : 'group-hover:opacity-100',
           )}
         />
@@ -354,7 +354,7 @@ const ComicReader = memo(({ libraryId, comicId }: ComicReaderProps) => {
     if (canShowDoubleColumn && images[currentIndex + 1]) {
       names.push(images[currentIndex + 1].filename)
     }
-    return names.filter(Boolean).join(' • ')
+    return names.filter(Boolean)
   }, [currentIndex, images, canShowDoubleColumn])
 
   // Check if TOC item is active
@@ -439,7 +439,11 @@ const ComicReader = memo(({ libraryId, comicId }: ComicReaderProps) => {
             )}
           </Button>
 
-          <h3 className="flex-1 truncate text-center">{currentImageNames}</h3>
+          <h3 className="flex flex-1 justify-evenly truncate text-center">
+            {currentImageNames.map((name) => (
+              <span key={name}>{name}</span>
+            ))}
+          </h3>
         </div>
       )}
       <div
