@@ -26,6 +26,7 @@ export interface Comic {
   path: string
   cover?: string
   libraryId: string
+  starred: boolean
   pageCount?: number
   createdAt: number
   progress?: {
@@ -50,6 +51,7 @@ export interface Book {
   path: string
   authorId: string
   libraryId: string
+  starred: boolean
   size: number
   createdAt: number
   progress?: {
@@ -61,9 +63,11 @@ export interface Book {
 }
 
 export interface Image {
+  path: string
   url: string
   thumbnail: string
   filename: string
+  starred: boolean
   width: number
   height: number
 }

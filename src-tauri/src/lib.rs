@@ -21,6 +21,7 @@ pub fn run() {
             scanner::scan_comic_images,
             scanner::clean_thumbnail_cache,
             scanner::get_thumbnail_stats,
+            scanner::set_file_star,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
