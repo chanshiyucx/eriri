@@ -62,5 +62,13 @@ export interface Book {
 
 export interface Image {
   url: string
+  thumbnail: string
   filename: string
+  width: number
+  height: number
+}
+
+export interface ImageCache {
+  count: number
+  size: number
 }

@@ -1,25 +1,31 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
-export type SortKey = 'name' | 'date'
-export type SortOrder = 'asc' | 'desc'
+export type ThemeMode = 'light' | 'dark' | 'system'
 
 interface UIState {
   isSidebarCollapsed: boolean
   setSidebarCollapsed: (collapsed: boolean) => void
   toggleSidebar: () => void
-  // Search & Sort
-  searchQuery: string
-  setSearchQuery: (query: string) => void
-  isSearchVisible: boolean
-  setIsSearchVisible: (visible: boolean) => void
-  sortKey: SortKey
-  setSortKey: (key: SortKey) => void
-  sortOrder: SortOrder
-  setSortOrder: (order: SortOrder) => void
-  isSortVisible: boolean
-  setIsSortVisible: (visible: boolean) => void
-  toggleSort: (key: SortKey) => void
+  isImmersive: boolean
+  toggleImmersive: () => void
+  theme: ThemeMode
+  setTheme: (theme: ThemeMode) => void
+}
+
+// Apply theme helper function
+export const applyTheme = (theme: ThemeMode) => {
+  if (typeof window === 'undefined') return
+
+  if (theme === 'system') {
+    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+      .matches
+      ? 'dark'
+      : 'light'
+    document.documentElement.setAttribute('data-theme', systemTheme)
+  } else {
+    document.documentElement.setAttribute('data-theme', theme)
+  }
 }
 
 export const useUIStore = create<UIState>()(
@@ -31,32 +37,21 @@ export const useUIStore = create<UIState>()(
       toggleSidebar: () =>
         set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
 
-      // Search & Sort defaults
-      searchQuery: '',
-      setSearchQuery: (query) => set({ searchQuery: query }),
-      isSearchVisible: false,
-      setIsSearchVisible: (visible) => set({ isSearchVisible: visible }),
-      sortKey: 'name',
-      setSortKey: (key) => set({ sortKey: key }),
-      sortOrder: 'asc',
-      setSortOrder: (order) => set({ sortOrder: order }),
-      isSortVisible: false,
-      setIsSortVisible: (visible) => set({ isSortVisible: visible }),
-      toggleSort: (key) =>
-        set((state) => {
-          if (state.sortKey === key) {
-            return { sortOrder: state.sortOrder === 'asc' ? 'desc' : 'asc' }
-          } else {
-            return { sortKey: key, sortOrder: 'asc' }
-          }
-        }),
+      isImmersive: false,
+      toggleImmersive: () =>
+        set((state) => ({ isImmersive: !state.isImmersive })),
+
+      theme: 'system',
+      setTheme: (theme) => {
+        applyTheme(theme)
+        set({ theme })
+      },
     }),
     {
       name: 'eriri-ui-storage',
       partialize: (state) => ({
         isSidebarCollapsed: state.isSidebarCollapsed,
-        sortKey: state.sortKey,
-        sortOrder: state.sortOrder,
+        theme: state.theme,
       }),
     },
   ),

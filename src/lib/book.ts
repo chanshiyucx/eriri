@@ -19,7 +19,7 @@ const CHAPTER_REGEX =
 export async function parseBook(path: string): Promise<BookContent> {
   try {
     const text = await readTextFile(path)
-    const lines = text.split('\n')
+    const lines = text.split('\n').filter((line) => line.trim() !== '')
     const chapters: Chapter[] = []
     const lineStartOffsets: number[] = []
 
@@ -36,11 +36,6 @@ export async function parseBook(path: string): Promise<BookContent> {
       }
       charCount += line.length + 1 // +1 for newline
     })
-
-    // If no chapters found, create a dummy one
-    if (chapters.length === 0) {
-      chapters.push({ title: '开始', lineIndex: 0, charIndex: 0 })
-    }
 
     return {
       fullText: text,

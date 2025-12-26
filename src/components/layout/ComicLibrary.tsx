@@ -1,14 +1,29 @@
-import { forwardRef, memo, useCallback, useMemo, useState } from 'react'
+import { PanelLeftClose, PanelLeftOpen, StepForward } from 'lucide-react'
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react'
 import { VirtuosoGrid } from 'react-virtuoso'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
-import type { Comic, Image } from '@/types/library'
+import { useTabsStore } from '@/store/tabs'
+import {
+  LibraryType,
+  type Comic,
+  type Image,
+  type Library,
+} from '@/types/library'
 
 interface ComicItemProps {
   index: number
   comic: Comic
   isSelected: boolean
-  onClick: (id: string) => Promise<void>
+  onClick: (id: string) => void
 }
 
 const ComicItem = memo(
@@ -66,29 +81,33 @@ ComicItem.displayName = 'ComicItem'
 interface ImageItemProps {
   index: number
   url: string
+  thumbnail: string
   filename: string
   onClick: (index: number) => void
 }
 
-const ImageItem = memo(({ url, filename, onClick, index }: ImageItemProps) => {
-  return (
-    <div
-      data-index={index}
-      className="group hover:bg-overlay flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all"
-      onClick={() => onClick(index)}
-    >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
-        <img
-          src={url}
-          alt={filename}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-        />
+const ImageItem = memo(
+  ({ thumbnail, filename, onClick, index }: ImageItemProps) => {
+    return (
+      <div
+        data-index={index}
+        className="group hover:bg-overlay flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all"
+        onClick={() => onClick(index)}
+      >
+        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
+          <img
+            src={thumbnail}
+            alt={filename}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+            loading="lazy"
+            decoding="async"
+          />
+        </div>
+        <div className="truncate text-sm transition-colors">{filename}</div>
       </div>
-      <div className="truncate text-sm transition-colors">{filename}</div>
-    </div>
-  )
-})
+    )
+  },
+)
 
 ImageItem.displayName = 'ImageItem'
 
@@ -114,34 +133,41 @@ const VIRTUOSO_COMPONENTS = {
   List: GridList,
 }
 
-export function ComicLibrary() {
-  const { libraries, selectedLibraryId, updateLibrary, getComicImages } =
-    useLibraryStore()
+interface ComicLibraryProps {
+  selectedLibrary: Library
+}
 
+export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
+  const { updateLibrary, getComicImages, findComic } = useLibraryStore()
+  const { addTab, setActiveTab, activeTab } = useTabsStore()
+  const [collapsed, setCollapsed] = useState(1) // 0 1 2
+  // const [isComicListCollapsed, setIsComicListCollapsed] = useState(false)
+  // const [isImageListCollapsed, setIsImageListCollapsed] = useState(false)
   const [images, setImages] = useState<Image[]>([])
-
-  // const { searchQuery, sortKey, sortOrder } = useUIStore()
-
-  const selectedLibrary = useMemo(
-    () => libraries.find((l) => l.id === selectedLibraryId),
-    [libraries, selectedLibraryId],
-  )
 
   const { id, comics = [], status = {} } = selectedLibrary ?? {}
 
-  const handleSelectComic = useCallback(
-    async (comicId: string) => {
-      console.log('handleSelectComic---', comicId)
-      if (comicId === status.comicId) return
-      updateLibrary(id!, { status: { comicId } })
+  const comic = useMemo(() => {
+    if (!selectedLibrary.id || !status.comicId) return null
+    return findComic(selectedLibrary.id, status.comicId)
+  }, [selectedLibrary.id, status.comicId, findComic])
 
-      // 手动触发扫描
-      const images = await getComicImages(id!, comicId)
-      console.log('images---', images.length)
-      setImages(images)
+  const handleSelectComic = useCallback(
+    (comicId: string) => {
+      if (comicId === status.comicId) return
+      updateLibrary(id, { status: { comicId } })
     },
-    [id, status.comicId, updateLibrary, getComicImages],
+    [id, status.comicId, updateLibrary],
   )
+
+  useEffect(() => {
+    const load = async () => {
+      if (!status.comicId) return
+      const images = await getComicImages(id, status.comicId)
+      setImages(images)
+    }
+    void load()
+  }, [id, status.comicId, getComicImages])
 
   const renderComic = useCallback(
     (index: number, comic: Comic) => (
@@ -160,6 +186,7 @@ export function ComicLibrary() {
       <ImageItem
         index={index}
         url={image.url}
+        thumbnail={image.thumbnail}
         filename={image.filename}
         onClick={() => console.log('Image clicked', index)}
       />
@@ -167,14 +194,44 @@ export function ComicLibrary() {
     [],
   )
 
-  console.log('comics render---', status.comicId)
+  const handleContinueReading = useCallback(() => {
+    if (!comic || activeTab === comic.path) return
+    addTab({
+      type: LibraryType.comic,
+      title: comic.title,
+      path: comic.path,
+      status: {
+        libraryId: id,
+        comicId: comic.id,
+      },
+    })
+    setActiveTab(comic.path)
+  }, [id, addTab, activeTab, setActiveTab, comic])
+
+  console.log('Render ComicLibrary', { ...status }, comics.length, comics)
 
   return (
     <div className="flex h-full w-full divide-x">
       {/* Left Column: Comic List */}
-      <div className="flex flex-1 shrink-0 flex-col overflow-hidden">
-        <div className="bg-base text-subtle border-b px-4 py-2 text-xs uppercase">
-          Comics ({comics.length})
+      <div
+        className={cn(
+          'flex shrink-0 flex-col overflow-hidden',
+          collapsed === 0 ? 'flex-0' : 'flex-1',
+          collapsed === 1 && 'border-r',
+        )}
+      >
+        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
+          <span>Comics ({comics.length})</span>
+          <Button
+            className="h-6 w-6"
+            onClick={() => setCollapsed(collapsed === 1 ? 0 : 1)}
+          >
+            {collapsed === 0 ? (
+              <PanelLeftOpen className="h-4 w-4" />
+            ) : (
+              <PanelLeftClose className="h-4 w-4" />
+            )}
+          </Button>
         </div>
         <VirtuosoGrid
           className="h-full w-full flex-1"
@@ -187,9 +244,33 @@ export function ComicLibrary() {
       </div>
 
       {/* Right Column: Comic Detail */}
-      <div className="relative flex flex-1 flex-col overflow-hidden">
-        <div className="bg-base text-subtle border-b px-4 py-2 text-xs uppercase">
-          Images ({images.length})
+      <div
+        className={cn(
+          'flex shrink-0 flex-col overflow-hidden',
+          collapsed === 2 ? 'flex-0' : 'flex-1',
+        )}
+      >
+        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
+          <span>Images ({images.length})</span>
+          <div className="flex gap-2">
+            <Button
+              className="h-6 w-6"
+              onClick={handleContinueReading}
+              title="Continue Reading"
+            >
+              <StepForward className="h-4 w-4" />
+            </Button>
+            <Button
+              className="h-6 w-6"
+              onClick={() => setCollapsed(collapsed === 1 ? 2 : 1)}
+            >
+              {collapsed === 2 ? (
+                <PanelLeftClose className="h-4 w-4" />
+              ) : (
+                <PanelLeftOpen className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
         <VirtuosoGrid
           className="h-full w-full flex-1"
