@@ -5,10 +5,12 @@ import {
   Columns2,
   Square,
   SquareMenu,
+  Star,
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { setFileStar } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
 import { useUIStore } from '@/store/ui'
@@ -46,17 +48,19 @@ interface ComicImageProps {
   previousImage?: Image
   isLoaded: boolean
   onLoad: (url: string) => void
+  onStar: (image: Image) => Promise<void>
 }
 
 const ComicImage = memo(
-  ({ image, previousImage, isLoaded, onLoad }: ComicImageProps) => (
-    <>
+  ({ image, previousImage, isLoaded, onLoad, onStar }: ComicImageProps) => (
+    <div className="group relative flex h-full items-center justify-center">
       {/* Previous image - visible until new image loads */}
       {previousImage && !isLoaded && (
         <img
           src={previousImage.url}
           alt={previousImage.filename}
-          className="absolute max-h-full max-w-full object-contain"
+          className="absolute inset-0 m-auto max-h-full max-w-full object-contain"
+          decoding="async"
         />
       )}
 
@@ -70,8 +74,24 @@ const ComicImage = memo(
           isLoaded ? 'opacity-100' : 'opacity-0',
         )}
         onLoad={() => onLoad(image.url)}
+        decoding="async"
       />
-    </>
+
+      <Button
+        className="absolute top-3 right-3 h-6 w-6 bg-transparent hover:bg-transparent"
+        onClick={(e) => {
+          e.stopPropagation()
+          void onStar(image)
+        }}
+      >
+        <Star
+          className={cn(
+            'text-love h-5 w-5 opacity-0',
+            image.starred ? 'fill-gold opacity-100' : 'group-hover:opacity-100',
+          )}
+        />
+      </Button>
+    </div>
   ),
 )
 ComicImage.displayName = 'ComicImage'
@@ -98,6 +118,9 @@ const ComicReader = memo(({ libraryId, comicId }: ComicReaderProps) => {
   const getComicImages = useLibraryStore((s) => s.getComicImages)
   const findComic = useLibraryStore((s) => s.findComic)
   const comic = findComic(libraryId, comicId)
+  const updateComicImageStarred = useLibraryStore(
+    (s) => s.updateComicImageStarred,
+  )
 
   useEffect(() => {
     restoredRef.current = false
@@ -345,6 +368,28 @@ const ComicReader = memo(({ libraryId, comicId }: ComicReaderProps) => {
     [currentIndex, canShowDoubleColumn],
   )
 
+  const handleStarImage = useCallback(
+    async (image: Image) => {
+      try {
+        const newStarred = !image.starred
+        const isSuccess = await setFileStar(image.path, newStarred)
+        if (isSuccess) {
+          updateComicImageStarred(comicId, image.filename, newStarred)
+          setImages((prev) =>
+            prev.map((img) =>
+              img.filename === image.filename
+                ? { ...img, starred: newStarred }
+                : img,
+            ),
+          )
+        }
+      } catch (error) {
+        console.error('Failed to star book:', error)
+      }
+    },
+    [comicId, updateComicImageStarred],
+  )
+
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
       {/* TOC Sidebar - only render content when expanded */}
@@ -408,6 +453,7 @@ const ComicReader = memo(({ libraryId, comicId }: ComicReaderProps) => {
               previousImage={previousImages[0]}
               isLoaded={loadedImages.has(images[currentIndex].url)}
               onLoad={handleImageLoaded}
+              onStar={handleStarImage}
             />
 
             {canShowDoubleColumn && images[currentIndex + 1] && (
@@ -416,6 +462,7 @@ const ComicReader = memo(({ libraryId, comicId }: ComicReaderProps) => {
                 previousImage={previousImages[1]}
                 isLoaded={loadedImages.has(images[currentIndex + 1].url)}
                 onLoad={handleImageLoaded}
+                onStar={handleStarImage}
               />
             )}
           </>

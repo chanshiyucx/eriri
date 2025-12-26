@@ -81,3 +81,19 @@ export async function getThumbnailStats(): Promise<ImageCache> {
     return { count: 0, size: 0 }
   }
 }
+
+export async function setFileStar(
+  path: string,
+  starred: boolean,
+): Promise<boolean> {
+  try {
+    console.log('Log: setFileStar: ', path, starred)
+    return await invoke('set_file_star', {
+      path,
+      starred,
+    })
+  } catch (error) {
+    console.error('Failed to star book:', error)
+    return false
+  }
+}

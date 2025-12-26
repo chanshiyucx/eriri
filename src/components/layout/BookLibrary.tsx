@@ -1,9 +1,10 @@
-import { Book, Folder } from 'lucide-react'
+import { Book as BookIcon, Folder } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { setFileStar } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
-import type { Library } from '@/types/library'
+import type { Book, Library } from '@/types/library'
 import { BookReader } from './BookReader'
 
 interface BookLibraryProps {
@@ -11,7 +12,7 @@ interface BookLibraryProps {
 }
 
 export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
-  const { updateLibrary } = useLibraryStore()
+  const { updateLibrary, updateBookStarred } = useLibraryStore()
 
   const { id, authors = [], status = {} } = selectedLibrary
 
@@ -28,7 +29,20 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
     updateLibrary(id, { status: { authorId: status.authorId, bookId } })
   }
 
-  console.log('Render BookLibrary ---')
+  const handleStarBook = async (book: Book) => {
+    try {
+      console.log('Star book:', book)
+      const newStarred = !book.starred
+      const isSuccess = await setFileStar(book.path, newStarred)
+      if (isSuccess) {
+        updateBookStarred(id, book.authorId, book.id, newStarred)
+      }
+    } catch (error) {
+      console.error('Failed to star book:', error)
+    }
+  }
+
+  console.log('Render BookLibrary ---', books)
 
   return (
     <div className="flex h-full w-full">
@@ -74,7 +88,16 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
                 status.bookId === book.id ? 'bg-overlay' : 'bg-surface',
               )}
             >
-              <Book className="h-4 w-4 shrink-0" />
+              <BookIcon
+                className={cn(
+                  'z-10 h-4 w-4 shrink-0',
+                  book.starred && 'text-love fill-gold/80',
+                )}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  void handleStarBook(book)
+                }}
+              />
               <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
                 <span className="truncate">{book.title}</span>
                 <span className="text-subtle/60 flex shrink-0 items-center gap-1 text-xs whitespace-nowrap">

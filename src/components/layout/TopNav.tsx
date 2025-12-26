@@ -104,7 +104,6 @@ export function TopNav() {
     updateArrowVisibility()
   }, [updateArrowVisibility])
 
-  // Keyboard navigation for tab switching
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -112,25 +111,19 @@ export function TopNav() {
         const currentIndex = tabs.findIndex((tab) => tab.path === activeTab)
 
         if (e.key === 'ArrowUp') {
-          // Switch to previous tab
           if (currentIndex > 0) {
             setActiveTab(tabs[currentIndex - 1].path)
           } else if (currentIndex === -1 && tabs.length > 0) {
-            // If no tab is active, go to last tab
             setActiveTab(tabs[tabs.length - 1].path)
           } else if (currentIndex === 0) {
-            // At first tab, go to home (no tab)
             setActiveTab('')
           }
         } else if (e.key === 'ArrowDown') {
-          // Switch to next tab
           if (currentIndex < tabs.length - 1 && currentIndex !== -1) {
             setActiveTab(tabs[currentIndex + 1].path)
           } else if (currentIndex === -1 && tabs.length > 0) {
-            // If no tab is active, go to first tab
             setActiveTab(tabs[0].path)
           } else if (currentIndex === tabs.length - 1) {
-            // At last tab, go to home (no tab)
             setActiveTab('')
           }
         }

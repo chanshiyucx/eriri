@@ -5,12 +5,7 @@ description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [lib]
-# The `_lib` suffix may seem redundant but it is necessary
-# to make the lib name unique and wouldn't conflict with the bin name.
-# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
 name = "eriri_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
@@ -29,5 +24,14 @@ uuid = { version = "1.0", features = ["v5"] }
 natord = "1.0"  
 percent-encoding = "2.3"
 image = "0.25"
+fast_image_resize = "5"
 sha2 = "0.10"
 rayon = "1.8"
+xattr = "1.6.1"
+plist = "1.8.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

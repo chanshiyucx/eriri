@@ -3,16 +3,27 @@ use serde::{Deserialize, Serialize};
 use std::fs::{self, File};
 use std::io::BufWriter;
 use std::path::{Path, PathBuf};
-use uuid::Uuid;
-use image::imageops::FilterType;
+use std::io::BufReader;
+use std::num::NonZeroU32;
+use image::ImageReader;
+
 use image::codecs::jpeg::JpegEncoder;
 use image::ExtendedColorType;
+use fast_image_resize as fr;
+use uuid::Uuid;
 use sha2::{Digest, Sha256};
 use rayon::prelude::*;
 use tauri::{AppHandle, Manager};
 use natord;
+use xattr;
+use plist;
 
-const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif"];
+const TAG_KEY: &str = "com.apple.metadata:_kMDItemUserTags";
+const FINDER_INFO_KEY: &str = "com.apple.FinderInfo";
+const STAR_TAG_NAME: &str = "Star"; 
+const STAR_TAG_VALUE: &str = "Star\n5";
+
+const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png"];
 const BOOK_EXTENSIONS: &[&str] = &["txt"];
 const NAMESPACE: &str = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
@@ -42,6 +53,7 @@ pub struct Book {
     size: u64,
     #[serde(rename = "createdAt")]
     created_at: u64,
+    starred: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -62,19 +74,20 @@ pub struct Comic {
     cover: String,
     #[serde(rename = "libraryId")]
     library_id: String,
-    #[serde(rename = "pageCount")]
-    page_count: usize,
     #[serde(rename = "createdAt")]
     created_at: u64,
+    starred: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ComicImage {
+    path: String,
     url: String,
     thumbnail: String,
     filename: String,
     width: u32,
     height: u32,
+    starred: bool,
 }
 
 #[derive(Debug)]
@@ -100,14 +113,18 @@ fn remove_extension(filename: &str) -> String {
 fn is_book_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext_str| BOOK_EXTENSIONS.contains(&ext_str.to_lowercase().as_str()))
+        .map(|ext_str| {
+            BOOK_EXTENSIONS.iter().any(|&x| x.eq_ignore_ascii_case(ext_str))
+        })
         .unwrap_or(false)
 }
 
 fn is_image_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext_str| IMAGE_EXTENSIONS.contains(&ext_str.to_lowercase().as_str()))
+        .map(|ext_str| {
+            IMAGE_EXTENSIONS.iter().any(|&x| x.eq_ignore_ascii_case(ext_str))
+        })
         .unwrap_or(false)
 }
 
@@ -139,31 +156,200 @@ fn get_thumbnail_hash(file_path: &Path) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn generate_thumbnail(source_path: &Path, thumb_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
-    if thumb_path.exists() {
-        return Ok(());
+fn has_star_tag(path: &Path) -> bool {
+    if let Ok(Some(value)) = xattr::get(path, TAG_KEY) {
+        if let Ok(plist::Value::Array(tags)) = plist::from_bytes(&value) {
+            for tag in tags {
+                if let Some(tag_str) = tag.as_string() {
+                     let name = tag_str.split('\n').next().unwrap_or("");
+                     if name.eq_ignore_ascii_case(STAR_TAG_NAME) {
+                         return true;
+                     }
+                }
+            }
+        }
+    }
+    false
+}
+
+
+fn set_star_tag_impl(path: &Path, is_starred: bool) -> Result<(), Box<dyn std::error::Error>> {
+    let mut tags_list = Vec::new();
+    
+    if let Ok(Some(value)) = xattr::get(path, TAG_KEY) {
+        if let Ok(plist::Value::Array(existing_tags)) = plist::from_bytes(&value) {
+             for tag in existing_tags {
+                 if let Some(s) = tag.as_string() {
+                     tags_list.push(s.to_string());
+                 }
+             }
+        }
     }
 
-    let img = image::open(source_path)?;
+    let has_star = tags_list.iter().any(|t| {
+        let name = t.split('\n').next().unwrap_or("");
+        name.eq_ignore_ascii_case(STAR_TAG_NAME)
+    });
+
+    if is_starred {
+        if !has_star {
+            tags_list.push(STAR_TAG_VALUE.to_string());
+        }
+    } else {
+        if has_star {
+            tags_list.retain(|t| {
+                let name = t.split('\n').next().unwrap_or("");
+                !name.eq_ignore_ascii_case(STAR_TAG_NAME)
+            });
+        }
+    }
+
+    let plist_tags: Vec<plist::Value> = tags_list.into_iter().map(plist::Value::String).collect();
+    let value = plist::Value::Array(plist_tags);
+    let mut buf = Vec::new();
     
-    let thumb = img.resize(THUMB_WIDTH, u32::MAX, FilterType::Triangle);
-    
-    let rgb_thumb = thumb.to_rgb8();
-    
-    let file = File::create(thumb_path)?;
-    let mut writer = BufWriter::new(file);
-    
-    let mut encoder = JpegEncoder::new_with_quality(&mut writer, THUMB_QUALITY);
-    encoder.encode(
-        rgb_thumb.as_raw(),
-        rgb_thumb.width(),
-        rgb_thumb.height(),
-        ExtendedColorType::Rgb8,
-    )?;
-    
+    value.to_writer_xml(&mut buf)?; 
+    xattr::set(path, TAG_KEY, &buf)?;
+
+
+    if let Ok(Some(mut data)) = xattr::get(path, FINDER_INFO_KEY) {
+        if data.len() >= 32 {
+            data[9] &= !0x0E; 
+            xattr::set(path, FINDER_INFO_KEY, &data)?;
+        }
+    }
+
     Ok(())
 }
 
+fn get_image_dimensions_fast(path: &Path) -> Result<(u32, u32), Box<dyn std::error::Error>> {
+    let file = File::open(path)?;
+    let reader = BufReader::new(file);
+    let reader = ImageReader::new(reader).with_guessed_format()?;
+    let (width, height) = reader.into_dimensions()?;
+    Ok((width, height))
+}
+
+fn process_and_get_dimensions(
+    source_path: &Path, 
+    thumb_path: &Path
+) -> Result<(u32, u32), Box<dyn std::error::Error>> {
+    if thumb_path.exists() {
+        if let Ok((w, h)) = get_image_dimensions_fast(thumb_path) {
+            return Ok((w, h));
+        }
+    }
+
+    let img = image::open(source_path)?;
+    let (width, height) = (img.width(), img.height());
+
+    if !thumb_path.exists() {
+        let src_width = NonZeroU32::new(width).ok_or("Width is 0")?;
+        let src_height = NonZeroU32::new(height).ok_or("Height is 0")?;
+        
+        let rgb_image = img.into_rgb8();
+        
+        let src_image = fr::images::Image::from_vec_u8(
+            src_width.get(),
+            src_height.get(),
+            rgb_image.into_raw(),
+            fr::PixelType::U8x3,
+        )?;
+
+        let target_width = THUMB_WIDTH;
+        let target_height = (height as f64 * (target_width as f64 / width as f64)) as u32;
+        
+        let dst_width = NonZeroU32::new(target_width).ok_or("Target width is 0")?;
+        let dst_height = NonZeroU32::new(target_height).ok_or("Target height is 0")?;
+
+        let mut dst_image = fr::images::Image::new(
+            dst_width.get(),
+            dst_height.get(),
+            src_image.pixel_type(),
+        );
+
+        let mut resizer = fr::Resizer::new();
+        let options = fr::ResizeOptions::new().resize_alg(
+            fr::ResizeAlg::Convolution(fr::FilterType::Bilinear)
+        );
+        resizer.resize(&src_image, &mut dst_image, &options)?;
+
+        let file = File::create(thumb_path)?;
+        let mut writer = BufWriter::new(file);
+        
+        let mut encoder = JpegEncoder::new_with_quality(&mut writer, THUMB_QUALITY);
+        encoder.encode(
+            dst_image.buffer(),
+            target_width,
+            target_height,
+            ExtendedColorType::Rgb8,
+        )?;
+    }
+
+    Ok((width, height))
+}
+
+
+
+fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
+    for &ext in IMAGE_EXTENSIONS {
+        let p = folder_path.join(format!("1001.{}", ext));
+        if p.exists() { return Some(p); }
+        let p_upper = folder_path.join(format!("1001.{}", ext.to_uppercase()));
+        if p_upper.exists() { return Some(p_upper); }
+    }
+    
+    let mut fallback_first_name: Option<String> = None;
+    let mut fallback_first_path: Option<PathBuf> = None;
+    let mut scanned_count = 0; 
+
+    if let Ok(entries) = fs::read_dir(folder_path) {
+        for entry in entries.flatten() {
+            if !entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                continue;
+            }
+
+            let path = entry.path();
+            if is_image_file(&path) {
+                scanned_count += 1;
+                
+                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    
+                    if stem.ends_with("_p0") {
+                        return Some(path);
+                    }
+
+                    if scanned_count == 1 {
+                        if let Some((prefix, _page_num)) = stem.rsplit_once("_p") {
+                            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                                let p0_name = format!("{}_p0.{}", prefix, ext);
+                                let p0_path = folder_path.join(p0_name);
+                                
+                                if p0_path.exists() {
+                                    return Some(p0_path); 
+                                }
+                            }
+                        }
+                    }
+                }
+
+                let name = entry.file_name().to_string_lossy().to_string();
+                
+                let is_new_min = match &fallback_first_name {
+                    None => true,
+                    Some(curr) => natord::compare(&name, curr) == std::cmp::Ordering::Less,
+                };
+
+                if is_new_min {
+                    fallback_first_name = Some(name);
+                    fallback_first_path = Some(path);
+                }
+            }
+        }
+    }
+
+    fallback_first_path
+}
 #[tauri::command]
 pub fn is_book_library(library_path: String) -> Result<bool, String> {
     let path = Path::new(&library_path);
@@ -238,6 +424,7 @@ pub fn scan_book_library(
                     library_id: library_id.clone(),
                     size,
                     created_at,
+                    starred: has_star_tag(&book_path),
                 });
             }
         }
@@ -263,7 +450,6 @@ pub async fn scan_comic_library(
     let start = std::time::Instant::now();
     let path = Path::new(&library_path);
 
-    // Resolve cache directory
     let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
     let thumb_dir = cache_dir.join("thumbnails");
     
@@ -275,7 +461,6 @@ pub async fn scan_comic_library(
     let entries_vec: Vec<_> = entries.flatten().collect();
 
 
-    // Use par_iter for parallel processing of comics
     let processed_comics: Vec<Comic> = entries_vec
         .par_iter()
         .filter_map(|entry| {
@@ -299,47 +484,21 @@ pub async fn scan_comic_library(
                 });
 
             let mut cover = String::new();
-            let mut page_count = 0;
-            
-            if let Ok(files) = fs::read_dir(&comic_path) {
-                let mut first_image_name: Option<String> = None;
-                let mut first_image_path: Option<PathBuf> = None;
 
-                for entry in files.flatten() {
-                    if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
-                        let path = entry.path();
-                        if is_image_file(&path) {
-                            page_count += 1;
-                            let name = entry.file_name().to_string_lossy().to_string();
-                            
-                            let is_new_first = match &first_image_name {
-                                None => true,
-                                Some(current_first) => natord::compare(&name, current_first) == std::cmp::Ordering::Less,
-                            };
+            if let Some(cover_path) = find_cover_image(&comic_path) {
+                
+                let hash = get_thumbnail_hash(&cover_path);
+                let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
 
-                            if is_new_first {
-                                first_image_name = Some(name);
-                                first_image_path = Some(path);
-                            }
-                        }
-                    }
+                if !thumb_path.exists() {
+                    let _ = process_and_get_dimensions(&cover_path, &thumb_path);
                 }
 
-                if let Some(path) = first_image_path {
-                    // Generate thumbnail for cover
-                    let hash = get_thumbnail_hash(&path);
-                    let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
-                    
-                    if let Err(e) = generate_thumbnail(&path, &thumb_path) {
-                        eprintln!("⚠️  Failed to generate thumbnail for cover {}: {}", comic_name, e);
-                    }
-
-                    cover = if thumb_path.exists() {
-                        convert_file_src(&thumb_path.to_string_lossy())
-                    } else {
-                        convert_file_src(&path.to_string_lossy())
-                    };
-                }
+                cover = if thumb_path.exists() {
+                    convert_file_src(&thumb_path.to_string_lossy())
+                } else {
+                    convert_file_src(&cover_path.to_string_lossy())
+                };
             }
 
             Some(Comic {
@@ -348,8 +507,8 @@ pub async fn scan_comic_library(
                 path: comic_path.to_string_lossy().to_string(),
                 cover,
                 library_id: library_id.clone(),
-                page_count,
                 created_at,
+                starred: has_star_tag(&comic_path),
             })
         })
         .collect();
@@ -407,9 +566,11 @@ pub async fn scan_comic_images(
             let hash = get_thumbnail_hash(file_path);
             let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
             
-            if let Err(e) = generate_thumbnail(file_path, &thumb_path) {
-                eprintln!("⚠️  Failed to generate thumbnail for {}: {}", filename, e);
-            }
+            let (width, height) = process_and_get_dimensions(file_path, &thumb_path)
+                .unwrap_or_else(|e| {
+                    eprintln!("⚠️ Failed to process {}: {}", filename, e);
+                    (0, 0)
+                });
 
             let thumbnail = if thumb_path.exists() {
                 convert_file_src(&thumb_path.to_string_lossy())
@@ -417,17 +578,14 @@ pub async fn scan_comic_images(
                 convert_file_src(&file_path.to_string_lossy())
             };
 
-            // Get image dimensions
-            let (width, height) = image::open(file_path)
-                .map(|img| (img.width(), img.height()))
-                .unwrap_or((0, 0));
-
             ComicImage {
+                path: file_path.to_string_lossy().to_string(),
                 filename,
                 url: convert_file_src(&file_path.to_string_lossy()),
                 thumbnail,
                 width,
                 height,
+                starred: has_star_tag(file_path),
             }
         })
         .collect();
@@ -559,4 +717,14 @@ pub async fn get_thumbnail_stats(
     }
     
     Ok((count, total_size))
+}
+
+#[tauri::command]
+pub fn set_file_star(path: String, starred: bool) -> Result<bool, String> {
+    let p = Path::new(&path);
+    if !p.exists() {
+        return Err("File not found".to_string());
+    }
+    set_star_tag_impl(p, starred).map_err(|e| e.to_string())?;
+    Ok(true)
 }

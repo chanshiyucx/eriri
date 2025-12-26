@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 import { scanComicImages } from '@/lib/scanner'
 import type { Author, Book, Comic, Image, Library } from '@/types/library'
 
-const MAX_CACHE_SIZE = 20
+const MAX_CACHE_SIZE = 30
 
 interface ComicImageCache {
   comicId: string
@@ -39,6 +39,25 @@ interface LibraryState {
   getComicImages: (libraryId: string, comicId: string) => Promise<Image[]>
   addComicImages: (comicId: string, images: Image[]) => void
   removeComicImages: (comicId: string) => void
+
+  updateBookStarred: (
+    libraryId: string,
+    authorId: string,
+    bookId: string,
+    starred: boolean,
+  ) => void
+
+  updateComicStarred: (
+    libraryId: string,
+    comicId: string,
+    starred: boolean,
+  ) => void
+
+  updateComicImageStarred: (
+    comicId: string,
+    filename: string,
+    starred: boolean,
+  ) => void
 
   updateComicProgress: (
     libraryId: string,
@@ -185,6 +204,7 @@ export const useLibraryStore = create<LibraryState>()(
 
           const currentLib = state.libraries[libraryIndex]
           const updatedLib = { ...currentLib }
+          let newComicImagesCache = state.comicImagesCache
 
           if (comics) {
             // Merge comics preserving progress
@@ -197,6 +217,12 @@ export const useLibraryStore = create<LibraryState>()(
               }
               return newComic
             })
+
+            // Clean up cache
+            const newComicIds = comics.map((c) => c.id)
+            newComicImagesCache = newComicImagesCache.filter(
+              (cache) => !newComicIds.includes(cache.comicId),
+            )
           }
 
           if (authors) {
@@ -227,7 +253,10 @@ export const useLibraryStore = create<LibraryState>()(
           const newLibraries = [...state.libraries]
           newLibraries[libraryIndex] = updatedLib
 
-          return { libraries: newLibraries }
+          return {
+            libraries: newLibraries,
+            comicImagesCache: newComicImagesCache,
+          }
         }),
 
       getComicImages: async (libraryId, comicId) => {
@@ -247,8 +276,33 @@ export const useLibraryStore = create<LibraryState>()(
 
         try {
           const images = await scanComicImages(comic.path)
-          console.log('images---', images)
           get().addComicImages(comicId, images)
+          // Update page count of the comic
+          set((state) => {
+            const libraryIndex = state.libraries.findIndex(
+              (l) => l.id === libraryId,
+            )
+            if (libraryIndex === -1) return { libraries: state.libraries }
+
+            const lib = state.libraries[libraryIndex]
+            if (!lib.comics) return { libraries: state.libraries }
+
+            const comicIndex = lib.comics.findIndex((c) => c.id === comicId)
+            if (comicIndex === -1) return { libraries: state.libraries }
+
+            const newComics = [...lib.comics]
+            newComics[comicIndex] = {
+              ...newComics[comicIndex],
+              pageCount: images.length,
+            }
+
+            const updatedLib = { ...lib, comics: newComics }
+            const newLibraries = [...state.libraries]
+            newLibraries[libraryIndex] = updatedLib
+
+            return { libraries: newLibraries }
+          })
+
           return images
         } catch (error) {
           console.error('Failed to scan comic images:', error)
@@ -271,6 +325,83 @@ export const useLibraryStore = create<LibraryState>()(
             newCache.sort((a, b) => b.timestamp - a.timestamp)
             newCache = newCache.slice(0, MAX_CACHE_SIZE)
           }
+
+          return { comicImagesCache: newCache }
+        }),
+
+      updateBookStarred: (libraryId, authorId, bookId, starred) =>
+        set((state) => {
+          const libraryIndex = state.libraries.findIndex(
+            (l) => l.id === libraryId,
+          )
+          if (libraryIndex === -1) return state
+
+          const lib = state.libraries[libraryIndex]
+          if (!lib.authors) return state
+
+          const authorIndex = lib.authors.findIndex((a) => a.id === authorId)
+          if (authorIndex === -1) return state
+
+          const author = lib.authors[authorIndex]
+          if (!author.books) return state
+
+          const bookIndex = author.books.findIndex((b) => b.id === bookId)
+          if (bookIndex === -1) return state
+
+          const newBooks = [...author.books]
+          newBooks[bookIndex] = { ...newBooks[bookIndex], starred }
+
+          const newAuthors = [...lib.authors]
+          newAuthors[authorIndex] = { ...author, books: newBooks }
+
+          const updatedLib = { ...lib, authors: newAuthors }
+          const newLibraries = [...state.libraries]
+          newLibraries[libraryIndex] = updatedLib
+
+          return { libraries: newLibraries }
+        }),
+
+      updateComicStarred: (libraryId, comicId, starred) =>
+        set((state) => {
+          const libraryIndex = state.libraries.findIndex(
+            (l) => l.id === libraryId,
+          )
+          if (libraryIndex === -1) return state
+
+          const lib = state.libraries[libraryIndex]
+          if (!lib.comics) return state
+
+          const comicIndex = lib.comics.findIndex((c) => c.id === comicId)
+          if (comicIndex === -1) return state
+
+          const newComics = [...lib.comics]
+          newComics[comicIndex] = { ...newComics[comicIndex], starred }
+
+          const updatedLib = { ...lib, comics: newComics }
+          const newLibraries = [...state.libraries]
+          newLibraries[libraryIndex] = updatedLib
+
+          return { libraries: newLibraries }
+        }),
+
+      updateComicImageStarred: (comicId, filename, starred) =>
+        set((state) => {
+          const cacheIndex = state.comicImagesCache.findIndex(
+            (c) => c.comicId === comicId,
+          )
+          if (cacheIndex === -1) return state
+
+          const cacheItem = state.comicImagesCache[cacheIndex]
+          const imageIndex = cacheItem.images.findIndex(
+            (i) => i.filename === filename,
+          )
+          if (imageIndex === -1) return state
+
+          const newImages = [...cacheItem.images]
+          newImages[imageIndex] = { ...newImages[imageIndex], starred }
+
+          const newCache = [...state.comicImagesCache]
+          newCache[cacheIndex] = { ...cacheItem, images: newImages }
 
           return { comicImagesCache: newCache }
         }),
