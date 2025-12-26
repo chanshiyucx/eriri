@@ -1,8 +1,16 @@
-use percent_encoding::{utf8_percent_encode, AsciiSet, CONTROLS};
+use percent_encoding::utf8_percent_encode;
 use serde::{Deserialize, Serialize};
-use std::fs;
+use std::fs::{self, File};
+use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use uuid::Uuid;
+use image::imageops::FilterType;
+use image::codecs::jpeg::JpegEncoder;
+use image::ExtendedColorType;
+use sha2::{Digest, Sha256};
+use rayon::prelude::*;
+use tauri::{AppHandle, Manager};
+use natord;
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "webp", "gif"];
 const BOOK_EXTENSIONS: &[&str] = &["txt"];
@@ -18,6 +26,9 @@ const ENCODE_SET: percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERI
     .remove(b'\'')
     .remove(b'(')
     .remove(b')');
+
+const THUMB_WIDTH: u32 = 256;
+const THUMB_QUALITY: u8 = 70;
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Book {
@@ -60,7 +71,17 @@ pub struct Comic {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ComicImage {
     url: String,
+    thumbnail: String,
     filename: String,
+    width: u32,
+    height: u32,
+}
+
+#[derive(Debug)]
+pub struct CacheFile {
+    path: PathBuf,
+    size: u64,
+    time_secs: u64,
 }
 
 fn generate_uuid(input: &str) -> String {
@@ -77,21 +98,17 @@ fn remove_extension(filename: &str) -> String {
 }
 
 fn is_book_file(path: &Path) -> bool {
-    if let Some(ext) = path.extension() {
-        if let Some(ext_str) = ext.to_str() {
-            return BOOK_EXTENSIONS.contains(&ext_str.to_lowercase().as_str());
-        }
-    }
-    false
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext_str| BOOK_EXTENSIONS.contains(&ext_str.to_lowercase().as_str()))
+        .unwrap_or(false)
 }
 
 fn is_image_file(path: &Path) -> bool {
-    if let Some(ext) = path.extension() {
-        if let Some(ext_str) = ext.to_str() {
-            return IMAGE_EXTENSIONS.contains(&ext_str.to_lowercase().as_str());
-        }
-    }
-    false
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext_str| IMAGE_EXTENSIONS.contains(&ext_str.to_lowercase().as_str()))
+        .unwrap_or(false)
 }
 
 fn convert_file_src(path: &str) -> String {
@@ -114,6 +131,37 @@ fn get_created_time(metadata: &fs::Metadata) -> u64 {
                 .unwrap()
                 .as_millis() as u64
         })
+}
+
+fn get_thumbnail_hash(file_path: &Path) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(file_path.to_string_lossy().as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+fn generate_thumbnail(source_path: &Path, thumb_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+    if thumb_path.exists() {
+        return Ok(());
+    }
+
+    let img = image::open(source_path)?;
+    
+    let thumb = img.resize(THUMB_WIDTH, u32::MAX, FilterType::Triangle);
+    
+    let rgb_thumb = thumb.to_rgb8();
+    
+    let file = File::create(thumb_path)?;
+    let mut writer = BufWriter::new(file);
+    
+    let mut encoder = JpegEncoder::new_with_quality(&mut writer, THUMB_QUALITY);
+    encoder.encode(
+        rgb_thumb.as_raw(),
+        rgb_thumb.width(),
+        rgb_thumb.height(),
+        ExtendedColorType::Rgb8,
+    )?;
+    
+    Ok(())
 }
 
 #[tauri::command]
@@ -207,100 +255,308 @@ pub fn scan_book_library(
 }
 
 #[tauri::command]
-pub fn scan_comic_library(
+pub async fn scan_comic_library(
+    app: AppHandle,
     library_path: String,
     library_id: String,
 ) -> Result<Vec<Comic>, String> {
+    let start = std::time::Instant::now();
     let path = Path::new(&library_path);
-    let mut comics = Vec::new();
+
+    // Resolve cache directory
+    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    let thumb_dir = cache_dir.join("thumbnails");
+    
+    if !thumb_dir.exists() {
+        fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
+    }
 
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
+    let entries_vec: Vec<_> = entries.flatten().collect();
 
-    for entry in entries.flatten() {
-        if !entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
-            continue;
-        }
 
-        let comic_name = entry.file_name().to_string_lossy().to_string();
-        let comic_path = entry.path();
-        let comic_id = generate_uuid(&comic_path.to_string_lossy());
+    // Use par_iter for parallel processing of comics
+    let processed_comics: Vec<Comic> = entries_vec
+        .par_iter()
+        .filter_map(|entry| {
+            if !entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                return None;
+            }
 
-        let created_at = entry
-            .metadata()
-            .ok()
-            .map(|m| get_created_time(&m))
-            .unwrap_or_else(|| {
-                std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as u64
-            });
+            let comic_name = entry.file_name().to_string_lossy().to_string();
+            let comic_path = entry.path();
+            let comic_id = generate_uuid(&comic_path.to_string_lossy());
 
-        let mut cover = String::new();
-        let mut page_count = 0;
-        
-        if let Ok(files) = fs::read_dir(&comic_path) {
-            let mut first_image_name: Option<String> = None;
-            let mut first_image_path: Option<PathBuf> = None;
+            let created_at = entry
+                .metadata()
+                .ok()
+                .map(|m| get_created_time(&m))
+                .unwrap_or_else(|| {
+                    std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap()
+                        .as_millis() as u64
+                });
 
-            for entry in files.flatten() {
-                if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
-                    let path = entry.path();
-                    if is_image_file(&path) {
-                        page_count += 1;
-                        let name = entry.file_name().to_string_lossy().to_string();
-                        
-                        let is_new_first = match &first_image_name {
-                            None => true,
-                            Some(current_first) => natord::compare(&name, current_first) == std::cmp::Ordering::Less,
-                        };
+            let mut cover = String::new();
+            let mut page_count = 0;
+            
+            if let Ok(files) = fs::read_dir(&comic_path) {
+                let mut first_image_name: Option<String> = None;
+                let mut first_image_path: Option<PathBuf> = None;
 
-                        if is_new_first {
-                            first_image_name = Some(name);
-                            first_image_path = Some(path);
+                for entry in files.flatten() {
+                    if entry.file_type().map(|ft| ft.is_file()).unwrap_or(false) {
+                        let path = entry.path();
+                        if is_image_file(&path) {
+                            page_count += 1;
+                            let name = entry.file_name().to_string_lossy().to_string();
+                            
+                            let is_new_first = match &first_image_name {
+                                None => true,
+                                Some(current_first) => natord::compare(&name, current_first) == std::cmp::Ordering::Less,
+                            };
+
+                            if is_new_first {
+                                first_image_name = Some(name);
+                                first_image_path = Some(path);
+                            }
                         }
                     }
                 }
+
+                if let Some(path) = first_image_path {
+                    // Generate thumbnail for cover
+                    let hash = get_thumbnail_hash(&path);
+                    let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
+                    
+                    if let Err(e) = generate_thumbnail(&path, &thumb_path) {
+                        eprintln!("⚠️  Failed to generate thumbnail for cover {}: {}", comic_name, e);
+                    }
+
+                    cover = if thumb_path.exists() {
+                        convert_file_src(&thumb_path.to_string_lossy())
+                    } else {
+                        convert_file_src(&path.to_string_lossy())
+                    };
+                }
             }
 
-            if let Some(path) = first_image_path {
-                cover = convert_file_src(&path.to_string_lossy());
-            }
-        }
+            Some(Comic {
+                id: comic_id,
+                title: comic_name,
+                path: comic_path.to_string_lossy().to_string(),
+                cover,
+                library_id: library_id.clone(),
+                page_count,
+                created_at,
+            })
+        })
+        .collect();
+    
+    // Sort comics by title naturally
+    let mut comics = processed_comics;
+    comics.sort_by(|a, b| natord::compare(&a.title, &b.title));
 
-        comics.push(Comic {
-            id: comic_id,
-            title: comic_name,
-            path: comic_path.to_string_lossy().to_string(),
-            cover,
-            library_id: library_id.clone(),
-            page_count,
-            created_at,
-        });
-    }
+    let duration = start.elapsed();
+    println!(
+        "✅ Scanned library with {} comics in {:.2}s",
+        comics.len(),
+        duration.as_secs_f32()
+    );
 
     Ok(comics)
 }
 
 #[tauri::command]
-pub fn scan_comic_images(comic_path: String) -> Result<Vec<ComicImage>, String> {
+pub async fn scan_comic_images(
+    app: AppHandle,
+    comic_path: String,
+) -> Result<Vec<ComicImage>, String> {
+    let start = std::time::Instant::now();
     let path = Path::new(&comic_path);
+    
+    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    let thumb_dir = cache_dir.join("thumbnails");
+    
+    if !thumb_dir.exists() {
+        fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
+    }
 
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
-
-    let mut images: Vec<ComicImage> = entries
+    let image_paths: Vec<PathBuf> = entries
         .flatten()
         .filter(|e| {
             e.file_type().map(|ft| ft.is_file()).unwrap_or(false)
                 && is_image_file(&e.path())
         })
-        .map(|e| ComicImage {
-            filename: e.file_name().to_string_lossy().to_string(),
-            url: convert_file_src(&e.path().to_string_lossy()),
+        .map(|e| e.path())
+        .collect();
+
+    println!("📚 Found {} images", image_paths.len());
+
+    let images: Vec<ComicImage> = image_paths
+        .par_iter()
+        .map(|file_path| {
+            let filename = file_path
+                .file_name()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+            
+            let hash = get_thumbnail_hash(file_path);
+            let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
+            
+            if let Err(e) = generate_thumbnail(file_path, &thumb_path) {
+                eprintln!("⚠️  Failed to generate thumbnail for {}: {}", filename, e);
+            }
+
+            let thumbnail = if thumb_path.exists() {
+                convert_file_src(&thumb_path.to_string_lossy())
+            } else {
+                convert_file_src(&file_path.to_string_lossy())
+            };
+
+            // Get image dimensions
+            let (width, height) = image::open(file_path)
+                .map(|img| (img.width(), img.height()))
+                .unwrap_or((0, 0));
+
+            ComicImage {
+                filename,
+                url: convert_file_src(&file_path.to_string_lossy()),
+                thumbnail,
+                width,
+                height,
+            }
         })
         .collect();
 
-    images.sort_by(|a, b| natord::compare(&a.filename, &b.filename));
+    let mut sorted_images = images;
+    sorted_images.sort_by(|a, b| natord::compare(&a.filename, &b.filename));
 
-    Ok(images)
+    let duration = start.elapsed();
+    println!(
+        "✅ Processed {} images in {:.2}s ({:.0}ms per image)",
+        sorted_images.len(),
+        duration.as_secs_f32(),
+        duration.as_millis() as f32 / sorted_images.len().max(1) as f32
+    );
+
+    Ok(sorted_images)
+}
+
+#[tauri::command]
+pub async fn clean_thumbnail_cache(
+    app: AppHandle,
+    days_old: Option<u64>,
+    max_size_mb: Option<u64>, 
+) -> Result<(usize, u64), String> {
+    use std::time::SystemTime;
+    
+    let days = days_old.unwrap_or(30);
+    let max_size = max_size_mb.unwrap_or(1024) * 1024 * 1024; 
+    
+    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    let thumb_dir = cache_dir.join("thumbnails");
+    
+    if !thumb_dir.exists() {
+        return Ok((0, 0));
+    }
+    
+    let now = SystemTime::now();
+    let cutoff_time = now
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_secs()
+        - (days * 24 * 60 * 60);
+    
+    let mut deleted_count = 0;
+    let mut freed_bytes = 0u64;
+    
+    let mut valid_files = Vec::new();
+    let mut current_total_size = 0u64;
+    
+    if let Ok(entries) = fs::read_dir(&thumb_dir) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if !metadata.is_file() { continue; }
+
+                let time = metadata.modified().unwrap_or(now);
+                
+                let time_secs = time
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                
+                let size = metadata.len();
+
+                if time_secs < cutoff_time {
+                    if fs::remove_file(entry.path()).is_ok() {
+                        freed_bytes += size;
+                        deleted_count += 1;
+                    }
+                } else {
+                    valid_files.push(CacheFile {
+                        path: entry.path(),
+                        size,
+                        time_secs,
+                    });
+                    current_total_size += size;
+                }
+            }
+        }
+    }
+
+    if current_total_size > max_size {
+        valid_files.sort_by_key(|f| f.time_secs);
+
+        for file in valid_files {
+            if current_total_size <= max_size {
+                break; 
+            }
+
+            if fs::remove_file(&file.path).is_ok() {
+                freed_bytes += file.size;
+                current_total_size -= file.size;
+                deleted_count += 1;
+            }
+        }
+    }
+    
+    println!(
+        "🗑️ Cleaned {} thumbnails, freed {:.2} MB",
+        deleted_count,
+        freed_bytes as f64 / 1024.0 / 1024.0
+    );
+    
+    Ok((deleted_count, freed_bytes))
+}
+
+#[tauri::command]
+pub async fn get_thumbnail_stats(
+    app: AppHandle,
+) -> Result<(usize, u64), String> {
+    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    let thumb_dir = cache_dir.join("thumbnails");
+    
+    if !thumb_dir.exists() {
+        return Ok((0, 0));
+    }
+    
+    let mut count = 0;
+    let mut total_size = 0u64;
+    
+    if let Ok(entries) = fs::read_dir(&thumb_dir) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_file() {
+                    count += 1;
+                    total_size += metadata.len();
+                }
+            }
+        }
+    }
+    
+    Ok((count, total_size))
 }

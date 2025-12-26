@@ -79,7 +79,6 @@ export const useLibraryStore = create<LibraryState>()(
 
       updateLibrary: (id, data) =>
         set((state) => {
-          console.log('updateLibrary---', id, data)
           return {
             libraries: state.libraries.map((lib) =>
               lib.id === id ? { ...lib, ...data } : lib,
@@ -230,6 +229,7 @@ export const useLibraryStore = create<LibraryState>()(
 
           return { libraries: newLibraries }
         }),
+
       getComicImages: async (libraryId, comicId) => {
         const cache = get().comicImagesCache
         const item = cache.find((c) => c.comicId === comicId)
@@ -247,6 +247,7 @@ export const useLibraryStore = create<LibraryState>()(
 
         try {
           const images = await scanComicImages(comic.path)
+          console.log('images---', images)
           get().addComicImages(comicId, images)
           return images
         } catch (error) {

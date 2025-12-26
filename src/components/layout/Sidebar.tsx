@@ -1,20 +1,18 @@
 import { ask, open } from '@tauri-apps/plugin-dialog'
 import {
   BookImage,
-  Clock,
   FolderPlus,
-  Heart,
   LibraryBig,
   RefreshCw,
-  Settings,
   Trash2,
 } from 'lucide-react'
+import { CacheInfo } from '@/components/layout/CacheInfo'
+import { ThemeSwitcher } from '@/components/layout/ThemeSwitcher'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { isBookLibrary, scanBookLibrary, scanComicLibrary } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
-// import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 import { LibraryType, type Library } from '@/types/library'
 
@@ -32,7 +30,7 @@ function SidebarButton({
   return (
     <Button
       className={cn(
-        'h-10 w-full justify-start gap-2 p-2 transition-all duration-300',
+        'h-10 w-full justify-start gap-2 rounded-none px-4 transition-all duration-300',
         className,
       )}
       {...props}
@@ -56,7 +54,6 @@ export function Sidebar() {
     isScanning,
     updateLibraryComicOrAuthor,
   } = useLibraryStore()
-  // const { setActiveTab } = useTabsStore()
 
   const handleImport = async () => {
     try {
@@ -96,7 +93,6 @@ export function Sidebar() {
           type: isBook ? LibraryType.book : LibraryType.comic,
         }
 
-        console.log('isBook--', isBook)
         if (isBook) {
           library.authors = await scanBookLibrary(selected, libraryId)
         } else {
@@ -114,7 +110,6 @@ export function Sidebar() {
 
   const handleSelect = (library: Library) => {
     setSelectedLibraryId(library.id)
-    // setActiveTab('home')
   }
 
   const handleRefresh = async (library: Library) => {
@@ -157,71 +152,54 @@ export function Sidebar() {
       )}
     >
       <ScrollArea className="flex-1">
-        <div className="space-y-1 p-4">
-          <SidebarButton
-            icon={Clock}
-            label="最近阅读"
-            onClick={() => {
-              setSelectedLibraryId(null)
-              // setActiveTab('home')
-            }}
-          />
-          <SidebarButton
-            icon={Heart}
-            label="我的收藏"
-            onClick={() => {
-              setSelectedLibraryId(null)
-              // setActiveTab('home')
-            }}
-          />
-          <SidebarButton
-            icon={FolderPlus}
-            label="导入资源"
-            disabled={isScanning}
-            onClick={() => {
-              void handleImport()
-            }}
-          />
-          {libraries.map((lib) => {
-            return (
-              <div key={lib.id} className="group relative">
-                <SidebarButton
-                  icon={lib.type === LibraryType.book ? LibraryBig : BookImage}
-                  label={lib.name}
-                  className={cn(selectedLibraryId === lib.id && 'bg-overlay')}
+        <SidebarButton
+          icon={FolderPlus}
+          label="导入资源"
+          disabled={isScanning}
+          onClick={() => {
+            void handleImport()
+          }}
+        />
+        {libraries.map((lib) => {
+          return (
+            <div key={lib.id} className="group relative">
+              <SidebarButton
+                icon={lib.type === LibraryType.book ? LibraryBig : BookImage}
+                label={lib.name}
+                className={cn(selectedLibraryId === lib.id && 'bg-overlay')}
+                onClick={() => {
+                  handleSelect(lib)
+                }}
+              />
+              <div className="absolute top-1/2 right-1 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+                <Button
+                  className="text-subtle bg-overlay hover:text-rose h-6 w-6"
                   onClick={() => {
-                    handleSelect(lib)
+                    void handleRefresh(lib)
                   }}
-                />
-                <div className="absolute top-1/2 right-1 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                  <Button
-                    className="text-subtle bg-overlay hover:text-rose h-6 w-6"
-                    onClick={() => {
-                      void handleRefresh(lib)
-                    }}
-                    disabled={isScanning}
-                    title="刷新库"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    className="text-subtle bg-overlay hover:text-rose h-6 w-6"
-                    onClick={() => {
-                      void handleRemove(lib)
-                    }}
-                    title="删除库"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
+                  disabled={isScanning}
+                  title="刷新库"
+                >
+                  <RefreshCw className="h-4 w-4" />
+                </Button>
+                <Button
+                  className="text-subtle bg-overlay hover:text-rose h-6 w-6"
+                  onClick={() => {
+                    void handleRemove(lib)
+                  }}
+                  title="删除库"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
               </div>
-            )
-          })}
-        </div>
+            </div>
+          )
+        })}
       </ScrollArea>
 
-      <div className="p-4">
-        <SidebarButton icon={Settings} label="设置" />
+      <div className="space-y-2 p-4">
+        <CacheInfo />
+        <ThemeSwitcher />
       </div>
     </div>
   )

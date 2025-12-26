@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { Author, Comic, Image } from '@/types/library'
+import type { Author, Comic, Image, ImageCache } from '@/types/library'
 
 export async function isBookLibrary(libraryPath: string): Promise<boolean> {
   try {
@@ -53,5 +53,31 @@ export async function scanComicImages(comicPath: string): Promise<Image[]> {
   } catch (error) {
     console.error('Failed to scan comic images:', error)
     return []
+  }
+}
+
+export async function cleanThumbnailCache(): Promise<void> {
+  try {
+    console.log('Log: cleanThumbnailCache: ')
+    return await invoke('clean_thumbnail_cache', {
+      daysOld: 30,
+      maxSizeMb: 1024,
+    })
+  } catch (error) {
+    console.error('Failed to clean thumbnail cache:', error)
+  }
+}
+
+export async function getThumbnailStats(): Promise<ImageCache> {
+  try {
+    console.log('Log: getThumbnailStats: ')
+    const [count, size] = await invoke<[number, number]>(
+      'get_thumbnail_stats',
+      {},
+    )
+    return { count, size }
+  } catch (error) {
+    console.error('Failed to get thumbnail stats:', error)
+    return { count: 0, size: 0 }
   }
 }
