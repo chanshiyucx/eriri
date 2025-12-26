@@ -1,15 +1,16 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
+import { immer } from 'zustand/middleware/immer'
+import { createIDBStorage } from '@/lib/storage'
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
 interface UIState {
   isSidebarCollapsed: boolean
-  setSidebarCollapsed: (collapsed: boolean) => void
-  toggleSidebar: () => void
   isImmersive: boolean
-  toggleImmersive: () => void
   theme: ThemeMode
+  toggleSidebar: () => void
+  toggleImmersive: () => void
   setTheme: (theme: ThemeMode) => void
 }
 
@@ -30,25 +31,29 @@ export const applyTheme = (theme: ThemeMode) => {
 
 export const useUIStore = create<UIState>()(
   persist(
-    (set) => ({
+    immer((set) => ({
       isSidebarCollapsed: false,
-      setSidebarCollapsed: (collapsed) =>
-        set({ isSidebarCollapsed: collapsed }),
-      toggleSidebar: () =>
-        set((state) => ({ isSidebarCollapsed: !state.isSidebarCollapsed })),
-
       isImmersive: false,
-      toggleImmersive: () =>
-        set((state) => ({ isImmersive: !state.isImmersive })),
-
       theme: 'system',
+
+      toggleSidebar: () =>
+        set((state) => {
+          state.isSidebarCollapsed = !state.isSidebarCollapsed
+        }),
+
+      toggleImmersive: () =>
+        set((state) => {
+          state.isImmersive = !state.isImmersive
+        }),
+
       setTheme: (theme) => {
         applyTheme(theme)
         set({ theme })
       },
-    }),
+    })),
     {
       name: 'eriri-ui-storage',
+      storage: createJSONStorage(() => createIDBStorage()),
       partialize: (state) => ({
         isSidebarCollapsed: state.isSidebarCollapsed,
         theme: state.theme,
