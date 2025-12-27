@@ -29,6 +29,9 @@ sha2 = "0.10"
 rayon = "1.8"
 xattr = "1.6.1"
 plist = "1.8.0"
+turbojpeg = "1.3.3"
+memmap2 = "0.9.9"
+
 
 [profile.release]
 lto = true
