@@ -71,3 +71,84 @@ Scanned library with 3 comics in 4.40s
 ✅ Processed 54 images in 13.78s (255ms per image)
 📚 Found 3 images
 ✅ Processed 3 images in 3.82s (1275ms per image)
+
+---
+
+---
+
+旧 第一次
+
+✅ Scanned library with 26 comics in 7.78s
+📚 Found 19 images
+✅ Processed 19 images in 0.89s (47ms per image)
+📚 Found 85 images
+✅ Processed 85 images in 14.95s (176ms per image)
+📚 Found 43 images
+✅ Processed 43 images in 4.55s (106ms per image)
+📚 Found 277 images
+✅ Processed 277 images in 48.25s (174ms per image)
+
+旧 第二次
+
+✅ Scanned library with 26 comics in 7.33s
+📚 Found 19 images
+✅ Processed 19 images in 0.94s (49ms per image)
+📚 Found 85 images
+✅ Processed 85 images in 16.07s (189ms per image)
+📚 Found 43 images
+✅ Processed 43 images in 4.51s (105ms per image)
+📚 Found 277 images
+✅ Processed 277 images in 47.51s (172ms per image)
+
+---
+
+新 第一次
+✅ Scanned library with 26 comics in 3.36s
+📚 Found 19 images
+✅ Processed 19 images in 1.37s (72ms per image)
+📚 Found 85 images
+✅ Processed 85 images in 1.29s (15ms per image)
+📚 Found 43 images
+✅ Processed 43 images in 7.32s (170ms per image)
+📚 Found 277 images
+✅ Processed 277 images in 6.85s (25ms per image)
+
+新 第二次
+
+✅ Scanned library with 26 comics in 3.30s
+📚 Found 19 images
+✅ Processed 19 images in 1.34s (70ms per image)
+📚 Found 85 images
+✅ Processed 85 images in 1.28s (15ms per image)
+📚 Found 43 images
+✅ Processed 43 images in 7.61s (177ms per image)
+📚 Found 277 images
+✅ Processed 277 images in 6.86s (25ms per image)
+
+---
+
+---
+
+new
+
+✅ Scanned library with 26 comics in 1.98s
+📚 Found 19 images
+✅ Processed 19 images in 0.90s (47ms per image)
+📚 Found 85 images
+✅ Processed 85 images in 1.33s (16ms per image)
+📚 Found 43 images
+✅ Processed 43 images in 4.78s (111ms per image)
+📚 Found 277 images
+✅ Processed 277 images in 6.38s (23ms per image)
+
+---
+
+✅ Scanned library with 26 comics in 2.30s
+📚 Found 19 images
+✅ Processed 19 images in 0.90s (47ms per image)
+📚 Found 85 images
+✅ Processed 85 images in 1.30s (15ms per image)
+📚 Found 43 images
+✅ Processed 43 images in 4.34s (101ms per image)
+📚 Found 277 images
+✅ Processed 277 images in 6.38s (23ms per image)
