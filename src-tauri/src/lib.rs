@@ -15,13 +15,14 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             greet,
+            scanner::generate_uuid,
             scanner::is_book_library,
             scanner::scan_book_library,
             scanner::scan_comic_library,
             scanner::scan_comic_images,
             scanner::clean_thumbnail_cache,
             scanner::get_thumbnail_stats,
-            scanner::set_file_star,
+            scanner::set_file_tag,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

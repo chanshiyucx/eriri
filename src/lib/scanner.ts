@@ -1,6 +1,17 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { Author, Comic, Image, ImageCache } from '@/types/library'
 
+export async function generateUuid(input: string): Promise<string> {
+  try {
+    return await invoke<string>('generate_uuid', {
+      input,
+    })
+  } catch (error) {
+    console.error('Failed to generate UUID:', error)
+    return ''
+  }
+}
+
 export async function isBookLibrary(libraryPath: string): Promise<boolean> {
   try {
     return await invoke<boolean>('is_book_library', {
@@ -82,18 +93,18 @@ export async function getThumbnailStats(): Promise<ImageCache> {
   }
 }
 
-export async function setFileStar(
+export async function setFileTag(
   path: string,
-  starred: boolean,
+  tags: { starred?: boolean; deleted?: boolean },
 ): Promise<boolean> {
   try {
-    console.log('Log: setFileStar: ', path, starred)
-    return await invoke('set_file_star', {
+    console.log('Log: setFileTag: ', path, tags)
+    return await invoke<boolean>('set_file_tag', {
       path,
-      starred,
+      tags,
     })
   } catch (error) {
-    console.error('Failed to star book:', error)
+    console.error('Failed to tag file:', error)
     return false
   }
 }

@@ -10,10 +10,8 @@ export interface Library {
   name: string
   path: string
   type: LibraryType
-  lastValidated?: number
-  comics?: Comic[]
-  authors?: Author[]
-  status?: {
+  createdAt: number
+  status: {
     comicId?: string
     authorId?: string
     bookId?: string
@@ -27,14 +25,9 @@ export interface Comic {
   cover?: string
   libraryId: string
   starred: boolean
+  deleted: boolean
   pageCount?: number
   createdAt: number
-  progress?: {
-    current: number
-    total: number
-    percent: number
-    lastRead: number
-  }
 }
 
 export interface Author {
@@ -42,6 +35,7 @@ export interface Author {
   name: string
   path: string
   libraryId: string
+  bookCount: number
   books?: Book[]
 }
 
@@ -52,14 +46,9 @@ export interface Book {
   authorId: string
   libraryId: string
   starred: boolean
+  deleted: boolean
   size: number
   createdAt: number
-  progress?: {
-    startCharIndex: number
-    totalChars: number
-    percent: number
-    lastRead: number
-  }
 }
 
 export interface Image {
@@ -68,6 +57,7 @@ export interface Image {
   thumbnail: string
   filename: string
   starred: boolean
+  deleted: boolean
   width: number
   height: number
 }
@@ -75,4 +65,20 @@ export interface Image {
 export interface ImageCache {
   count: number
   size: number
+}
+
+export interface ComicImage {
+  comicId: string
+  images: Image[]
+  timestamp: number
+}
+
+export interface ScannedLibrary {
+  comics?: Comic[]
+  authors?: Author[]
+}
+
+export interface FileTags {
+  starred?: boolean
+  deleted?: boolean
 }

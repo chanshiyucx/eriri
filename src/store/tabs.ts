@@ -6,14 +6,9 @@ import { LibraryType } from '@/types/library'
 
 export interface Tab {
   type: LibraryType
+  id: string
   title: string
   path: string
-  status: {
-    libraryId: string
-    comicId?: string
-    authorId?: string
-    bookId?: string
-  }
 }
 
 interface TabsState {

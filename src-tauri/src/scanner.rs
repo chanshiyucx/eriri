@@ -5,8 +5,8 @@ use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::io::BufReader;
 use std::num::NonZeroU32;
+use std::os::unix::fs::MetadataExt;
 use image::ImageReader;
-
 use image::codecs::jpeg::JpegEncoder;
 use image::ExtendedColorType;
 use fast_image_resize as fr;
@@ -20,8 +20,10 @@ use plist;
 
 const TAG_KEY: &str = "com.apple.metadata:_kMDItemUserTags";
 const FINDER_INFO_KEY: &str = "com.apple.FinderInfo";
-const STAR_TAG_NAME: &str = "Star"; 
-const STAR_TAG_VALUE: &str = "Star\n5";
+const STAR_TAG_NAME: &str = "STAR"; 
+const STAR_TAG_VALUE: &str = "STAR\n5";
+const DELETE_TAG_NAME: &str = "DELETE";
+const DELETE_TAG_VALUE: &str = "DELETE\n6";
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png"];
 const BOOK_EXTENSIONS: &[&str] = &["txt"];
@@ -54,6 +56,7 @@ pub struct Book {
     #[serde(rename = "createdAt")]
     created_at: u64,
     starred: bool,
+    deleted: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -63,6 +66,7 @@ pub struct Author {
     path: String,
     #[serde(rename = "libraryId")]
     library_id: String,
+    book_count: u32,
     books: Vec<Book>,
 }
 
@@ -77,6 +81,7 @@ pub struct Comic {
     #[serde(rename = "createdAt")]
     created_at: u64,
     starred: bool,
+    deleted: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -88,6 +93,7 @@ pub struct ComicImage {
     width: u32,
     height: u32,
     starred: bool,
+    deleted: bool,
 }
 
 #[derive(Debug)]
@@ -97,10 +103,12 @@ pub struct CacheFile {
     time_secs: u64,
 }
 
-fn generate_uuid(input: &str) -> String {
-    let namespace = Uuid::parse_str(NAMESPACE).unwrap();
-    Uuid::new_v5(&namespace, input.as_bytes()).to_string()
+#[derive(Deserialize)]
+pub struct FileTags {
+    starred: Option<bool>,
+    deleted: Option<bool>,
 }
+
 
 fn remove_extension(filename: &str) -> String {
     Path::new(filename)
@@ -150,9 +158,11 @@ fn get_created_time(metadata: &fs::Metadata) -> u64 {
         })
 }
 
-fn get_thumbnail_hash(file_path: &Path) -> String {
+fn get_thumbnail_hash(metadata: &fs::Metadata) -> String {
     let mut hasher = Sha256::new();
-    hasher.update(file_path.to_string_lossy().as_bytes());
+    hasher.update(metadata.ino().to_le_bytes());
+    hasher.update(metadata.len().to_le_bytes());
+    hasher.update(metadata.mtime().to_le_bytes());
     format!("{:x}", hasher.finalize())
 }
 
@@ -161,10 +171,10 @@ fn has_star_tag(path: &Path) -> bool {
         if let Ok(plist::Value::Array(tags)) = plist::from_bytes(&value) {
             for tag in tags {
                 if let Some(tag_str) = tag.as_string() {
-                     let name = tag_str.split('\n').next().unwrap_or("");
-                     if name.eq_ignore_ascii_case(STAR_TAG_NAME) {
-                         return true;
-                     }
+                    let name = tag_str.split('\n').next().unwrap_or("");
+                    if name.eq_ignore_ascii_case(STAR_TAG_NAME) {
+                        return true;
+                    }
                 }
             }
         }
@@ -172,35 +182,72 @@ fn has_star_tag(path: &Path) -> bool {
     false
 }
 
+fn has_delete_tag(path: &Path) -> bool {
+    if let Ok(Some(value)) = xattr::get(path, TAG_KEY) {
+        if let Ok(plist::Value::Array(tags)) = plist::from_bytes(&value) {
+            for tag in tags {
+                if let Some(tag_str) = tag.as_string() {
+                    let name = tag_str.split('\n').next().unwrap_or("");
+                    if name.eq_ignore_ascii_case(DELETE_TAG_NAME) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
+}
 
-fn set_star_tag_impl(path: &Path, is_starred: bool) -> Result<(), Box<dyn std::error::Error>> {
+fn set_file_tag_impl(path: &Path, tags: FileTags) -> Result<(), Box<dyn std::error::Error>> {
     let mut tags_list = Vec::new();
     
     if let Ok(Some(value)) = xattr::get(path, TAG_KEY) {
         if let Ok(plist::Value::Array(existing_tags)) = plist::from_bytes(&value) {
-             for tag in existing_tags {
-                 if let Some(s) = tag.as_string() {
-                     tags_list.push(s.to_string());
-                 }
-             }
+            for tag in existing_tags {
+                if let Some(s) = tag.as_string() {
+                    tags_list.push(s.to_string());
+                }
+            }
         }
     }
 
-    let has_star = tags_list.iter().any(|t| {
-        let name = t.split('\n').next().unwrap_or("");
-        name.eq_ignore_ascii_case(STAR_TAG_NAME)
-    });
+    if let Some(is_starred) = tags.starred {
+        let has_star = tags_list.iter().any(|t| {
+            let name = t.split('\n').next().unwrap_or("");
+            name.eq_ignore_ascii_case(STAR_TAG_NAME)
+        });
 
-    if is_starred {
-        if !has_star {
-            tags_list.push(STAR_TAG_VALUE.to_string());
+        if is_starred {
+            if !has_star {
+                tags_list.push(STAR_TAG_VALUE.to_string());
+            }
+        } else {
+            if has_star {
+                tags_list.retain(|t| {
+                    let name = t.split('\n').next().unwrap_or("");
+                    !name.eq_ignore_ascii_case(STAR_TAG_NAME)
+                });
+            }
         }
-    } else {
-        if has_star {
-            tags_list.retain(|t| {
-                let name = t.split('\n').next().unwrap_or("");
-                !name.eq_ignore_ascii_case(STAR_TAG_NAME)
-            });
+    }
+
+    if let Some(is_deleted) = tags.deleted {
+         let has_delete = tags_list.iter().any(|t| {
+            let name = t.split('\n').next().unwrap_or("");
+            name.eq_ignore_ascii_case(DELETE_TAG_NAME)
+        });
+
+        if is_deleted {
+            if !has_delete {
+                tags_list.push(DELETE_TAG_VALUE.to_string());
+            }
+        } else {
+            if has_delete {
+                tags_list.retain(|t| {
+                    let name = t.split('\n').next().unwrap_or("");
+                    !name.eq_ignore_ascii_case(DELETE_TAG_NAME)
+                });
+            }
         }
     }
 
@@ -289,8 +336,6 @@ fn process_and_get_dimensions(
     Ok((width, height))
 }
 
-
-
 fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
     for &ext in IMAGE_EXTENSIONS {
         let p = folder_path.join(format!("1001.{}", ext));
@@ -350,6 +395,13 @@ fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
 
     fallback_first_path
 }
+
+#[tauri::command]
+pub fn generate_uuid(input: &str) -> String {
+    let namespace = Uuid::parse_str(NAMESPACE).unwrap();
+    Uuid::new_v5(&namespace, input.as_bytes()).to_string()
+}
+
 #[tauri::command]
 pub fn is_book_library(library_path: String) -> Result<bool, String> {
     let path = Path::new(&library_path);
@@ -425,6 +477,7 @@ pub fn scan_book_library(
                     size,
                     created_at,
                     starred: has_star_tag(&book_path),
+                    deleted: has_delete_tag(&book_path),
                 });
             }
         }
@@ -434,6 +487,7 @@ pub fn scan_book_library(
             name: author_name,
             path: author_path.to_string_lossy().to_string(),
             library_id: library_id.clone(),
+            book_count: books.len() as u32,
             books,
         });
     }
@@ -486,19 +540,20 @@ pub async fn scan_comic_library(
             let mut cover = String::new();
 
             if let Some(cover_path) = find_cover_image(&comic_path) {
-                
-                let hash = get_thumbnail_hash(&cover_path);
-                let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
+                if let Ok(cover_meta) = fs::metadata(&cover_path) {
+                    let hash = get_thumbnail_hash(&cover_meta);
+                    let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
 
-                if !thumb_path.exists() {
-                    let _ = process_and_get_dimensions(&cover_path, &thumb_path);
+                    if !thumb_path.exists() {
+                        let _ = process_and_get_dimensions(&cover_path, &thumb_path);
+                    }
+
+                    cover = if thumb_path.exists() {
+                        convert_file_src(&thumb_path.to_string_lossy())
+                    } else {
+                        convert_file_src(&cover_path.to_string_lossy())
+                    }
                 }
-
-                cover = if thumb_path.exists() {
-                    convert_file_src(&thumb_path.to_string_lossy())
-                } else {
-                    convert_file_src(&cover_path.to_string_lossy())
-                };
             }
 
             Some(Comic {
@@ -509,6 +564,7 @@ pub async fn scan_comic_library(
                 library_id: library_id.clone(),
                 created_at,
                 starred: has_star_tag(&comic_path),
+                deleted: has_delete_tag(&comic_path),
             })
         })
         .collect();
@@ -562,8 +618,16 @@ pub async fn scan_comic_images(
                 .unwrap_or_default()
                 .to_string_lossy()
                 .to_string();
-            
-            let hash = get_thumbnail_hash(file_path);
+
+            let hash = match fs::metadata(file_path) {
+                Ok(metadata) => get_thumbnail_hash(&metadata),
+                Err(_) => {
+                    let mut hasher = Sha256::new();
+                    hasher.update(file_path.to_string_lossy().as_bytes());
+                    format!("{:x}", hasher.finalize())
+                }
+            };
+
             let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
             
             let (width, height) = process_and_get_dimensions(file_path, &thumb_path)
@@ -586,6 +650,7 @@ pub async fn scan_comic_images(
                 width,
                 height,
                 starred: has_star_tag(file_path),
+                deleted: has_delete_tag(file_path),
             }
         })
         .collect();
@@ -720,11 +785,11 @@ pub async fn get_thumbnail_stats(
 }
 
 #[tauri::command]
-pub fn set_file_star(path: String, starred: bool) -> Result<bool, String> {
+pub fn set_file_tag(path: String, tags: FileTags) -> Result<bool, String> {
     let p = Path::new(&path);
     if !p.exists() {
         return Err("File not found".to_string());
     }
-    set_star_tag_impl(p, starred).map_err(|e| e.to_string())?;
+    set_file_tag_impl(p, tags).map_err(|e| e.to_string())?;
     Ok(true)
 }

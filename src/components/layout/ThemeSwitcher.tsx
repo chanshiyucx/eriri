@@ -34,7 +34,7 @@ export function ThemeSwitcher() {
             onClick={() => setTheme(mode)}
             className={cn(
               'hover:bg-base h-8 w-8 rounded-full transition-all duration-300',
-              isActive ? 'text-rose' : 'text-text bg-transparent',
+              isActive ? 'text-love' : 'text-text bg-transparent',
             )}
             title={label}
           >

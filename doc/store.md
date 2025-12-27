@@ -1,151 +1,103 @@
-# Library Store 性能优化分析方案
+# Library Store 性能优化方案 (Revised)
 
-## 1. 现状深入分析 (Deep Analysis)
+## 1. 核心目标 (Core Objectives)
 
-经过对 `src/store/library.ts` 及项目整体引用的分析，当前 Store 实现主要存在以下特征与潜在瓶颈：
+在保持 `src-tauri/src/scanner.rs` 返回的原始数据结构不变的前提下，通过分离高频/低频状态和优化持久化策略，解决性能瓶颈。
 
-### 1.1 数据结构 (Data Structure)
+## 2. 现状分析 (Analysis)
 
-目前采用 **深层嵌套数组 (Deeply Nested Arrays)** 结构：
+- **数据源**: 后端 Scanner 返回嵌套的 `Library[] -> (Authors[] -> Books[] | Comics[])` 结构。此结构不可变。
+- **性能热点**:
+  1.  **高频更新**: 阅读进度 (`progress`) 随用户滚动/翻页极高频触发。
+  2.  **全量重写**: 阅读进度存储在 `Library` 对象树中，Zustand 的 `persist` 中间件在每次更新时序列化整个大对象树。
+  3.  **引用变动**: 深层嵌套更新导致 Immer 产生新的对象引用，触发大量组件不必要的重渲染检查。
+
+## 3. 优化实施方案 (Implementation Plan)
+
+### 3.1 状态分离 (Split State) - 核心策略
+
+将 **极高频变化的“阅读进度”** 从 **低频变化的“库元数据”** 中剥离。
+
+- **LibraryStore (主库)**:
+  - 存储: 所有的 `Library`, `Comic`, `Book` 数据，以及 `starred` (收藏) 状态。
+  - 原因: `starred` 状态变更频率低，且涉及文件系统写入 (xattr)，适合留在主实体上。
+  - 结构: 保持 Scanner 返回的嵌套结构，但内部可维护 `ID -> Reference` 的辅助映射以加速查找 (Optional)。
+
+- **ProgressStore (进度库) [New]**:
+  - 存储: `Record<ItemId, Progress>`。
+  - 特点: 极致扁平，只存 ID 和进度对象。
+  - 更新: 滚动时只更新此 Store，不触碰庞大的 LibraryStore。
 
 ```typescript
-Library[] -> Authors[] -> Books[]
-          -> Comics[]
+// 伪代码示例
+interface ProgressState {
+  // comicId/bookId -> Progress
+  items: Record<
+    string,
+    {
+      current: number
+      total: number
+      percent: number
+      lastRead: number
+    }
+  >
+  updateProgress: (id: string, progress: any) => void
+}
 ```
 
-- **查找复杂度**: 所有的查找操作（`findComic`, `findBook`）都需要遍历数组，时间复杂度为 `O(N)`。随着库中书籍/漫画数量增加，性能会线性下降。
-- **更新开销**: 使用 `immer` 虽然简化了不可变数据的更新逻辑，但在深层嵌套结构中，修改底层的 `progress` 或 `starred` 属性仍需要产生从根节点到叶子节点的全新引用路径，这在数据量大时会有一定开销。
+### 3.2 持久化策略 (Persistence Strategy)
 
-### 1.2 持久化机制 (Persistence)
+针对两个 Store 采用不同的策略：
 
-使用 `createIDBStorage` (IndexedDB) 进行全量状态持久化。
+1.  **LibraryStore**:
+    - 使用 `IndexedDB` (现有方案)。
+    - **优化**: 配置 `partialize` 忽略 `isScanning`, `comicImagesCache` 等不需要持久化的临时数据。
 
-- **高频写入瓶颈**: 阅读进度的更新（`updateComicProgress`, `updateBookProgress`）即使是节流的，也会触发 Zustand 的 `persist` 中间件。默认情况下，每次状态变更（即使是极其微小的进度变化）都会触发整个 `libraries` 数组及其所有子对象的序列化和 IndexedDB 写入。
-- **序列化成本**: `libraries` 数组如果包含成千上万条目，`JSON.stringify` 的成本极高，且会阻塞主线程（尽管 IndexedDB 是异步的，但序列化通常在主线程发生）。
+2.  **ProgressStore**:
+    - 使用 `IndexedDB`。
+    - **核心优化**: **Debounce (防抖) 写入**。
+    - 阅读时内存状态 (`Zustand State`) 是实时更新的，保证 UI 响应无延迟。
+    - 磁盘写入 (`Storage`) 延迟 1-5秒执行。如果用户快速翻页，不会连续触发 IDB 写入。
 
-### 1.3 状态粒度与选择器 (Granularity & Selectors)
+### 3.3 数据结构优化 (Data Access Optimization)
 
-- **全量订阅风险**: 如果组件使用 `useLibraryStore(state => state.libraries)`，那么任何一个库、任何一本书的任何属性变化，都会导致由于引用变动而触发组件重渲染。
-- **衍生数据计算**: `findComic` 等方法挂载在 Store 上，每次调用都会重新遍历数组。
+虽然不改变后端返回结构，但在前端 Store 初始化 (`setLibraries`) 时，可以构建 **辅助索引 (Auxiliary Indexes)**：
+
+```typescript
+// 在 Store 内部维护，不一定暴露给 state，或者作为 derived state
+const comicIndex = new Map<string, Comic>()
+const bookIndex = new Map<string, Book>()
+```
+
+这将 `findComic` / `findBook` 的时间复杂度从 `O(N)` 降低到 `O(1)`，且不破坏原始层级结构。
+
+## 4. 实施步骤 (Roadmap)
+
+### 阶段一：重构持久化与索引 (Foundation)
+
+1.  **构建 Debounced Storage**: 实现一个支持防抖的 `storage` 适配器。
+2.  **建立内部索引**: 修改 `useLibraryStore`，在 `addLibrary` / `updateLibrary` 时自动维护一个 `id -> item` 的查找表（可使用 `proxy-memoize` 或简单的 Map 缓存）。
+3.  **优化 `find` 方法**: 重写 `findComic` / `findBook` 使用索引查找。
+
+### 阶段二：分离进度状态 (Split Progress)
+
+1.  **创建 `useProgressStore`**: 定义新的 Store 专门管理阅读进度。
+2.  **迁移数据**: 在应用启动时，如果需要兼容旧数据，从 `LibraryStore` 读取进度迁移到 `ProgressStore` (如果决定彻底分离)。或者保持双向同步（不推荐，增加复杂性）。建议完全迁移。
+3.  **修改组件**:
+    - `ComicReader` / `BookReader`: 写入 `useProgressStore`。
+    - `LibraryItem` / `Sidebar`: 从 `useProgressStore` 读取进度显示。
+
+### 阶段三：清理主 Store
+
+1.  从 `LibraryStore` 类型定义中移除 `progress` 字段 (可选，或者保留与其同步用于导出，但运行时UI不依赖它)。
+2.  `starred` 状态保留在 `LibraryStore`，因为它是元数据的一部分。
+
+## 5. 预期收益 (Expected Outcome)
+
+- **阅读流畅度**: 翻页/滚动不再触发大对象序列化，消除卡顿。
+- **内存占用**: 减少因 Immer 生成过多 Draft 对象导致的瞬时内存峰值。
+- **响应速度**: 从库中查找书籍/漫画的速度提升至瞬时 (O1)。
 
 ---
 
-## 2. 优化方案 (Optimization Proposals)
-
-为了达到极致性能，建议从以下几个维度进行优化：
-
-### 方案一：数据结构扁平化与标准化 (Normalization) **[推荐]**
-
-将嵌套结构改为 ID 索引的扁平化结构 (Normalized Structure)。
-
-**Before:**
-
-```typescript
-interface Library {
-  id: string
-  comics: Comic[]
-  // ...
-}
-```
-
-**After (Proposed):**
-
-```typescript
-interface LibraryState {
-  libraries: Record<string, LibraryMetadata>
-  comics: Record<string, Comic> // Keyed by comicId
-  books: Record<string, Book> // Keyed by bookId
-  // 关联关系使用 ID 数组存储
-  libraryComics: Record<string, string[]> // libraryId -> comicId[]
-}
-```
-
-- **收益**:
-  - **O(1) 查找**: 无论数据量多大，通过 ID 获取对象瞬间完成。
-  - **精准更新**: 更新某本漫画的进度，只会改变 `comics` 记录中该 ID 对应的引用，不会波及 `libraries` 数组结构，大幅减少 Immer 的 Proxy 追踪开销。
-
-### 方案二：分离易变状态 (Split Volatile State)
-
-阅读进度（Progress）是高频更新数据，而元数据（Metadata，如标题、作者、封面）是低频更新数据。将它们分离：
-
-```typescript
-// Store 1: Metadata (Low frequency, heavy structure)
-interface LibraryMetadataState {
-  libraries: Library[]
-  // operations...
-}
-
-// Store 2: UserData (High frequency, flat structure)
-interface UserProgresState {
-  comicProgress: Record<string, ComicProgress>
-  bookProgress: Record<string, BookProgress>
-  starredItems: Record<string, boolean>
-}
-```
-
-- **收益**: 阅读时的高频进度更新只会触发 `UserProgresState` 的变更，完全隔离了庞大的 `LibraryMetadataState`。这避免了每次翻页都序列化整个 Library 树。
-
-### 方案三：持久化策略优化 (Persistence Strategy)
-
-针对 `persist` 中间件进行调优，避免高频写入阻塞。
-
-1.  **Partialize (部分持久化)**:
-    只持久化必要字段。例如 `isScanning` 不需要持久化。
-    ```typescript
-    persist(..., {
-      partialize: (state) => ({ libraries: state.libraries, comicImagesCache: state.comicImagesCache }),
-    })
-    ```
-2.  **Debounce Storage (防抖写入)**:
-    即使状态更新了，也可以延迟写入 IndexedDB。可以实现一个自定义的 `storage` 包装器，对 setItem 进行 `debounce` 处理（例如 1000ms 或 5000ms 写入一次），大幅减少磁盘 IO 和序列化开销。
-
-### 方案四：选择器与渲染优化 (Selector Optimization)
-
-在组件层面，强制实施细粒度选择和浅层比较。
-
-- **使用 `useShallow`**:
-
-  ```typescript
-  import { useShallow } from 'zustand/react/shallow'
-
-  // 仅当 id 或 name 变化时渲染，忽略内部 comics 数组变化
-  const { id, name } = useLibraryStore(
-    useShallow((state) => ({
-      id: state.libraries[0]?.id,
-      name: state.libraries[0]?.name,
-    })),
-  )
-  ```
-
-- **原子化选择器**:
-  不要在组件中 `const library = useStore(s => s.getLibrary(id))`，因为这通常返回整个对象。而是创建专门的 hook 如 `useComicProgress(comicId)` 只订阅进度字段。
-
----
-
-## 3. 实施路线图 (Implementation Roadmap)
-
-考虑到“尽量不破坏功能”的前提，激进的数据标准化（方案一）改动较大。我建议采用 **"方案三 (持久化优化)" + "方案二 (逻辑分离 - 这里的逻辑分离指内部状态分离)"** 的混合轻量级路径：
-
-1.  **第一步：优化持久化 (最为紧迫)**
-    - 为 `createJSONStorage` 增加 Debounce 机制。
-    - 配置 `partialize` 排除 `isScanning` 和显式不需持久化的临时状态。
-
-2.  **第二步：内部查找 Map 化 (无需重构 API)**
-    - 虽然对外保持 `Library[]` 结构不变以兼容现有组件，但在 Store 内部维护 `Map<Id, Reference>` 缓存。
-    - 或者，在 `get` 方法中，利用 `computed` 概念（Zustand 本身无 computed，但可以通过 getter 优化）或简单的 Memoization 优化查找。
-    - _但在 Zustand 中，最好的方式是数据源头就是 Map。如果不改数据结构，则跳过此步，直接通过选择器优化。_
-
-3.  **第三步：重构 `update` 逻辑**
-    - 修改 `updateComicProgress` 等高频方法。目前它们使用 `find` 遍历。
-    - 优化为：虽然数据结构是数组，但如果必须保持数组，我们在 `Library` 对象上也许无法直接优化 `O(N)`，除非引入辅助 Map。
-    - **折中方案**: 保持 `Library[]` 结构，但对于 `Item` 的查找，仅在初始化或 Library 变更时构建一次 `Id -> Index` 的映射表（可在组件层用 `useMemo` 做，或在 Store 外部维护一个索引缓存）。
-
-## 4. 推荐的最终建议 (Recommendation)
-
-**主要建议**: 保持现有数据结构不变（为了兼容性），但**实现自定义的 Debounced Storage** 和 **细粒度选择器模式**。
-
-如果允许小范围重构结构，**强烈建议将 `libraries` 内部的 `comics`, `authors` 数组改为 `Map` 或 `Record`**，这是性能提升的根源。
-
----
-
-_待您审查后，我们可以决定具体实施哪一项优化。_
+_请确认此方案是否符合您的预期，确认后我将开始按阶段实施。_
