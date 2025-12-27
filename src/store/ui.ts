@@ -54,10 +54,6 @@ export const useUIStore = create<UIState>()(
     {
       name: 'eriri-ui-storage',
       storage: createJSONStorage(() => createIDBStorage()),
-      partialize: (state) => ({
-        isSidebarCollapsed: state.isSidebarCollapsed,
-        theme: state.theme,
-      }),
     },
   ),
 )

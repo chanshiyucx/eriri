@@ -6,11 +6,11 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react'
+import { useMemo } from 'react'
 import { CacheInfo } from '@/components/layout/CacheInfo'
 import { ThemeSwitcher } from '@/components/layout/ThemeSwitcher'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { isBookLibrary, scanBookLibrary, scanComicLibrary } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
 import { useUIStore } from '@/store/ui'
@@ -42,18 +42,19 @@ function SidebarButton({
 }
 
 export function Sidebar() {
-  const { isSidebarCollapsed } = useUIStore()
+  const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed)
 
-  const {
-    libraries,
-    removeLibrary,
-    selectedLibraryId,
-    setSelectedLibraryId,
-    addLibrary,
-    setScanning,
-    isScanning,
-    updateLibraryComicOrAuthor,
-  } = useLibraryStore()
+  const libraries = useLibraryStore((s) => s.libraries)
+  const removeLibrary = useLibraryStore((s) => s.removeLibrary)
+  const importLibrary = useLibraryStore((s) => s.importLibrary)
+  const refreshLibrary = useLibraryStore((s) => s.refreshLibrary)
+  const selectedLibraryId = useLibraryStore((s) => s.selectedLibraryId)
+  const setSelectedLibraryId = useLibraryStore((s) => s.setSelectedLibraryId)
+  const isScanning = useLibraryStore((s) => s.isScanning)
+
+  const librariesList = useMemo(() => {
+    return Object.values(libraries).sort((a, b) => b.createdAt - a.createdAt)
+  }, [libraries])
 
   const handleImport = async () => {
     try {
@@ -65,46 +66,10 @@ export function Sidebar() {
       })
       if (!selected || typeof selected !== 'string') return
 
-      setScanning(true)
-      const existingLibrary = libraries.find((l) => l.path === selected)
-      if (existingLibrary) {
-        if (existingLibrary.type === LibraryType.book) {
-          const authors = await scanBookLibrary(
-            existingLibrary.path,
-            existingLibrary.id,
-          )
-          updateLibraryComicOrAuthor(existingLibrary.id, { authors })
-        } else {
-          const comics = await scanComicLibrary(
-            existingLibrary.path,
-            existingLibrary.id,
-          )
-          updateLibraryComicOrAuthor(existingLibrary.id, { comics })
-        }
-      } else {
-        const libraryId = crypto.randomUUID()
-        const libraryName = selected.split('/').pop() ?? 'Untitled Library'
-
-        const isBook = await isBookLibrary(selected)
-        const library: Library = {
-          id: libraryId,
-          name: libraryName,
-          path: selected,
-          type: isBook ? LibraryType.book : LibraryType.comic,
-        }
-
-        if (isBook) {
-          library.authors = await scanBookLibrary(selected, libraryId)
-        } else {
-          library.comics = await scanComicLibrary(selected, libraryId)
-        }
-        addLibrary(library)
-      }
+      await importLibrary(selected)
     } catch (error) {
       console.error('Failed to import library:', error)
       alert('Failed to import library: ' + String(error))
-    } finally {
-      setScanning(false)
     }
   }
 
@@ -113,25 +78,16 @@ export function Sidebar() {
   }
 
   const handleRefresh = async (library: Library) => {
-    const yes = await ask(`确认刷新库 "${library.name}"?`, {
-      title: '刷新库',
-      kind: 'warning',
-    })
-    if (!yes) return
     try {
-      setScanning(true)
-      if (library.type === LibraryType.book) {
-        const authors = await scanBookLibrary(library.path, library.id)
-        updateLibraryComicOrAuthor(library.id, { authors })
-      } else {
-        const comics = await scanComicLibrary(library.path, library.id)
-        updateLibraryComicOrAuthor(library.id, { comics })
-      }
+      const yes = await ask(`确认刷新库 "${library.name}"?`, {
+        title: '刷新库',
+        kind: 'warning',
+      })
+      if (!yes) return
+      await refreshLibrary(library.id)
     } catch (error) {
-      console.error('Refresh failed', error)
-      alert('Refresh failed: ' + String(error))
-    } finally {
-      setScanning(false)
+      console.error('Failed to refresh library:', error)
+      alert('Failed to refresh library: ' + String(error))
     }
   }
 
@@ -143,6 +99,8 @@ export function Sidebar() {
     if (!yes) return
     removeLibrary(library.id)
   }
+
+  console.log('Render Sidebar: ')
 
   return (
     <div
@@ -160,7 +118,7 @@ export function Sidebar() {
             void handleImport()
           }}
         />
-        {libraries.map((lib) => {
+        {librariesList.map((lib) => {
           return (
             <div key={lib.id} className="group relative">
               <SidebarButton
@@ -173,7 +131,7 @@ export function Sidebar() {
               />
               <div className="absolute top-1/2 right-1 flex -translate-y-1/2 gap-1 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
                 <Button
-                  className="text-subtle bg-overlay hover:text-rose h-6 w-6"
+                  className="text-subtle bg-overlay hover:text-love h-6 w-6"
                   onClick={() => {
                     void handleRefresh(lib)
                   }}
@@ -183,7 +141,7 @@ export function Sidebar() {
                   <RefreshCw className="h-4 w-4" />
                 </Button>
                 <Button
-                  className="text-subtle bg-overlay hover:text-rose h-6 w-6"
+                  className="text-subtle bg-overlay hover:text-love h-6 w-6"
                   onClick={() => {
                     void handleRemove(lib)
                   }}

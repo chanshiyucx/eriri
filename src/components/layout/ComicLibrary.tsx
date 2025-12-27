@@ -1,14 +1,23 @@
-import { PanelLeftClose, PanelLeftOpen, Star, StepForward } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import {
+  PanelLeftClose,
+  PanelLeftOpen,
+  Star,
+  StepForward,
+  Trash2,
+} from 'lucide-react'
+import { memo, useCallback, useEffect, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { setFileStar } from '@/lib/scanner'
+import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/utils'
 import { useLibraryStore } from '@/store/library'
+import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import {
   LibraryType,
   type Comic,
+  type FileTags,
   type Image,
   type Library,
 } from '@/types/library'
@@ -18,17 +27,20 @@ interface ComicItemProps {
   comic: Comic
   isSelected: boolean
   onClick: (id: string) => void
-  onStar: (comic: Comic) => Promise<void>
+  onTags: (comic: Comic, tags: FileTags) => Promise<void>
 }
 
 const ComicItem = memo(
-  ({ index, comic, isSelected, onClick, onStar }: ComicItemProps) => {
+  ({ index, comic, isSelected, onClick, onTags }: ComicItemProps) => {
+    const progress = useProgressStore((s) => s.comics[comic.id])
+
     return (
       <div
         data-index={index}
         className={cn(
           'group hover:bg-overlay flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
           isSelected && 'bg-overlay ring-rose ring-2',
+          comic.deleted && 'opacity-50',
         )}
         onClick={() => void onClick(comic.id)}
       >
@@ -41,39 +53,58 @@ const ComicItem = memo(
             decoding="async"
           />
 
-          <Button
-            className="absolute top-1.5 right-1.5 h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onStar(comic)
-            }}
-          >
-            <Star
-              className={cn(
-                'text-love h-5 w-5 opacity-0',
-                comic.starred
-                  ? 'fill-gold opacity-100'
-                  : 'group-hover:opacity-100',
-              )}
-            />
-          </Button>
+          <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
+            <Button
+              className="h-6 w-6 bg-transparent hover:bg-transparent"
+              onClick={(e) => {
+                e.stopPropagation()
+                void onTags(comic, { starred: !comic.starred })
+              }}
+            >
+              <Star
+                className={cn(
+                  'text-love h-5 w-5 opacity-0',
+                  comic.starred
+                    ? 'fill-gold opacity-100'
+                    : 'group-hover:opacity-100',
+                )}
+              />
+            </Button>
+
+            <Button
+              className="h-6 w-6 bg-transparent hover:bg-transparent"
+              onClick={(e) => {
+                e.stopPropagation()
+                void onTags(comic, { deleted: !comic.deleted })
+              }}
+            >
+              <Trash2
+                className={cn(
+                  'text-love h-5 w-5 opacity-0',
+                  comic.deleted
+                    ? 'fill-gold/80 opacity-100'
+                    : 'group-hover:opacity-100',
+                )}
+              />
+            </Button>
+          </div>
 
           {comic.pageCount && (
             <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-xs text-white">
               <span>{comic.pageCount}P</span>
 
-              {comic.progress && comic.progress.percent > 0 && (
-                <span>{Math.round(comic.progress.percent)}%</span>
+              {progress && progress.percent > 0 && (
+                <span>{Math.round(progress.percent)}%</span>
               )}
             </div>
           )}
 
-          {comic.progress && comic.progress.percent > 0 && (
+          {progress && progress.percent > 0 && (
             <div className="bg-rose/30 absolute inset-x-0 bottom-0 h-1">
               <div
                 className="bg-rose h-full"
                 style={{
-                  width: `${comic.progress.percent}%`,
+                  width: `${progress.percent}%`,
                 }}
               />
             </div>
@@ -82,7 +113,7 @@ const ComicItem = memo(
         <div
           className={cn(
             'truncate text-center text-sm transition-colors',
-            isSelected && 'text-rose',
+            isSelected && 'text-love',
           )}
         >
           {comic.title}
@@ -98,14 +129,17 @@ interface ImageItemProps {
   index: number
   image: Image
   onClick: (index: number) => void
-  onStar: (image: Image) => Promise<void>
+  onTags: (image: Image, tags: FileTags) => Promise<void>
 }
 
-const ImageItem = memo(({ index, image, onClick, onStar }: ImageItemProps) => {
+const ImageItem = memo(({ index, image, onClick, onTags }: ImageItemProps) => {
   return (
     <div
       data-index={index}
-      className="group hover:bg-overlay flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all"
+      className={cn(
+        'group hover:bg-overlay flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+        image.deleted && 'opacity-50',
+      )}
       onClick={() => onClick(index)}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
@@ -117,22 +151,41 @@ const ImageItem = memo(({ index, image, onClick, onStar }: ImageItemProps) => {
           decoding="async"
         />
 
-        <Button
-          className="absolute top-1.5 right-1.5 h-6 w-6 bg-transparent hover:bg-transparent"
-          onClick={(e) => {
-            e.stopPropagation()
-            void onStar(image)
-          }}
-        >
-          <Star
-            className={cn(
-              'text-love h-5 w-5 opacity-0',
-              image.starred
-                ? 'fill-gold opacity-100'
-                : 'group-hover:opacity-100',
-            )}
-          />
-        </Button>
+        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
+          <Button
+            className="h-6 w-6 bg-transparent hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation()
+              void onTags(image, { starred: !image.starred })
+            }}
+          >
+            <Star
+              className={cn(
+                'text-love h-5 w-5 opacity-0',
+                image.starred
+                  ? 'fill-gold opacity-100'
+                  : 'group-hover:opacity-100',
+              )}
+            />
+          </Button>
+
+          <Button
+            className="h-6 w-6 bg-transparent hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation()
+              void onTags(image, { deleted: !image.deleted })
+            }}
+          >
+            <Trash2
+              className={cn(
+                'text-love h-5 w-5 opacity-0',
+                image.deleted
+                  ? 'fill-gold/80 opacity-100'
+                  : 'group-hover:opacity-100',
+              )}
+            />
+          </Button>
+        </div>
       </div>
       <div className="truncate text-center text-sm transition-colors">
         {image.filename}
@@ -148,39 +201,35 @@ interface ComicLibraryProps {
 }
 
 export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
-  const {
-    updateLibrary,
-    getComicImages,
-    findComic,
-    updateComicStarred,
-    updateComicImageStarred,
-    updateComicProgress,
-  } = useLibraryStore()
-  const { addTab, setActiveTab, activeTab } = useTabsStore()
   const [collapsed, setCollapsed] = useState(1) // 0 1 2
   const [images, setImages] = useState<Image[]>([])
 
-  const { id, comics = [], status = {} } = selectedLibrary ?? {}
+  const updateLibrary = useLibraryStore((s) => s.updateLibrary)
+  const updateComicTags = useLibraryStore((s) => s.updateComicTags)
+  const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
+  const getComicImages = useLibraryStore((s) => s.getComicImages)
 
-  const comic = useMemo(() => {
-    if (!selectedLibrary.id || !status.comicId) return null
-    return findComic(selectedLibrary.id, status.comicId)
-  }, [selectedLibrary.id, status.comicId, findComic])
+  const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
+  const activeTab = useTabsStore((s) => s.activeTab)
+  const addTab = useTabsStore((s) => s.addTab)
+  const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  const handleSelectComic = useCallback(
-    (comicId: string) => {
-      if (comicId === status.comicId) return
-      updateLibrary(id, { status: { comicId } })
-    },
-    [id, status.comicId, updateLibrary],
+  const comics = useLibraryStore(
+    useShallow((s) => {
+      const comicIds = s.libraryComics[selectedLibrary.id]
+      return comicIds.map((id) => s.comics[id])
+    }),
   )
+
+  const { comicId } = selectedLibrary.status
+  const comic = useLibraryStore((s) => (comicId ? s.comics[comicId] : ''))
 
   useEffect(() => {
     let isMounted = true
     const load = async () => {
-      if (!status.comicId) return
+      if (!comicId) return
       setImages([])
-      const res = await getComicImages(id, status.comicId)
+      const res = await getComicImages(comicId)
       if (isMounted) {
         setImages(res)
       }
@@ -189,84 +238,85 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     return () => {
       isMounted = false
     }
-  }, [id, status.comicId, getComicImages])
+  }, [comicId, getComicImages])
+
+  const handleSelectComic = useCallback(
+    (id: string) => {
+      if (id === comicId) return
+      updateLibrary(selectedLibrary.id, { status: { comicId: id } })
+    },
+    [selectedLibrary.id, updateLibrary, comicId],
+  )
 
   const handleContinueReading = useCallback(() => {
     if (!comic || activeTab === comic.path) return
     addTab({
       type: LibraryType.comic,
+      id: comic.id,
       title: comic.title,
       path: comic.path,
-      status: {
-        libraryId: id,
-        comicId: comic.id,
-      },
     })
     setActiveTab(comic.path)
-  }, [id, addTab, activeTab, setActiveTab, comic])
+  }, [addTab, activeTab, setActiveTab, comic])
 
-  const handleStarComic = useCallback(
-    async (comic: Comic) => {
+  const handleSetComicTags = useCallback(
+    async (comic: Comic, tags: FileTags) => {
       try {
-        const newStarred = !comic.starred
-        const isSuccess = await setFileStar(comic.path, newStarred)
+        const isSuccess = await setFileTag(comic.path, tags)
         if (isSuccess) {
-          updateComicStarred(id, comic.id, newStarred)
+          updateComicTags(comic.id, tags)
         }
       } catch (error) {
-        console.error('Failed to star book:', error)
+        console.error('Failed to set book tags:', error)
       }
     },
-    [id, updateComicStarred],
+    [updateComicTags],
   )
 
-  const handleStarImage = useCallback(
-    async (image: Image) => {
+  const handleSetImageTags = useCallback(
+    async (image: Image, tags: FileTags) => {
       try {
-        const newStarred = !image.starred
-        const isSuccess = await setFileStar(image.path, newStarred)
+        if (!comic) return
+        const isSuccess = await setFileTag(image.path, tags)
         if (isSuccess) {
-          updateComicImageStarred(status.comicId!, image.filename, newStarred)
+          updateComicImageTags(comic.id, image.filename, tags)
           setImages((prev) =>
             prev.map((img) =>
-              img.filename === image.filename
-                ? { ...img, starred: newStarred }
-                : img,
+              img.filename === image.filename ? { ...img, ...tags } : img,
             ),
           )
         }
       } catch (error) {
-        console.error('Failed to star book:', error)
+        console.error('Failed to set image tags:', error)
       }
     },
-    [status.comicId, updateComicImageStarred],
+    [updateComicImageTags, comic],
   )
 
   const handleImageClick = useCallback(
     (index: number) => {
       if (!comic) return
-
-      updateComicProgress(id, comic.id, index, images.length)
+      updateComicProgress(comic.id, {
+        current: index,
+        total: images.length,
+        percent: (index / (images.length - 1)) * 100,
+        lastRead: Date.now(),
+      })
 
       if (activeTab !== comic.path) {
         addTab({
           type: LibraryType.comic,
+          id: comic.id,
           title: comic.title,
           path: comic.path,
-          status: {
-            libraryId: id,
-            comicId: comic.id,
-          },
         })
         setActiveTab(comic.path)
       } else {
-        // If already active, just ensure we switch to it (redundant if checking activeTab, but safe)
         setActiveTab(comic.path)
       }
     },
     [
       comic,
-      id,
       images.length,
       updateComicProgress,
       activeTab,
@@ -275,7 +325,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     ],
   )
 
-  console.log('Render ComicLibrary', { ...status }, comics.length, comics)
+  console.log('Render ComicLibrary: ', comics.length)
 
   return (
     <div className="flex h-full w-full divide-x">
@@ -308,9 +358,9 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
                   key={c.id}
                   index={i}
                   comic={c}
-                  isSelected={status.comicId === c.id}
+                  isSelected={comicId === c.id}
                   onClick={handleSelectComic}
-                  onStar={handleStarComic}
+                  onTags={handleSetComicTags}
                 />
               ))}
             </div>
@@ -356,7 +406,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
                   index={i}
                   image={img}
                   onClick={handleImageClick}
-                  onStar={handleStarImage}
+                  onTags={handleSetImageTags}
                 />
               ))}
             </div>

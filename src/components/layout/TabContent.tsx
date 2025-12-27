@@ -2,7 +2,8 @@ import { memo } from 'react'
 import { BookReader } from '@/components/layout/BookReader'
 import { ComicReader } from '@/components/layout/ComicReader'
 import { cn } from '@/lib/utils'
-import { type Tab } from '@/store/tabs'
+import type { Tab } from '@/store/tabs'
+import { LibraryType } from '@/types/library'
 
 interface TabContentProps {
   tab: Tab
@@ -11,9 +12,9 @@ interface TabContentProps {
 }
 
 const TabContent = memo(({ tab, isActive, isImmersive }: TabContentProps) => {
-  const { libraryId, authorId, bookId, comicId } = tab.status
+  const { type, id } = tab
 
-  console.log('Render TabContent ---', { ...tab.status })
+  console.log('Render TabContent:', type, id)
 
   return (
     <div
@@ -23,16 +24,11 @@ const TabContent = memo(({ tab, isActive, isImmersive }: TabContentProps) => {
         isImmersive ? 'top-0' : 'top-8',
       )}
     >
-      {authorId && bookId && (
-        <BookReader
-          libraryId={libraryId}
-          authorId={authorId}
-          bookId={bookId}
-          showToc
-        />
+      {type === LibraryType.book ? (
+        <BookReader bookId={id} showToc />
+      ) : (
+        <ComicReader comicId={id} />
       )}
-
-      {comicId && <ComicReader libraryId={libraryId} comicId={comicId} />}
     </div>
   )
 })

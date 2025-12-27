@@ -24,7 +24,7 @@ const TabItem = memo(({ tab, isActive, onSelect, onRemove }: TabItemProps) => {
     <div
       className={cn(
         'bg-surface hover:bg-overlay group flex max-w-[200px] min-w-[150px] cursor-pointer items-center gap-2 rounded-sm px-3 py-1 text-sm',
-        isActive && 'bg-overlay text-rose',
+        isActive && 'bg-overlay text-love',
       )}
       onClick={() => onSelect(tab.path)}
     >
@@ -45,15 +45,19 @@ const TabItem = memo(({ tab, isActive, onSelect, onRemove }: TabItemProps) => {
 TabItem.displayName = 'TabItem'
 
 export function TopNav() {
-  const { tabs, activeTab, setActiveTab, removeTab } = useTabsStore()
-  const { isSidebarCollapsed, toggleSidebar } = useUIStore()
-
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const [showLeftArrow, setShowLeftArrow] = useState(false)
   const [showRightArrow, setShowRightArrow] = useState(false)
   const rafIdRef = useRef<number | null>(null)
-
   const lastArrowStateRef = useRef({ left: false, right: false })
+
+  const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed)
+  const toggleSidebar = useUIStore((s) => s.toggleSidebar)
+  const toggleImmersive = useUIStore((s) => s.toggleImmersive)
+  const tabs = useTabsStore((s) => s.tabs)
+  const activeTab = useTabsStore((s) => s.activeTab)
+  const removeTab = useTabsStore((s) => s.removeTab)
+  const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
   const updateArrowVisibility = useCallback(() => {
     if (rafIdRef.current !== null) return
@@ -106,8 +110,13 @@ export function TopNav() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      e.preventDefault()
+
+      if (e.key === 'Spacebar' || e.key === ' ') {
+        toggleImmersive()
+      }
+
       if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-        e.preventDefault()
         const currentIndex = tabs.findIndex((tab) => tab.path === activeTab)
 
         if (e.key === 'ArrowUp') {
@@ -132,7 +141,7 @@ export function TopNav() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tabs, activeTab, setActiveTab])
+  }, [tabs, activeTab, setActiveTab, toggleImmersive])
 
   const scroll = useCallback((direction: 'left' | 'right') => {
     const container = scrollContainerRef.current
@@ -153,7 +162,7 @@ export function TopNav() {
   const handleScrollLeft = useCallback(() => scroll('left'), [scroll])
   const handleScrollRight = useCallback(() => scroll('right'), [scroll])
 
-  console.log('Render TopNav ---', activeTab)
+  console.log('Render TopNav: ', activeTab)
 
   return (
     <div className="bg-base flex h-8 shrink-0 items-center border-b px-2">
@@ -166,7 +175,7 @@ export function TopNav() {
       </Button>
 
       <Button
-        className={cn('mx-1 h-6 w-6', !activeTab && 'text-rose')}
+        className={cn('mx-1 h-6 w-6', !activeTab && 'text-love')}
         onClick={() => setActiveTab('')}
       >
         <Home className="h-4 w-4" />

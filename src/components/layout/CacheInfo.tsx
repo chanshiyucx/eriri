@@ -55,7 +55,7 @@ export function CacheInfo() {
           void handleCleanCache()
         }}
         disabled={isLoading || cache.count === 0}
-        className="hover:text-rose h-6 w-6 bg-transparent p-0 transition-colors"
+        className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
         title="清理缓存"
       >
         <Trash2 className="h-4 w-4" />
