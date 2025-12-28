@@ -9,6 +9,7 @@ import {
   scanComicLibrary,
 } from '@/lib/scanner'
 import { createIDBStorage } from '@/lib/storage'
+import { useTabsStore, type Tab } from '@/store/tabs'
 import {
   LibraryType,
   type Author,
@@ -147,9 +148,13 @@ export const useLibraryStore = create<LibraryState>()(
             (aId) => state.authorBooks[aId] ?? [],
           )
 
+          const tabsStore = useTabsStore.getState()
+          let tabsToRemove: Tab[] = []
+
           comicIds.forEach((cId) => {
             delete state.comics[cId]
             delete state.comicImages[cId]
+            tabsToRemove = tabsStore.tabs.filter((t) => t.id === cId)
           })
 
           authorIds.forEach((aId) => {
@@ -157,11 +162,15 @@ export const useLibraryStore = create<LibraryState>()(
             delete state.authorBooks[aId]
           })
 
-          bookIds.forEach((bId) => delete state.books[bId])
+          bookIds.forEach((bId) => {
+            delete state.books[bId]
+            tabsToRemove = tabsStore.tabs.filter((t) => t.id === bId)
+          })
 
           delete state.libraryComics[id]
           delete state.libraryAuthors[id]
           delete state.libraries[id]
+          tabsToRemove.forEach((t) => tabsStore.removeTab(t.path))
 
           if (state.selectedLibraryId === id) {
             state.selectedLibraryId = ''

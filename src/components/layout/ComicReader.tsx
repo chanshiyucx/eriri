@@ -66,10 +66,10 @@ const ComicImage = memo(({ image, position, onTags }: ComicImageProps) => {
     >
       <figure
         className={cn(
-          'absolute top-0 h-full w-auto',
-          position === 'left' && 'right-0 object-right',
-          position === 'right' && 'left-0 object-left',
-          position === 'center' && 'object-center',
+          'h-full w-auto',
+          position === 'left' && 'absolute top-0 right-0 object-right',
+          position === 'right' && 'absolute top-0 left-0 object-left',
+          position === 'center' && 'relative object-center',
         )}
       >
         <img
@@ -158,9 +158,11 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
       initialIndex: 0,
     })
 
+  const comicPath = comic?.path ?? ''
+
   const stateRef = useRef({
     activeTab,
-    comicPath: comic.path,
+    comicPath,
     images,
     visibleIndices,
   })
@@ -168,7 +170,7 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
   useEffect(() => {
     stateRef.current = {
       activeTab,
-      comicPath: comic.path,
+      comicPath,
       images,
       visibleIndices,
     }
@@ -236,14 +238,14 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
 
   useEffect(() => {
     if (!images.length) return
-    if (activeTab !== comic.path) return
+    if (activeTab !== comicPath) return
 
-    const progress = useProgressStore.getState().comics[comic.id]
+    const progress = useProgressStore.getState().comics[comicId]
     if (progress?.current !== undefined) {
       const targetIndex = Math.min(progress.current, images.length - 1)
       jumpTo(targetIndex)
     }
-  }, [images.length, comic.path, comic.id, jumpTo, activeTab])
+  }, [images.length, comicPath, comicId, jumpTo, activeTab])
 
   useEffect(() => {
     if (!images.length) return

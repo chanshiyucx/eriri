@@ -3,7 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { BookContent, parseBook } from '@/lib/book'
+import { findLineIndexByOffset, parseBook, type BookContent } from '@/lib/book'
 import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -41,7 +41,6 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
   const [content, setContent] = useState<BookContent | null>(null)
   const [currentChapterTitle, setCurrentChapterTitle] = useState<string>('')
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const restoredRef = useRef(false)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
 
   const book = useLibraryStore((s) => s.books[bookId])
@@ -81,7 +80,6 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
 
   useEffect(() => {
     if (!book.path) return
-    restoredRef.current = false
     let mounted = true
     const load = async () => {
       try {
@@ -97,33 +95,20 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
     return () => {
       mounted = false
     }
-  }, [book])
+  }, [book.path])
 
   useEffect(() => {
     if (!content || !virtuosoRef.current) return
-    if (restoredRef.current) return
 
-    // Allow a small delay for Virtuoso to initialize and calculate line heights
     const timer = setTimeout(() => {
       if (!virtuosoRef.current) return
-
-      // Read progress directly from progress store
       const progress = useProgressStore.getState().books[bookId]
 
       if (progress?.startCharIndex) {
-        // Find line by char offset
-        let targetLine = 0
-        if (content.lineStartOffsets) {
-          // Binary search or simple loop to find the line containing the char index
-          // Simple loop is fine for now as line count isn't massive, but could be optimized
-          for (let i = 0; i < content.lineStartOffsets.length; i++) {
-            if (content.lineStartOffsets[i] > progress.startCharIndex) {
-              targetLine = Math.max(0, i - 1)
-              break
-            }
-            targetLine = i
-          }
-        }
+        const targetLine = findLineIndexByOffset(
+          content.lineStartOffsets,
+          progress.startCharIndex,
+        )
 
         console.log(
           'Restoring to line:',
@@ -147,13 +132,10 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
           behavior: 'auto',
         })
       }
-
-      // Mark as restored after successful scroll attempt
-      restoredRef.current = true
     }, 60)
 
     return () => clearTimeout(timer)
-  }, [content, bookId])
+  }, [content, bookId, activeTab])
 
   const toggleToc = useCallback(() => {
     setTocCollapsed((prev) => !prev)
@@ -206,15 +188,10 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
         content.lineStartOffsets[content.lineStartOffsets.length - 1] +
         (content.lines[content.lines.length - 1]?.length || 0)
 
-      // Find current chapter
-      const reversedChapters = [...content.chapters].reverse()
-      let chapterTitle = ''
-      if (reversedChapters.length > 0) {
-        const match = reversedChapters.find((c) => c.lineIndex <= safeLineIndex)
-        if (match) {
-          chapterTitle = match.title
-        }
-      }
+      const match = content.chapters.findLast(
+        (c) => c.lineIndex <= safeLineIndex,
+      )
+      const chapterTitle = match?.title ?? ''
 
       if (chapterTitle !== currentChapterTitle) {
         setCurrentChapterTitle(chapterTitle)
