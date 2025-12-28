@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/style'
 import { useTabsStore, type Tab } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 

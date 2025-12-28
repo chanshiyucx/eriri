@@ -1,4 +1,4 @@
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/style'
 
 type SeparatorProps = React.HTMLAttributes<HTMLDivElement> & {
   orientation?: 'horizontal' | 'vertical'
