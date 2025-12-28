@@ -10,7 +10,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { setFileTag } from '@/lib/scanner'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
@@ -53,7 +53,7 @@ const ComicItem = memo(
             decoding="async"
           />
 
-          <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
+          <div className="absolute top-0 right-0 flex flex-col gap-1 p-1">
             <Button
               className="h-6 w-6 bg-transparent hover:bg-transparent"
               onClick={(e) => {
@@ -151,7 +151,7 @@ const ImageItem = memo(({ index, image, onClick, onTags }: ImageItemProps) => {
           decoding="async"
         />
 
-        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
+        <div className="absolute top-0 right-0 flex flex-col gap-1 p-1">
           <Button
             className="h-6 w-6 bg-transparent hover:bg-transparent"
             onClick={(e) => {

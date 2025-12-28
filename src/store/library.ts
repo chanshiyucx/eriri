@@ -333,6 +333,11 @@ export const useLibraryStore = create<LibraryState>()(
     {
       name: 'eriri-library-storage',
       storage: createJSONStorage(() => createIDBStorage()),
+      partialize: (state) => {
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { isScanning, ...persistedState } = state
+        return persistedState
+      },
     },
   ),
 )

@@ -1,7 +1,7 @@
 import { memo } from 'react'
 import { BookReader } from '@/components/layout/BookReader'
 import { ComicReader } from '@/components/layout/ComicReader'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/style'
 import type { Tab } from '@/store/tabs'
 import { LibraryType } from '@/types/library'
 

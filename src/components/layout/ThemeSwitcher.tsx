@@ -1,7 +1,7 @@
 import { Monitor, Moon, Sun } from 'lucide-react'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { cn } from '@/lib/style'
 import { applyTheme, useUIStore, type ThemeMode } from '@/store/ui'
 
 export function ThemeSwitcher() {

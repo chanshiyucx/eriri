@@ -13,9 +13,7 @@ export const createIDBStorage = (): StateStorage => ({
   },
 })
 
-export const createDebouncedIDBStorage = (
-  wait = 2000,
-): StateStorage & { cancel: (name: string) => void } => {
+export const createDebouncedIDBStorage = (wait = 2000): StateStorage => {
   const pending = new Map<string, ReturnType<typeof setTimeout>>()
 
   return {
@@ -40,12 +38,6 @@ export const createDebouncedIDBStorage = (
         pending.delete(name)
       }
       await del(name)
-    },
-    cancel: (name: string) => {
-      if (pending.has(name)) {
-        clearTimeout(pending.get(name))
-        pending.delete(name)
-      }
     },
   }
 }
