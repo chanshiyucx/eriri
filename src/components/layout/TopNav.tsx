@@ -114,12 +114,12 @@ export function TopNav() {
 
       if (e.key === 'Spacebar' || e.key === ' ') {
         toggleImmersive()
-      }
-
-      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+      } else if (e.key === 'x' || e.key === 'X') {
+        removeTab(activeTab)
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         const currentIndex = tabs.findIndex((tab) => tab.path === activeTab)
 
-        if (e.key === 'ArrowUp') {
+        if (e.key === 'ArrowLeft') {
           if (currentIndex > 0) {
             setActiveTab(tabs[currentIndex - 1].path)
           } else if (currentIndex === -1 && tabs.length > 0) {
@@ -127,7 +127,7 @@ export function TopNav() {
           } else if (currentIndex === 0) {
             setActiveTab('')
           }
-        } else if (e.key === 'ArrowDown') {
+        } else if (e.key === 'ArrowRight') {
           if (currentIndex < tabs.length - 1 && currentIndex !== -1) {
             setActiveTab(tabs[currentIndex + 1].path)
           } else if (currentIndex === -1 && tabs.length > 0) {
@@ -141,7 +141,7 @@ export function TopNav() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tabs, activeTab, setActiveTab, toggleImmersive])
+  }, [tabs, activeTab, setActiveTab, toggleImmersive, removeTab])
 
   const scroll = useCallback((direction: 'left' | 'right') => {
     const container = scrollContainerRef.current
@@ -193,7 +193,7 @@ export function TopNav() {
 
         <div
           ref={scrollContainerRef}
-          className="scrollbar-hide flex flex-1 items-center gap-2 overflow-x-auto"
+          className="scrollbar-hide flex flex-1 items-center gap-1 overflow-x-auto"
         >
           {tabs.map((tab) => (
             <TabItem

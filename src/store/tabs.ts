@@ -34,11 +34,8 @@ export const useTabsStore = create<TabsState>()(
 
       addTab: (newTab) =>
         set((state) => {
-          const existingTabIndex = state.tabs.findIndex(
-            (t) => t.path === newTab.path,
-          )
-
-          if (existingTabIndex !== -1) {
+          const existingTab = state.tabs.find((t) => t.path === newTab.path)
+          if (existingTab) {
             state.activeTab = newTab.path
           } else {
             state.tabs.push(newTab)
@@ -48,11 +45,16 @@ export const useTabsStore = create<TabsState>()(
 
       removeTab: (tabPath) =>
         set((state) => {
-          state.tabs = state.tabs.filter((t) => t.path !== tabPath)
+          const targetIndex = state.tabs.findIndex((t) => t.path === tabPath)
+          if (targetIndex === -1) return
 
-          if (state.activeTab === tabPath || state.tabs.length === 0) {
-            state.activeTab = ''
+          if (state.activeTab === tabPath) {
+            const newActiveTab =
+              state.tabs[targetIndex + 1] || state.tabs[targetIndex - 1]
+            state.activeTab = newActiveTab ? newActiveTab.path : ''
           }
+
+          state.tabs.splice(targetIndex, 1)
         }),
 
       setActiveTab: (tabPath) => set({ activeTab: tabPath }),

@@ -38,9 +38,10 @@ const ComicItem = memo(
       <div
         data-index={index}
         className={cn(
-          'group hover:bg-overlay flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+          'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
           isSelected && 'bg-overlay ring-rose ring-2',
-          comic.deleted && 'opacity-50',
+          comic.deleted && 'opacity-40',
+          comic.starred ? 'bg-love/50' : 'hover:bg-overlay',
         )}
         onClick={() => void onClick(comic.id)}
       >
@@ -53,7 +54,7 @@ const ComicItem = memo(
             decoding="async"
           />
 
-          <div className="absolute top-0 right-0 flex flex-col gap-1 p-1">
+          <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between opacity-0 group-hover:opacity-100">
             <Button
               className="h-6 w-6 bg-transparent hover:bg-transparent"
               onClick={(e) => {
@@ -63,10 +64,8 @@ const ComicItem = memo(
             >
               <Star
                 className={cn(
-                  'text-love h-5 w-5 opacity-0',
-                  comic.starred
-                    ? 'fill-gold opacity-100'
-                    : 'group-hover:opacity-100',
+                  'text-love h-5 w-5',
+                  comic.starred && 'fill-gold/80',
                 )}
               />
             </Button>
@@ -80,10 +79,8 @@ const ComicItem = memo(
             >
               <Trash2
                 className={cn(
-                  'text-love h-5 w-5 opacity-0',
-                  comic.deleted
-                    ? 'fill-gold/80 opacity-100'
-                    : 'group-hover:opacity-100',
+                  'text-love h-5 w-5',
+                  comic.deleted && 'fill-gold/80',
                 )}
               />
             </Button>
@@ -137,8 +134,9 @@ const ImageItem = memo(({ index, image, onClick, onTags }: ImageItemProps) => {
     <div
       data-index={index}
       className={cn(
-        'group hover:bg-overlay flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
-        image.deleted && 'opacity-50',
+        'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+        image.deleted && 'opacity-40',
+        image.starred ? 'bg-love/50' : 'hover:bg-overlay',
       )}
       onClick={() => onClick(index)}
     >
@@ -151,7 +149,7 @@ const ImageItem = memo(({ index, image, onClick, onTags }: ImageItemProps) => {
           decoding="async"
         />
 
-        <div className="absolute top-0 right-0 flex flex-col gap-1 p-1">
+        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
           <Button
             className="h-6 w-6 bg-transparent hover:bg-transparent"
             onClick={(e) => {
@@ -161,10 +159,10 @@ const ImageItem = memo(({ index, image, onClick, onTags }: ImageItemProps) => {
           >
             <Star
               className={cn(
-                'text-love h-5 w-5 opacity-0',
+                'text-love h-5 w-5',
                 image.starred
-                  ? 'fill-gold opacity-100'
-                  : 'group-hover:opacity-100',
+                  ? 'fill-gold'
+                  : 'opacity-0 group-hover:opacity-100',
               )}
             />
           </Button>
@@ -178,10 +176,10 @@ const ImageItem = memo(({ index, image, onClick, onTags }: ImageItemProps) => {
           >
             <Trash2
               className={cn(
-                'text-love h-5 w-5 opacity-0',
+                'text-love h-5 w-5',
                 image.deleted
-                  ? 'fill-gold/80 opacity-100'
-                  : 'group-hover:opacity-100',
+                  ? 'fill-gold/80'
+                  : 'opacity-0 group-hover:opacity-100',
               )}
             />
           </Button>
@@ -204,6 +202,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const [collapsed, setCollapsed] = useState(1) // 0 1 2
   const [images, setImages] = useState<Image[]>([])
 
+  const isScanning = useLibraryStore((s) => s.isScanning)
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
@@ -225,6 +224,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const comic = useLibraryStore((s) => (comicId ? s.comics[comicId] : ''))
 
   useEffect(() => {
+    if (activeTab) return
     let isMounted = true
     const load = async () => {
       if (!comicId) return
@@ -238,7 +238,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     return () => {
       isMounted = false
     }
-  }, [comicId, getComicImages])
+  }, [comicId, getComicImages, activeTab, isScanning])
 
   const handleSelectComic = useCallback(
     (id: string) => {
@@ -303,37 +303,25 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         lastRead: Date.now(),
       })
 
-      if (activeTab !== comic.path) {
-        addTab({
-          type: LibraryType.comic,
-          id: comic.id,
-          title: comic.title,
-          path: comic.path,
-        })
-        setActiveTab(comic.path)
-      } else {
-        setActiveTab(comic.path)
-      }
+      addTab({
+        type: LibraryType.comic,
+        id: comic.id,
+        title: comic.title,
+        path: comic.path,
+      })
     },
-    [
-      comic,
-      images.length,
-      updateComicProgress,
-      activeTab,
-      addTab,
-      setActiveTab,
-    ],
+    [comic, images.length, updateComicProgress, addTab],
   )
 
   console.log('Render ComicLibrary: ', comics.length)
 
   return (
-    <div className="flex h-full w-full divide-x">
+    <div className="flex h-full w-full">
       {/* Left Column: Comic List */}
       <div
         className={cn(
           'flex shrink-0 flex-col',
-          collapsed === 0 ? 'flex-0 border-none' : 'flex-1',
+          collapsed === 0 ? 'w-0 border-none' : 'flex-1',
           collapsed === 1 && 'border-r',
         )}
       >
@@ -372,7 +360,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
       <div
         className={cn(
           'flex shrink-0 flex-col',
-          collapsed === 2 ? 'flex-0' : 'flex-1',
+          collapsed === 2 ? 'w-0' : 'flex-1',
         )}
       >
         <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
