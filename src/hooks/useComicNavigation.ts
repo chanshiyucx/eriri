@@ -3,7 +3,7 @@ import type { Image } from '@/types/library'
 
 type ViewMode = 'single' | 'double'
 
-export const shouldPair = (
+const shouldPair = (
   img1: Image,
   img2: Image | undefined,
   containerW: number,
@@ -18,7 +18,7 @@ export const shouldPair = (
   return scaledW1 + scaledW2 <= containerW + 1
 }
 
-export const getVisibleIndices = (
+const getVisibleIndices = (
   startIndex: number,
   images: Image[],
   viewMode: 'single' | 'double',

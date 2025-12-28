@@ -48,7 +48,6 @@ interface LibraryState {
   setSelectedLibraryId: (id: string | null) => void
 
   isScanning: boolean
-  setScanning: (isScanning: boolean) => void
 
   getComicImages: (comicId: string) => Promise<Image[]>
   addComicImages: (comicId: string, images: Image[]) => void
@@ -61,21 +60,6 @@ interface LibraryState {
     filename: string,
     tags: FileTags,
   ) => void
-
-  // updateBookStarred: (bookId: string, starred: boolean) => void
-  // updateBookDeleted: (bookId: string, deleted: boolean) => void
-  // updateComicStarred: (comicId: string, starred: boolean) => void
-  // updateComicDeleted: (comicId: string, deleted: boolean) => void
-  // updateComicImageStarred: (
-  //   comicId: string,
-  //   filename: string,
-  //   starred: boolean,
-  // ) => void
-  // updateComicImageDeleted: (
-  //   comicId: string,
-  //   filename: string,
-  //   deleted: boolean,
-  // ) => void
 }
 
 export const useLibraryStore = create<LibraryState>()(
@@ -231,6 +215,12 @@ export const useLibraryStore = create<LibraryState>()(
             scannedLibrary.authors = await scanBookLibrary(lib.path, lib.id)
           } else {
             scannedLibrary.comics = await scanComicLibrary(lib.path, lib.id)
+            const comicIds = scannedLibrary.comics?.map((c) => c.id) ?? []
+            set((state) => {
+              comicIds.forEach((comicId) => {
+                delete state.comicImages[comicId]
+              })
+            })
           }
           get().updateLibrary(id, {}, scannedLibrary)
         } finally {
@@ -239,8 +229,6 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       setSelectedLibraryId: (id) => set({ selectedLibraryId: id }),
-
-      setScanning: (isScanning) => set({ isScanning }),
 
       updateBookTags: (bookId, tags) =>
         set((state) => {

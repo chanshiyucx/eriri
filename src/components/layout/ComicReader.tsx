@@ -33,55 +33,54 @@ interface TocItemProps {
 const TocItem = memo(({ image, index, isActive, onClick }: TocItemProps) => (
   <div
     className={cn(
-      'hover:bg-overlay w-full cursor-pointer truncate px-4 py-2 text-left text-sm',
+      'hover:bg-overlay flex w-full cursor-pointer gap-1 truncate px-4 py-2 text-left text-sm',
       isActive && 'bg-overlay text-love',
+      image.deleted && 'opacity-40',
     )}
     onClick={() => onClick(index)}
   >
-    {image.filename}
+    <Star
+      className={cn(
+        'text-love fill-gold/80 h-4 w-4 opacity-0',
+        image.starred && 'opacity-100',
+      )}
+    />
+    <span>{image.filename}</span>
   </div>
 ))
 TocItem.displayName = 'TocItem'
 
 interface ComicImageProps {
   image: Image
-  viewKey: string
   position?: ImagePosition
   onTags: (image: Image, tags: FileTags) => Promise<void>
 }
 
-const ComicImage = memo(
-  ({ image, viewKey, position, onTags }: ComicImageProps) => {
-    const [isLoaded, setIsLoaded] = useState(false)
-
-    return (
-      <div
+const ComicImage = memo(({ image, position, onTags }: ComicImageProps) => {
+  return (
+    <div
+      className={cn(
+        'relative flex h-full w-full justify-center',
+        image.deleted && 'opacity-40',
+      )}
+    >
+      <figure
         className={cn(
-          'relative flex h-full w-full items-center justify-center',
-          image.deleted && 'opacity-50',
+          'absolute top-0 h-full w-auto',
+          position === 'left' && 'right-0 object-right',
+          position === 'right' && 'left-0 object-left',
+          position === 'center' && 'object-center',
         )}
       >
         <img
-          key={image.url + viewKey}
+          key={image.url}
           src={image.url}
           alt={image.filename}
-          className={cn(
-            'absolute inset-0 h-auto h-full w-full object-contain transition-opacity duration-300',
-            position === 'left' && 'object-right',
-            position === 'right' && 'object-left',
-            position === 'center' && 'object-center',
-            isLoaded ? 'opacity-100' : 'opacity-0',
-          )}
-          onLoad={() => setIsLoaded(true)}
+          className="block h-full w-auto object-contain select-none"
           decoding="async"
         />
 
-        <div
-          className={cn(
-            'group absolute top-0 flex flex-col gap-2 p-2',
-            position === 'right' ? 'left-0' : 'right-0',
-          )}
-        >
+        <div className="group absolute top-1.5 right-1.5 left-1.5 flex justify-between">
           <Button
             className="h-8 w-8 bg-transparent hover:bg-transparent"
             onClick={(e) => {
@@ -91,10 +90,10 @@ const ComicImage = memo(
           >
             <Star
               className={cn(
-                'text-love h-6 w-6 opacity-0',
+                'text-love h-6 w-6',
                 image.starred
-                  ? 'fill-gold opacity-100'
-                  : 'group-hover:opacity-100',
+                  ? 'fill-gold/80'
+                  : 'opacity-0 group-hover:opacity-100',
               )}
             />
           </Button>
@@ -108,18 +107,18 @@ const ComicImage = memo(
           >
             <Trash2
               className={cn(
-                'text-love h-6 w-6 opacity-0',
+                'text-love h-6 w-6',
                 image.deleted
-                  ? 'fill-gold/80 opacity-100'
-                  : 'group-hover:opacity-100',
+                  ? 'fill-gold/80'
+                  : 'opacity-0 group-hover:opacity-100',
               )}
             />
           </Button>
         </div>
-      </div>
-    )
-  },
-)
+      </figure>
+    </div>
+  )
+})
 
 ComicImage.displayName = 'ComicImage'
 
@@ -135,7 +134,6 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const restoredRef = useRef(false)
   const throttleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestProgressRef = useRef<{
     current: number
@@ -160,19 +158,37 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
       initialIndex: 0,
     })
 
+  const stateRef = useRef({
+    activeTab,
+    comicPath: comic.path,
+    images,
+    visibleIndices,
+  })
+
+  useEffect(() => {
+    stateRef.current = {
+      activeTab,
+      comicPath: comic.path,
+      images,
+      visibleIndices,
+    }
+  })
+
   useEffect(() => {
     if (!containerRef.current) return
 
+    let frameId: number
     const measure = () => {
       if (containerRef.current) {
-        const newWidth = containerRef.current.clientWidth
-        const newHeight = containerRef.current.clientHeight
+        frameId = requestAnimationFrame(() => {
+          const newWidth = containerRef.current?.clientWidth ?? 0
+          const newHeight = containerRef.current?.clientHeight ?? 0
 
-        setContainerSize((prev) => {
-          if (prev.width === newWidth && prev.height === newHeight) {
-            return prev
-          }
-          return { width: newWidth, height: newHeight }
+          setContainerSize((prev) => {
+            if (prev.width === newWidth && prev.height === newHeight)
+              return prev
+            return { width: newWidth, height: newHeight }
+          })
         })
       }
     }
@@ -180,15 +196,13 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
     const observer = new ResizeObserver(measure)
     observer.observe(containerRef.current)
 
-    measure()
-
     return () => {
       observer.disconnect()
+      cancelAnimationFrame(frameId)
     }
   }, [isImmersive])
 
   useEffect(() => {
-    restoredRef.current = false
     let mounted = true
 
     const load = async () => {
@@ -221,15 +235,15 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
   }, [comicId, getComicImages, updateComicProgress])
 
   useEffect(() => {
-    if (!images.length || restoredRef.current) return
+    if (!images.length) return
+    if (activeTab !== comic.path) return
 
-    const progress = useProgressStore.getState().comics[comicId]
+    const progress = useProgressStore.getState().comics[comic.id]
     if (progress?.current !== undefined) {
-      jumpTo(Math.min(progress.current, images.length - 1))
+      const targetIndex = Math.min(progress.current, images.length - 1)
+      jumpTo(targetIndex)
     }
-
-    restoredRef.current = true
-  }, [images, comicId, jumpTo])
+  }, [images.length, comic.path, comic.id, jumpTo, activeTab])
 
   useEffect(() => {
     if (!images.length) return
@@ -257,7 +271,6 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
     if (!images.length) return
 
     const nextIndexStart = currentIndex + visibleIndices.length
-
     const prevIndexStart = currentIndex - 1
 
     const indicesToPreload = [
@@ -267,15 +280,20 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
 
     indicesToPreload.forEach((idx) => {
       const url = images[idx].url
-      if (!preloadCache.current.has(url)) {
-        const img = new Image()
-        img.src = url
-        preloadCache.current.set(url, img)
-      }
+      if (preloadCache.current.has(url)) return
+      const img = new Image()
+      img.src = url
+      preloadCache.current.set(url, img)
     })
 
     if (preloadCache.current.size > 50) {
-      preloadCache.current.clear()
+      const iterator = preloadCache.current.keys()
+
+      for (let i = 0; i < 20; i++) {
+        const result = iterator.next()
+        if (result.done) break
+        preloadCache.current.delete(result.value)
+      }
     }
   }, [currentIndex, visibleIndices, images])
 
@@ -321,11 +339,15 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeTab !== comic.path) return
-      if (e.key === 'ArrowLeft') {
+      const { activeTab, comicPath, images, visibleIndices } = stateRef.current
+      if (activeTab !== comicPath) return
+
+      if (e.key === 'ArrowUp') {
         throttledPrev()
-      } else if (e.key === 'ArrowRight') {
+      } else if (e.key === 'ArrowDown') {
         throttledNext()
+      } else if (e.key === 'd' || e.key === 'D') {
+        toggleViewMode()
       } else if (e.key === 'n' || e.key === 'N') {
         const firstImage = images[visibleIndices[0]]
         if (firstImage) {
@@ -355,15 +377,7 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [
-    comic,
-    activeTab,
-    throttledNext,
-    throttledPrev,
-    images,
-    visibleIndices,
-    handleSetImageTags,
-  ])
+  }, [throttledPrev, throttledNext, toggleViewMode, handleSetImageTags])
 
   const isReady = images.length > 0 && containerSize.width > 0
 
@@ -372,26 +386,21 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
       {images.length > 0 && (
         <div
           className={cn(
-            'bg-base absolute left-0 z-100 flex h-full flex-col transition-all duration-300 ease-in-out',
+            'bg-base absolute top-8 left-0 z-100 flex h-full flex-col transition-all duration-300 ease-in-out',
             isTocCollapsed ? 'w-0' : 'w-64 border-r',
-            isImmersive ? 'top-0' : 'top-0',
           )}
         >
-          {!isTocCollapsed && (
-            <ScrollArea className="h-0 flex-1">
-              <div className="w-64">
-                {images.map((image, i) => (
-                  <TocItem
-                    key={i}
-                    image={image}
-                    index={i}
-                    isActive={visibleIndices.includes(i)}
-                    onClick={jumpTo}
-                  />
-                ))}
-              </div>
-            </ScrollArea>
-          )}
+          <ScrollArea className="h-0 flex-1">
+            {images.map((image, i) => (
+              <TocItem
+                key={i}
+                index={i}
+                image={image}
+                isActive={visibleIndices.includes(i)}
+                onClick={jumpTo}
+              />
+            ))}
+          </ScrollArea>
         </div>
       )}
       {!isImmersive && (
@@ -428,20 +437,19 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
       >
         {isReady && (
           <>
-            {visibleIndices.map((index) => {
+            {visibleIndices.map((index, mapIndex) => {
               const img = images[index]
               const isSpread =
                 viewMode === 'double' && visibleIndices.length > 1
               let pos: ImagePosition = 'center'
               if (isSpread) {
-                pos = index === 0 ? 'left' : 'right'
+                pos = mapIndex === 0 ? 'left' : 'right'
               }
 
               return (
                 <ComicImage
-                  key={img.url + viewMode}
+                  key={img.url}
                   image={img}
-                  viewKey={viewMode}
                   position={pos}
                   onTags={handleSetImageTags}
                 />
