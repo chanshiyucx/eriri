@@ -139,7 +139,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
       </div>
 
       {/* Column 3: Preview */}
-      {bookId && <BookReader bookId={bookId} />}
+      {bookId && <BookReader bookId={bookId} showToc />}
     </div>
   )
 }

@@ -48,3 +48,24 @@ export async function parseBook(path: string): Promise<BookContent> {
     throw error
   }
 }
+
+export const findLineIndexByOffset = (
+  offsets: number[],
+  targetOffset: number,
+) => {
+  let low = 0
+  let high = offsets.length - 1
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2)
+    const midOffset = offsets[mid]
+
+    if (midOffset === targetOffset) return mid
+    if (midOffset < targetOffset) {
+      low = mid + 1
+    } else {
+      high = mid - 1
+    }
+  }
+  return Math.max(0, high)
+}

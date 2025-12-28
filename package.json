@@ -1,7 +1,7 @@
 {
   "name": "eriri",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.2.0",
   "description": "A lovely app for comics and books.",
   "type": "module",
   "author": "Shiyu <chanshiyucx@gmail.com>",
