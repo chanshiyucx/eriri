@@ -1,6 +1,7 @@
 import { memo } from 'react'
 import { BookReader } from '@/components/layout/BookReader'
 import { ComicReader } from '@/components/layout/ComicReader'
+import { VideoPlayer } from '@/components/layout/VideoPlayer'
 import { cn } from '@/lib/style'
 import type { Tab } from '@/store/tabs'
 import { LibraryType } from '@/types/library'
@@ -26,6 +27,8 @@ const TabContent = memo(({ tab, isActive, isImmersive }: TabContentProps) => {
     >
       {type === LibraryType.book ? (
         <BookReader bookId={id} showToc />
+      ) : type === LibraryType.video ? (
+        <VideoPlayer videoId={id} />
       ) : (
         <ComicReader comicId={id} />
       )}

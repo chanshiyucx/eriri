@@ -1,6 +1,7 @@
 export const LibraryType = {
   book: 'book',
   comic: 'comic',
+  video: 'video',
 } as const
 
 export type LibraryType = (typeof LibraryType)[keyof typeof LibraryType]
@@ -15,7 +16,22 @@ export interface Library {
     comicId?: string
     authorId?: string
     bookId?: string
+    videoId?: string
   }
+}
+
+export interface Video {
+  id: string
+  title: string
+  path: string
+  url: string
+  cover: string
+  libraryId: string
+  createdAt: number
+  size: number
+  duration: number
+  starred: boolean
+  deleted: boolean
 }
 
 export interface Comic {
@@ -76,6 +92,7 @@ export interface ComicImage {
 export interface ScannedLibrary {
   comics?: Comic[]
   authors?: Author[]
+  videos?: Video[]
 }
 
 export interface FileTags {

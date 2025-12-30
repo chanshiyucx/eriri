@@ -16,8 +16,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             scanner::generate_uuid,
-            scanner::is_book_library,
+            scanner::get_library_type,
             scanner::scan_book_library,
+            scanner::scan_video_library,
             scanner::scan_comic_library,
             scanner::scan_comic_images,
             scanner::clean_thumbnail_cache,

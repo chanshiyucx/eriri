@@ -9,6 +9,7 @@ import { memo, useCallback, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useCollapse } from '@/hooks/useCollapse'
 import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -199,8 +200,8 @@ interface ComicLibraryProps {
 }
 
 export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
-  const [collapsed, setCollapsed] = useState(1) // 0 1 2
   const [images, setImages] = useState<Image[]>([])
+  const { collapsed, setCollapsed } = useCollapse()
 
   const isScanning = useLibraryStore((s) => s.isScanning)
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)

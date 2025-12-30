@@ -5,6 +5,7 @@ import { LibraryType } from '@/types/library'
 import { BookLibrary } from './BookLibrary'
 import { ComicLibrary } from './ComicLibrary'
 import { TabContent } from './TabContent'
+import { VideoLibrary } from './VideoLibrary'
 
 export function ContentArea() {
   const tabs = useTabsStore((s) => s.tabs)
@@ -29,6 +30,8 @@ export function ContentArea() {
         <div className="flex-1">
           {selectedLibrary.type === LibraryType.book ? (
             <BookLibrary selectedLibrary={selectedLibrary} />
+          ) : selectedLibrary.type === LibraryType.video ? (
+            <VideoLibrary selectedLibrary={selectedLibrary} />
           ) : (
             <ComicLibrary selectedLibrary={selectedLibrary} />
           )}
