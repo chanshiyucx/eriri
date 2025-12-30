@@ -116,6 +116,8 @@ export function TopNav() {
         toggleImmersive()
       } else if (e.key === 'x' || e.key === 'X') {
         removeTab(activeTab)
+      } else if (e.key === 'a' || e.key === 'A') {
+        toggleSidebar()
       } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         const currentIndex = tabs.findIndex((tab) => tab.path === activeTab)
 
@@ -141,7 +143,7 @@ export function TopNav() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tabs, activeTab, setActiveTab, toggleImmersive, removeTab])
+  }, [tabs, activeTab, setActiveTab, toggleImmersive, removeTab, toggleSidebar])
 
   const scroll = useCallback((direction: 'left' | 'right') => {
     const container = scrollContainerRef.current
