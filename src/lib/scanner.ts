@@ -1,5 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
-import type { Author, Comic, Image, ImageCache } from '@/types/library'
+import {
+  LibraryType,
+  type Author,
+  type Comic,
+  type Image,
+  type ImageCache,
+  type Video,
+} from '@/types/library'
 
 export async function generateUuid(input: string): Promise<string> {
   try {
@@ -12,14 +19,16 @@ export async function generateUuid(input: string): Promise<string> {
   }
 }
 
-export async function isBookLibrary(libraryPath: string): Promise<boolean> {
+export async function getLibraryType(
+  libraryPath: string,
+): Promise<LibraryType> {
   try {
-    return await invoke<boolean>('is_book_library', {
+    return await invoke<LibraryType>('get_library_type', {
       libraryPath,
     })
   } catch (error) {
-    console.error('Failed to check if library is a book library:', error)
-    return false
+    console.error('Failed to get library type:', error)
+    return LibraryType.book
   }
 }
 
@@ -51,6 +60,22 @@ export async function scanComicLibrary(
     })
   } catch (error) {
     console.error('Failed to scan comic library:', error)
+    return []
+  }
+}
+
+export async function scanVideoLibrary(
+  libraryPath: string,
+  libraryId: string,
+): Promise<Video[]> {
+  try {
+    console.log('Log: scanVideoLibrary: ', libraryPath, libraryId)
+    return await invoke<Video[]>('scan_video_library', {
+      libraryPath,
+      libraryId,
+    })
+  } catch (error) {
+    console.error('Failed to scan video library:', error)
     return []
   }
 }

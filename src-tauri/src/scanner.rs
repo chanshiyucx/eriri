@@ -5,6 +5,7 @@ use std::io::BufWriter;
 use std::path::{Path, PathBuf};
 use std::io::BufReader;
 use std::num::NonZeroU32;
+use std::process::Command;
 use std::os::unix::fs::MetadataExt;
 use image::ImageReader;
 use image::codecs::jpeg::JpegEncoder;
@@ -28,6 +29,7 @@ const DELETE_TAG_NAME: &str = "DELETE";
 const DELETE_TAG_VALUE: &str = "DELETE\n6";
 
 const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png"];
+const VIDEO_EXTENSIONS: &[&str] = &["mp4"];
 const BOOK_EXTENSIONS: &[&str] = &["txt"];
 const NAMESPACE: &str = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
@@ -87,6 +89,23 @@ pub struct Comic {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Video {
+    id: String,
+    title: String,
+    path: String,
+    url: String,
+    cover: String,
+    #[serde(rename = "libraryId")]
+    library_id: String,
+    #[serde(rename = "createdAt")]
+    created_at: u64,
+    size: u64,
+    duration: u64,
+    starred: bool,
+    deleted: bool,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ComicImage {
     path: String,
     url: String,
@@ -98,12 +117,7 @@ pub struct ComicImage {
     deleted: bool,
 }
 
-#[derive(Debug)]
-pub struct CacheFile {
-    path: PathBuf,
-    size: u64,
-    time_secs: u64,
-}
+
 
 #[derive(Deserialize)]
 pub struct FileTags {
@@ -137,6 +151,15 @@ fn is_image_file(path: &Path) -> bool {
         .and_then(|ext| ext.to_str())
         .map(|ext_str| {
             IMAGE_EXTENSIONS.iter().any(|&x| x.eq_ignore_ascii_case(ext_str))
+        })
+        .unwrap_or(false)
+}
+
+fn is_video_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext_str| {
+            VIDEO_EXTENSIONS.iter().any(|&x| x.eq_ignore_ascii_case(ext_str))
         })
         .unwrap_or(false)
 }
@@ -438,6 +461,24 @@ fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
     fallback_first_path
 }
 
+fn generate_video_thumbnail(
+    input_path: &Path,
+    output_path: &Path,
+    sidecar_executable: &Path, 
+) -> Result<(), Box<dyn std::error::Error>> {
+    let output = Command::new(sidecar_executable)
+        .arg(input_path.to_str().ok_or("Invalid input path")?)
+        .arg(output_path.to_str().ok_or("Invalid output path")?)
+        .output()?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let err = String::from_utf8_lossy(&output.stderr);
+        Err(format!("Thumb gen failed: {}", err).into())
+    }
+}
+
 #[tauri::command]
 pub fn generate_uuid(input: &str) -> String {
     let namespace = Uuid::parse_str(NAMESPACE).unwrap();
@@ -445,25 +486,132 @@ pub fn generate_uuid(input: &str) -> String {
 }
 
 #[tauri::command]
-pub fn is_book_library(library_path: String) -> Result<bool, String> {
+pub fn get_library_type(library_path: String) -> Result<String, String> {
     let path = Path::new(&library_path);
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
 
     for entry in entries.flatten() {
-        if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
-            let sub_path = entry.path();
-            if let Ok(sub_entries) = fs::read_dir(&sub_path) {
-                for sub_entry in sub_entries.flatten() {
-                    if is_book_file(&sub_entry.path()) {
-                        return Ok(true);
+        let entry_path = entry.path();
+        if entry_path.is_file() {
+            if is_video_file(&entry_path) {
+                return Ok("video".to_string());
+            }
+        } else if entry_path.is_dir() {
+            if let Ok(entries) = fs::read_dir(entry_path) {
+                for entry in entries.flatten() {
+                    let p = entry.path();
+                    if is_book_file(&p) {
+                        return Ok("book".to_string());
                     }
+                    return Ok("comic".to_string());
                 }
             }
-            break;
         }
     }
+    Ok("comic".to_string())
+}
 
-    Ok(false)
+
+#[tauri::command]
+pub async fn scan_video_library(
+    app: AppHandle,
+    library_path: String,
+    library_id: String,
+) -> Result<Vec<Video>, String> {
+    let start = std::time::Instant::now(); // ⏱️ 计时
+    let path = Path::new(&library_path);
+
+    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
+    let thumb_dir = cache_dir.join("thumbnails");
+    if !thumb_dir.exists() {
+        fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
+    }
+    let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
+    let sidecar_path = resource_dir.join("swift").join("video-cover"); 
+    
+    let sidecar_executable = if sidecar_path.exists() {
+        sidecar_path
+    } else {
+        // Fallback for dev mode when running from project root
+        let dev_path = PathBuf::from("src-tauri/swift/video-cover");
+        if dev_path.exists() {
+            dev_path
+        } else {
+            PathBuf::from("./swift/video-cover")
+        }
+    };
+
+    let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
+    let mut tasks = Vec::new();
+
+    for entry in entries.flatten() {
+        let file_type = entry.file_type().map_err(|e| e.to_string())?;
+        if file_type.is_file() {
+            if is_video_file(&entry.path()) {
+                tasks.push((entry.path(), entry.path())); 
+            }
+        } 
+    }
+
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(4) 
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    let processed_videos: Vec<Video> = pool.install(|| {
+        tasks.par_iter()
+            .map(|(video_path, source_entry)| {
+                let id = generate_uuid(&video_path.to_string_lossy());
+                let title = remove_extension(&source_entry.file_name().unwrap().to_string_lossy());
+
+                let (size, created_at) = if let Ok(metadata) = fs::metadata(video_path) {
+                    (metadata.len(), get_created_time(&metadata))
+                } else {
+                    (0, 0)
+                };
+
+                let (starred, deleted) = get_file_tags(video_path);
+
+                let hash = match fs::metadata(video_path) {
+                    Ok(m) => get_thumbnail_hash(&m),
+                    Err(_) => generate_uuid(&title),
+                };
+                let thumb_path = thumb_dir.join(format!("{}.jpg", hash));
+
+                if !thumb_path.exists() {
+                    let _ = generate_video_thumbnail(video_path, &thumb_path, &sidecar_executable);
+                }
+
+                let cover = if thumb_path.exists() {
+                    convert_file_src(&thumb_path.to_string_lossy())
+                } else {
+                    "".to_string()
+                };
+
+                let url = convert_file_src(&video_path.to_string_lossy());
+
+                Video {
+                    id,
+                    title,
+                    path: video_path.to_string_lossy().to_string(),
+                    url,
+                    cover,
+                    library_id: library_id.clone(),
+                    created_at,
+                    size,
+                    duration: 0,
+                    starred,
+                    deleted,
+                }
+            })
+            .collect()
+    });
+
+    let mut videos = processed_videos;
+    videos.sort_by(|a, b| natord::compare(&a.title, &b.title));
+
+    println!("✅ Scanned {} videos in {:.2}s", videos.len(), start.elapsed().as_secs_f32());
+    Ok(videos)
 }
 
 #[tauri::command]
@@ -638,6 +786,7 @@ pub async fn scan_comic_library(
 
     Ok(comics)
 }
+
 #[tauri::command]
 pub async fn scan_comic_images(
     app: AppHandle,
@@ -764,6 +913,12 @@ pub async fn clean_thumbnail_cache(
     let mut deleted_count = 0;
     let mut freed_bytes = 0u64;
     
+    struct CacheFile {
+        path: PathBuf,
+        size: u64,
+        time_secs: u64,
+    }
+
     let mut valid_files = Vec::new();
     let mut current_total_size = 0u64;
     
