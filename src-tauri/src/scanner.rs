@@ -20,6 +20,7 @@ use fast_image_resize as fr;
 use natord;
 use xattr;
 use plist;
+use crate::config;
 
 const TAG_KEY: &str = "com.apple.metadata:_kMDItemUserTags";
 const FINDER_INFO_KEY: &str = "com.apple.FinderInfo";
@@ -521,11 +522,7 @@ pub async fn scan_video_library(
     let start = std::time::Instant::now(); // ⏱️ 计时
     let path = Path::new(&library_path);
 
-    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
-    let thumb_dir = cache_dir.join("thumbnails");
-    if !thumb_dir.exists() {
-        fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
-    }
+    let thumb_dir = config::get_thumbnail_dir(&app);
     let resource_dir = app.path().resource_dir().map_err(|e| e.to_string())?;
     let sidecar_path = resource_dir.join("swift").join("video-cover"); 
     
@@ -795,8 +792,7 @@ pub async fn scan_comic_images(
     let start = std::time::Instant::now();
     let path = Path::new(&comic_path);
     
-    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
-    let thumb_dir = cache_dir.join("thumbnails");
+    let thumb_dir = config::get_thumbnail_dir(&app);
     
     if !thumb_dir.exists() {
         fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
@@ -873,7 +869,6 @@ pub async fn scan_comic_images(
 
     let mut sorted_images = images;
     sorted_images.sort_by(|a, b| natord::compare(&a.filename, &b.filename));
-
     let duration = start.elapsed();
     println!(
         "✅ Processed {} images in {:.2}s ({:.0}ms per image)",
@@ -896,8 +891,7 @@ pub async fn clean_thumbnail_cache(
     let days = days_old.unwrap_or(30);
     let max_size = max_size_mb.unwrap_or(1024) * 1024 * 1024; 
     
-    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
-    let thumb_dir = cache_dir.join("thumbnails");
+    let thumb_dir = config::get_thumbnail_dir(&app);
     
     if !thumb_dir.exists() {
         return Ok((0, 0));
@@ -982,8 +976,7 @@ pub async fn clean_thumbnail_cache(
 pub async fn get_thumbnail_stats(
     app: AppHandle,
 ) -> Result<(usize, u64), String> {
-    let cache_dir = app.path().app_cache_dir().map_err(|e| e.to_string())?;
-    let thumb_dir = cache_dir.join("thumbnails");
+    let thumb_dir = config::get_thumbnail_dir(&app);
     
     if !thumb_dir.exists() {
         return Ok((0, 0));
@@ -1007,6 +1000,18 @@ pub async fn get_thumbnail_stats(
 }
 
 #[tauri::command]
+pub fn get_cache_dir(app: AppHandle) -> Option<String> {
+    config::load_config(&app).cache_dir
+}
+
+#[tauri::command]
+pub fn set_cache_dir(app: AppHandle, path: String) -> Result<(), String> {
+    let mut config = config::load_config(&app);
+    config.cache_dir = Some(path);
+    config::save_config(&app, &config)
+}
+
+#[tauri::command]
 pub fn set_file_tag(path: String, tags: FileTags) -> Result<bool, String> {
     let p = Path::new(&path);
     if !p.exists() {
@@ -1014,4 +1019,33 @@ pub fn set_file_tag(path: String, tags: FileTags) -> Result<bool, String> {
     }
     set_file_tag_impl(p, tags).map_err(|e| e.to_string())?;
     Ok(true)
+}
+
+#[tauri::command]
+pub fn open_path_native(path: String) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+
+    Ok(())
 }

@@ -133,3 +133,30 @@ export async function setFileTag(
     return false
   }
 }
+
+export async function getCacheDir(): Promise<string | null> {
+  try {
+    return await invoke<string | null>('get_cache_dir')
+  } catch (error) {
+    console.error('Failed to get cache dir:', error)
+    return null
+  }
+}
+
+export async function setCacheDir(path: string): Promise<void> {
+  try {
+    await invoke('set_cache_dir', { path })
+  } catch (error) {
+    console.error('Failed to set cache dir:', error)
+    throw error
+  }
+}
+
+export async function openPathNative(path: string): Promise<void> {
+  try {
+    await invoke('open_path_native', { path })
+  } catch (error) {
+    console.error('Failed to open path:', error)
+    throw error
+  }
+}

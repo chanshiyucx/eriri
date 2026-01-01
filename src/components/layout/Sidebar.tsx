@@ -11,6 +11,7 @@ import { CacheInfo } from '@/components/layout/CacheInfo'
 import { ThemeSwitcher } from '@/components/layout/ThemeSwitcher'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { getCacheDir, setCacheDir } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useUIStore } from '@/store/ui'
@@ -58,6 +59,30 @@ export function Sidebar() {
 
   const handleImport = async () => {
     try {
+      const cacheDir = await getCacheDir()
+      if (!cacheDir) {
+        const yes = await ask(
+          '未设置缩略图缓存目录，请先选择一个目录用于存储缩略图。',
+          {
+            title: '需要设置缓存目录',
+            kind: 'info',
+            okLabel: '去设置',
+            cancelLabel: '取消',
+          },
+        )
+        if (!yes) return
+
+        const selectedCache = await open({
+          directory: true,
+          multiple: false,
+          recursive: true,
+          title: '选择缓存目录',
+        })
+        if (!selectedCache || typeof selectedCache !== 'string') return
+
+        await setCacheDir(selectedCache)
+      }
+
       const selected = await open({
         directory: true,
         multiple: false,
