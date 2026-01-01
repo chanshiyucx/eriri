@@ -20,8 +20,8 @@ export function VideoPlayer({ videoId }: VideoPlayerProps) {
         title={video.title}
         src={video.url}
         poster={video.cover}
-        aspectRatio="auto"
-        className="max-h-full max-w-full"
+        autoPlay={true}
+        className="h-full max-h-full max-w-full [&_video]:!h-full"
       >
         <MediaProvider />
         <PlyrLayout icons={plyrLayoutIcons} />
