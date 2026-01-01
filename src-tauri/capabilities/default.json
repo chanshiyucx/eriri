@@ -29,7 +29,6 @@
     },
     "fs:allow-app-meta",
     "fs:allow-app-meta-recursive",
-    "fs:default",
-    "opener:allow-open-path"
+    "fs:default"
   ]
 }
