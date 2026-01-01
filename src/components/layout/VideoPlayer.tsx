@@ -15,7 +15,7 @@ export function VideoPlayer({ videoId }: VideoPlayerProps) {
   const video = useLibraryStore((s) => s.videos[videoId])
 
   return (
-    <div className="flex h-full w-full items-center justify-center">
+    <div className="flex h-full w-full flex-1 items-center justify-center">
       <MediaPlayer
         title={video.title}
         src={video.url}

@@ -5,6 +5,7 @@ fn greet(name: &str) -> String {
 }
 
 mod scanner;
+mod config;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -24,6 +25,9 @@ pub fn run() {
             scanner::clean_thumbnail_cache,
             scanner::get_thumbnail_stats,
             scanner::set_file_tag,
+            scanner::get_cache_dir,
+            scanner::set_cache_dir,
+            scanner::open_path_native,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,8 +1,14 @@
-import { ask } from '@tauri-apps/plugin-dialog'
-import { Trash2 } from 'lucide-react'
+import { ask, open as openDialog } from '@tauri-apps/plugin-dialog'
+import { FolderOpen, Settings, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { cleanThumbnailCache, getThumbnailStats } from '@/lib/scanner'
+import {
+  cleanThumbnailCache,
+  getCacheDir,
+  getThumbnailStats,
+  openPathNative,
+  setCacheDir,
+} from '@/lib/scanner'
 import type { ImageCache } from '@/types/library'
 
 function formatBytes(bytes: number): string {
@@ -15,15 +21,18 @@ function formatBytes(bytes: number): string {
 
 export function CacheInfo() {
   const [cache, setCache] = useState<ImageCache>({ count: 0, size: 0 })
+  const [cacheDir, setCacheDirState] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
-  const loadCacheStats = async () => {
+  const loadData = async () => {
     const stats = await getThumbnailStats()
     setCache(stats)
+    const dir = await getCacheDir()
+    setCacheDirState(dir)
   }
 
   useEffect(() => {
-    void loadCacheStats()
+    void loadData()
   }, [])
 
   const handleCleanCache = async () => {
@@ -36,7 +45,7 @@ export function CacheInfo() {
     setIsLoading(true)
     try {
       await cleanThumbnailCache()
-      await loadCacheStats()
+      await loadData()
     } catch (error) {
       console.error('Failed to clean cache:', error)
     } finally {
@@ -44,12 +53,57 @@ export function CacheInfo() {
     }
   }
 
+  const handleSetCacheDir = async () => {
+    try {
+      const selected = await openDialog({
+        directory: true,
+        multiple: false,
+        recursive: true,
+        title: 'Select Cache Directory',
+      })
+      if (!selected || typeof selected !== 'string') return
+
+      await setCacheDir(selected)
+      await loadData()
+    } catch (error) {
+      console.error('Failed to set cache dir:', error)
+    }
+  }
+
+  const handleOpenCacheDir = async () => {
+    if (cacheDir) {
+      await openPathNative(cacheDir)
+    }
+  }
+
   return (
     <div className="bg-overlay flex h-10 items-center justify-evenly rounded-full text-xs">
-      <div className="flex gap-2">
+      <div className="flex gap-2" title={cacheDir ?? 'Default Cache Dir'}>
         <div>{cache.count} 项</div>
         <div>{formatBytes(cache.size)}</div>
       </div>
+      <Button
+        onClick={() => {
+          void handleSetCacheDir()
+        }}
+        disabled={isLoading}
+        className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
+        title="设置缓存目录"
+      >
+        <Settings className="h-4 w-4" />
+      </Button>
+      {cacheDir && (
+        <Button
+          onClick={() => {
+            void handleOpenCacheDir()
+          }}
+          disabled={isLoading}
+          className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
+          title="打开缓存目录"
+        >
+          <FolderOpen className="h-4 w-4" />
+        </Button>
+      )}
       <Button
         onClick={() => {
           void handleCleanCache()
