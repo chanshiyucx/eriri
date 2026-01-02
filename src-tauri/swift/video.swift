@@ -1,10 +1,10 @@
-import Foundation
-import QuickLookThumbnailing
+import AVFoundation
 import AppKit
 
 let args = CommandLine.arguments
+
 guard args.count >= 3 else {
-    print("Usage: thumb-gen <input_video_path> <output_image_path>")
+    print("Usage: thumb-gen <input_video_path> <output_image_path>") 
     exit(1)
 }
 
@@ -14,53 +14,28 @@ let inputURL = URL(fileURLWithPath: inputPath)
 let outputURL = URL(fileURLWithPath: outputPath)
 
 if !FileManager.default.fileExists(atPath: inputPath) {
-    print("Error: Input file does not exist")
+    print("Error: Input file does not exist at \(inputPath)")
     exit(1)
 }
 
-let size = CGSize(width: 512, height: 512)
-let scale = 1.0 
+let asset = AVURLAsset(url: inputURL)
+let generator = AVAssetImageGenerator(asset: asset)
+generator.appliesPreferredTrackTransform = true 
 
-let request = QLThumbnailGenerator.Request(
-    fileAt: inputURL,
-    size: size,
-    scale: scale,
-    representationTypes: .thumbnail
-)
+let time = CMTime(seconds: 0, preferredTimescale: 600)
 
-let generator = QLThumbnailGenerator.shared
-let semaphore = DispatchSemaphore(value: 0)
-
-generator.generateBestRepresentation(for: request) { (thumbnail, error) in
-    if let error = error {
-        print("Error generating thumbnail: \(error.localizedDescription)")
-        exit(1)
-    }
+do {
+    let (cgImage, _) = try await generator.image(at: time)
+    let bitmapRep = NSBitmapImageRep(cgImage: cgImage)
     
-    guard let thumb = thumbnail else {
-        print("Error: No thumbnail generated")
-        exit(1)
-    }
-    
-    let nsImage = thumb.nsImage
-    
-    if let tiff = nsImage.tiffRepresentation,
-        let bitmap = NSBitmapImageRep(data: tiff),
-        let jpgData = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.8]) {
-        
-        do {
-            try jpgData.write(to: outputURL)
-        } catch {
-            print("Error writing file: \(error)")
-            exit(1)
-        }
+    if let jpegData = bitmapRep.representation(using: .jpeg, properties: [.compressionFactor: 0.7]) {
+        try jpegData.write(to: outputURL)
+        exit(0)
     } else {
-        print("Error: Failed to convert image to JPEG")
+        print("Error: Failed to create JPEG representation")
         exit(1)
     }
-    
-    semaphore.signal() 
+} catch {
+    print("Error: \(error.localizedDescription)")
+    exit(1)
 }
-
-semaphore.wait()
-exit(0)
