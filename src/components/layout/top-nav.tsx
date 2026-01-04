@@ -19,7 +19,12 @@ interface TabItemProps {
   onRemove: (path: string) => void
 }
 
-const TabItem = memo(({ tab, isActive, onSelect, onRemove }: TabItemProps) => {
+const TabItem = memo(function TabItem({
+  tab,
+  isActive,
+  onSelect,
+  onRemove,
+}: TabItemProps) {
   return (
     <div
       className={cn(
@@ -41,8 +46,6 @@ const TabItem = memo(({ tab, isActive, onSelect, onRemove }: TabItemProps) => {
     </div>
   )
 })
-
-TabItem.displayName = 'TabItem'
 
 export function TopNav() {
   const scrollContainerRef = useRef<HTMLDivElement>(null)

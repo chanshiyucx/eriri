@@ -38,60 +38,57 @@ interface TableOfContentsProps {
   onSelect: (index: number) => void
 }
 
-const TableOfContents = memo(
-  ({
-    images,
-    visibleIndicesSet,
-    isCollapsed,
-    onSelect,
-  }: TableOfContentsProps) => {
-    const handleClick = useCallback(
-      (e: React.MouseEvent<HTMLDivElement>) => {
-        const target = e.target as HTMLElement
-        const item = target.closest('[data-index]')
-        if (item) {
-          const index = item.getAttribute('data-index')
-          if (index !== null) onSelect(Number(index))
-        }
-      },
-      [onSelect],
-    )
+const TableOfContents = memo(function TableOfContents({
+  images,
+  visibleIndicesSet,
+  isCollapsed,
+  onSelect,
+}: TableOfContentsProps) {
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement
+      const item = target.closest('[data-index]')
+      if (item) {
+        const index = item.getAttribute('data-index')
+        if (index !== null) onSelect(Number(index))
+      }
+    },
+    [onSelect],
+  )
 
-    return (
-      <div
-        className={cn(
-          'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-all duration-300 ease-in-out',
-          isCollapsed ? '-translate-x-full' : 'translate-x-0',
-        )}
-      >
-        <ScrollArea className="h-full">
-          <div className="pb-12" onClick={handleClick}>
-            {images.map((image, i) => (
-              <div
-                key={i}
-                data-index={i}
+  return (
+    <div
+      className={cn(
+        'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-all duration-300 ease-in-out',
+        isCollapsed ? '-translate-x-full' : 'translate-x-0',
+      )}
+    >
+      <ScrollArea className="h-full">
+        <div className="pb-12" onClick={handleClick}>
+          {images.map((image, i) => (
+            <div
+              key={i}
+              data-index={i}
+              className={cn(
+                'hover:bg-overlay flex w-full cursor-pointer gap-1 truncate px-4 py-2 text-left text-sm',
+                visibleIndicesSet.has(i) && 'bg-overlay text-love',
+                image.deleted && 'opacity-40',
+              )}
+            >
+              <Star
                 className={cn(
-                  'hover:bg-overlay flex w-full cursor-pointer gap-1 truncate px-4 py-2 text-left text-sm',
-                  visibleIndicesSet.has(i) && 'bg-overlay text-love',
-                  image.deleted && 'opacity-40',
+                  'text-love fill-gold/80 h-4 w-4 opacity-0',
+                  image.starred && 'opacity-100',
                 )}
-              >
-                <Star
-                  className={cn(
-                    'text-love fill-gold/80 h-4 w-4 opacity-0',
-                    image.starred && 'opacity-100',
-                  )}
-                />
-                <span>{image.filename}</span>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </div>
-    )
-  },
-)
-TableOfContents.displayName = 'TableOfContents'
+              />
+              <span>{image.filename}</span>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  )
+})
 
 interface ComicImageProps {
   image: Image
@@ -99,7 +96,11 @@ interface ComicImageProps {
   onTags: (image: Image, tags: FileTags) => Promise<void>
 }
 
-const ComicImage = memo(({ image, position, onTags }: ComicImageProps) => {
+const ComicImage = memo(function ComicImage({
+  image,
+  position,
+  onTags,
+}: ComicImageProps) {
   return (
     <div
       className={cn(
@@ -164,13 +165,11 @@ const ComicImage = memo(({ image, position, onTags }: ComicImageProps) => {
   )
 })
 
-ComicImage.displayName = 'ComicImage'
-
 interface ComicReaderProps {
   comicId: string
 }
 
-const ComicReader = memo(({ comicId }: ComicReaderProps) => {
+const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
   const [images, setImages] = useState<Image[]>([])
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('single')
@@ -518,7 +517,5 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
     </div>
   )
 })
-
-ComicReader.displayName = 'ComicReader'
 
 export { ComicReader }
