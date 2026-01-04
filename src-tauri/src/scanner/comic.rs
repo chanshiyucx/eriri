@@ -1,0 +1,213 @@
+use fast_image_resize as fr;
+use natord;
+use rayon::prelude::*;
+use sha2::{Digest, Sha256};
+use std::fs;
+use std::path::{Path, PathBuf};
+use tauri::AppHandle;
+use tracing::{info, warn};
+use turbojpeg::Decompressor;
+
+use crate::models::{Comic, ComicImage};
+use crate::tags::get_file_tags;
+use crate::thumbnail::{
+    convert_file_src, find_cover_image, get_thumbnail_dir, get_thumbnail_hash, is_image_file,
+    process_and_get_dimensions, THUMB_HEIGHT, THUMB_WIDTH,
+};
+
+use super::utils::{current_time_millis, generate_uuid, get_created_time, is_hidden};
+
+/// Scan comic library and return comics with covers
+#[tauri::command]
+pub fn scan_comic_library(
+    app: AppHandle,
+    library_path: &str,
+    library_id: &str,
+) -> Result<Vec<Comic>, String> {
+    let start = std::time::Instant::now();
+    let path = Path::new(library_path);
+
+    let thumb_dir = get_thumbnail_dir(&app);
+
+    let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
+    let entries_vec: Vec<_> = entries
+        .flatten()
+        .filter(|e| !is_hidden(&e.path()))
+        .collect();
+
+    let processed_comics: Vec<Comic> = entries_vec
+        .par_iter()
+        .map_init(
+            || {
+                let decompressor = Decompressor::new().ok();
+                let resizer = fr::Resizer::new();
+                (decompressor, resizer)
+            },
+            |(decompressor_opt, resizer), entry| {
+                if !entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
+                    return None;
+                }
+
+                let comic_path = entry.path();
+                let path_str = comic_path.to_string_lossy();
+                let comic_name = entry.file_name().to_string_lossy().to_string();
+                let comic_id = generate_uuid(&path_str);
+
+                let created_at = entry
+                    .metadata()
+                    .map(|m| get_created_time(&m))
+                    .unwrap_or_else(|_| current_time_millis());
+
+                let mut cover = String::new();
+
+                if let Some(cover_path) = find_cover_image(&comic_path) {
+                    if let Ok(cover_meta) = fs::metadata(&cover_path) {
+                        let hash = get_thumbnail_hash(&cover_meta);
+                        let thumb_path = thumb_dir.join(format!("{hash}.jpg"));
+
+                        if !thumb_path.exists() {
+                            if let Some(ref mut decompressor) = decompressor_opt.as_mut() {
+                                let _ = process_and_get_dimensions(
+                                    &cover_path,
+                                    &thumb_path,
+                                    decompressor,
+                                    resizer,
+                                );
+                            }
+                        }
+
+                        cover = if thumb_path.exists() {
+                            convert_file_src(&thumb_path.to_string_lossy())
+                        } else {
+                            convert_file_src(&cover_path.to_string_lossy())
+                        };
+                    }
+                }
+
+                let (starred, deleted) = get_file_tags(&comic_path);
+
+                Some(Comic {
+                    id: comic_id,
+                    title: comic_name,
+                    path: path_str.into_owned(),
+                    cover,
+                    library_id: library_id.to_string(),
+                    created_at,
+                    starred,
+                    deleted,
+                })
+            },
+        )
+        .flatten()
+        .collect();
+
+    let mut comics = processed_comics;
+    comics.sort_by(|a, b| natord::compare(&a.title, &b.title));
+
+    info!(
+        count = comics.len(),
+        duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
+        "Scanned comic library"
+    );
+
+    Ok(comics)
+}
+
+/// Scan comic images and generate thumbnails
+#[tauri::command]
+pub fn scan_comic_images(
+    app: AppHandle,
+    comic_path: &str,
+) -> Result<Vec<ComicImage>, String> {
+    let start = std::time::Instant::now();
+    let path = Path::new(comic_path);
+
+    let thumb_dir = get_thumbnail_dir(&app);
+
+    let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
+    let image_paths: Vec<PathBuf> = entries
+        .flatten()
+        .filter(|e| {
+            let path = e.path();
+            !is_hidden(&path)
+                && e.file_type().map(|ft| ft.is_file()).unwrap_or(false)
+                && is_image_file(&path)
+        })
+        .map(|e| e.path())
+        .collect();
+
+    info!(count = image_paths.len(), "Found images");
+
+    let images: Vec<ComicImage> = image_paths
+        .par_iter()
+        .map_init(
+            || {
+                let decompressor = Decompressor::new().ok();
+                let resizer = fr::Resizer::new();
+                (decompressor, resizer)
+            },
+        |(decompressor_opt, resizer), file_path| {
+                let path_str = file_path.to_string_lossy();
+                let filename = file_path
+                    .file_name()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .to_string();
+
+                let hash = match fs::metadata(file_path) {
+                    Ok(metadata) => get_thumbnail_hash(&metadata),
+                    Err(_) => {
+                        let mut hasher = Sha256::new();
+                        hasher.update(path_str.as_bytes());
+                        format!("{:x}", hasher.finalize())
+                    }
+                };
+
+                let thumb_path = thumb_dir.join(format!("{hash}.jpg"));
+
+                let (width, height) = if let Some(ref mut decompressor) = decompressor_opt.as_mut()
+                {
+                    process_and_get_dimensions(file_path, &thumb_path, decompressor, resizer)
+                        .unwrap_or_else(|e| {
+                            warn!(error = %e, path = %file_path.display(), "Failed to process image");
+                        (THUMB_WIDTH, THUMB_HEIGHT)
+                        })
+                } else {
+                    (THUMB_WIDTH, THUMB_HEIGHT)
+                };
+
+                let thumbnail = if thumb_path.exists() {
+                    convert_file_src(&thumb_path.to_string_lossy())
+                } else {
+                    convert_file_src(&path_str)
+                };
+
+                let (starred, deleted) = get_file_tags(file_path);
+                let url = convert_file_src(&path_str);
+
+                ComicImage {
+                    path: path_str.into_owned(),
+                    filename,
+                    url,
+                    thumbnail,
+                    width,
+                    height,
+                    starred,
+                    deleted,
+                }
+            },
+        )
+        .collect();
+
+    let mut sorted_images = images;
+    sorted_images.sort_by(|a, b| natord::compare(&a.filename, &b.filename));
+
+    info!(
+        count = sorted_images.len(),
+        duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
+        avg_ms = start.elapsed().as_millis() as f32 / sorted_images.len().max(1) as f32,
+        "Processed comic images"
+    );
+
+    Ok(sorted_images)
+}

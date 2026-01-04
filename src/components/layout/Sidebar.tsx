@@ -1,6 +1,7 @@
 import { ask, open } from '@tauri-apps/plugin-dialog'
 import {
   BookImage,
+  Film,
   FolderPlus,
   LibraryBig,
   RefreshCw,
@@ -147,7 +148,13 @@ export function Sidebar() {
           return (
             <div key={lib.id} className="group relative">
               <SidebarButton
-                icon={lib.type === LibraryType.book ? LibraryBig : BookImage}
+                icon={
+                  lib.type === LibraryType.book
+                    ? LibraryBig
+                    : lib.type === LibraryType.video
+                      ? Film
+                      : BookImage
+                }
                 label={lib.name}
                 className={cn(selectedLibraryId === lib.id && 'bg-overlay')}
                 onClick={() => {

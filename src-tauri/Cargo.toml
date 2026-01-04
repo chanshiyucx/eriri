@@ -31,6 +31,8 @@ xattr = "1.6.1"
 plist = "1.8.0"
 turbojpeg = "1.3.3"
 memmap2 = "0.9.9"
+tracing = "0.1.44"
+once_cell = "1.21.3"
 
 
 [profile.release]

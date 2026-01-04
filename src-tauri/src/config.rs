@@ -40,19 +40,3 @@ pub fn save_config(app: &AppHandle, config: &Config) -> Result<(), String> {
         Err("Failed to resolve config path".to_string())
     }
 }
-
-pub fn get_thumbnail_dir(app: &AppHandle) -> PathBuf {
-    let config = load_config(app);
-    if let Some(custom_path) = config.cache_dir {
-        let path = PathBuf::from(custom_path);
-        if !path.exists() {
-            let _ = fs::create_dir_all(&path);
-        }
-        return path;
-    }
-
-    app.path()
-        .app_cache_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("thumbnails")
-}

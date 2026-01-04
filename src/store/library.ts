@@ -212,6 +212,7 @@ export const useLibraryStore = create<LibraryState>()(
           if (existingLibrary) return
 
           const type = await getLibraryType(path)
+          console.log('getLibraryType:', type, path)
           const libraryName = path.split('/').pop() ?? 'Untitled Library'
           const library: Library = {
             id: libraryId,
