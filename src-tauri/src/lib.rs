@@ -1,11 +1,8 @@
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-mod scanner;
 mod config;
+mod models;
+mod scanner;
+mod tags;
+mod thumbnail;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -15,19 +12,18 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
-            greet,
-            scanner::generate_uuid,
-            scanner::get_library_type,
-            scanner::scan_book_library,
-            scanner::scan_video_library,
-            scanner::scan_comic_library,
-            scanner::scan_comic_images,
-            scanner::clean_thumbnail_cache,
-            scanner::get_thumbnail_stats,
-            scanner::set_file_tag,
-            scanner::get_cache_dir,
-            scanner::set_cache_dir,
-            scanner::open_path_native,
+            scanner::utils::generate_uuid_command,
+            scanner::utils::get_library_type,
+            scanner::book::scan_book_library,
+            scanner::video::scan_video_library,
+            scanner::comic::scan_comic_library,
+            scanner::comic::scan_comic_images,
+            thumbnail::clean_thumbnail_cache,
+            thumbnail::get_thumbnail_stats,
+            thumbnail::get_cache_dir,
+            thumbnail::set_cache_dir,
+            tags::set_file_tag,
+            scanner::utils::open_path_native,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
