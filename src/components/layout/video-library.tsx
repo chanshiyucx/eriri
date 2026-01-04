@@ -130,8 +130,6 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
     [updateVideoTags],
   )
 
-  console.log('Render VideoLibrary: ', videos.length)
-
   return (
     <div className="flex h-full w-full">
       {/* Left Column: Video List */}

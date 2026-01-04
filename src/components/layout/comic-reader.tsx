@@ -23,32 +23,48 @@ import type { FileTags, Image } from '@/types/library'
 type ViewMode = 'single' | 'double'
 type ImagePosition = 'center' | 'left' | 'right'
 
-interface TocItemProps {
-  image: Image
-  index: number
-  isActive: boolean
-  onClick: (index: number) => void
+interface TableOfContentsProps {
+  images: Image[]
+  visibleIndices: number[]
+  isCollapsed: boolean
+  onSelect: (index: number) => void
 }
 
-const TocItem = memo(({ image, index, isActive, onClick }: TocItemProps) => (
-  <div
-    className={cn(
-      'hover:bg-overlay flex w-full cursor-pointer gap-1 truncate px-4 py-2 text-left text-sm',
-      isActive && 'bg-overlay text-love',
-      image.deleted && 'opacity-40',
-    )}
-    onClick={() => onClick(index)}
-  >
-    <Star
+const TableOfContents = memo(
+  ({ images, visibleIndices, isCollapsed, onSelect }: TableOfContentsProps) => (
+    <div
       className={cn(
-        'text-love fill-gold/80 h-4 w-4 opacity-0',
-        image.starred && 'opacity-100',
+        'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-all duration-300 ease-in-out',
+        isCollapsed ? '-translate-x-full' : 'translate-x-0',
       )}
-    />
-    <span>{image.filename}</span>
-  </div>
-))
-TocItem.displayName = 'TocItem'
+    >
+      <ScrollArea className="h-full">
+        <div className="pb-12">
+          {images.map((image, i) => (
+            <div
+              key={i}
+              className={cn(
+                'hover:bg-overlay flex w-full cursor-pointer gap-1 truncate px-4 py-2 text-left text-sm',
+                visibleIndices.includes(i) && 'bg-overlay text-love',
+                image.deleted && 'opacity-40',
+              )}
+              onClick={() => onSelect(i)}
+            >
+              <Star
+                className={cn(
+                  'text-love fill-gold/80 h-4 w-4 opacity-0',
+                  image.starred && 'opacity-100',
+                )}
+              />
+              <span>{image.filename}</span>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  ),
+)
+TableOfContents.displayName = 'TableOfContents'
 
 interface ComicImageProps {
   image: Image
@@ -386,24 +402,12 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
       {images.length > 0 && (
-        <div
-          className={cn(
-            'bg-base absolute top-8 left-0 z-100 flex h-full flex-col transition-all duration-300 ease-in-out',
-            isTocCollapsed ? 'w-0' : 'w-64 border-r',
-          )}
-        >
-          <ScrollArea className="h-0 flex-1">
-            {images.map((image, i) => (
-              <TocItem
-                key={i}
-                index={i}
-                image={image}
-                isActive={visibleIndices.includes(i)}
-                onClick={jumpTo}
-              />
-            ))}
-          </ScrollArea>
-        </div>
+        <TableOfContents
+          images={images}
+          visibleIndices={visibleIndices}
+          isCollapsed={isTocCollapsed}
+          onSelect={jumpTo}
+        />
       )}
       {!isImmersive && (
         <div className="bg-base text-subtle flex h-8 w-full items-center border-b px-2 text-xs">

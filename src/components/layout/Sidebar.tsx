@@ -126,10 +126,8 @@ export function Sidebar() {
     removeLibrary(library.id)
   }
 
-  console.log('Render Sidebar: ')
-
   return (
-    <div
+    <aside
       className={cn(
         'bg-base flex h-full flex-col transition-all duration-300 ease-in-out',
         isSidebarCollapsed ? 'w-0' : 'w-56 border-r',
@@ -191,6 +189,6 @@ export function Sidebar() {
         <CacheInfo />
         <ThemeSwitcher />
       </div>
-    </div>
+    </aside>
   )
 }

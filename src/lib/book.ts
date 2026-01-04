@@ -7,10 +7,10 @@ export interface Chapter {
 }
 
 export interface BookContent {
-  fullText: string
   lines: string[]
   lineStartOffsets: number[]
   chapters: Chapter[]
+  totalChars: number
 }
 
 const CHAPTER_REGEX =
@@ -38,10 +38,10 @@ export async function parseBook(path: string): Promise<BookContent> {
     })
 
     return {
-      fullText: text,
       lines,
       lineStartOffsets,
       chapters,
+      totalChars: charCount,
     }
   } catch (error) {
     console.error('Failed to parse book:', error)

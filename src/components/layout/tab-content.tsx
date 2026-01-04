@@ -15,8 +15,6 @@ interface TabContentProps {
 const TabContent = memo(({ tab, isActive, isImmersive }: TabContentProps) => {
   const { type, id } = tab
 
-  console.log('Render TabContent:', type, id)
-
   return (
     <div
       className={cn(
@@ -26,7 +24,7 @@ const TabContent = memo(({ tab, isActive, isImmersive }: TabContentProps) => {
       )}
     >
       {type === LibraryType.book ? (
-        <BookReader bookId={id} showToc />
+        <BookReader bookId={id} />
       ) : type === LibraryType.video ? (
         <VideoPlayer videoId={id} />
       ) : (

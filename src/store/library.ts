@@ -71,7 +71,6 @@ interface LibraryState {
 
 /**
  * Apply scanned library data to state (DRY helper)
- * Note: state type is inferred from immer's Draft<LibraryState>
  */
 function applyScannedLibrary(
   state: LibraryState,
@@ -195,7 +194,6 @@ export const useLibraryStore = create<LibraryState>()(
           if (existingLibrary) return
 
           const type = await getLibraryType(path)
-          console.log('getLibraryType:', type, path)
           const libraryName = path.split('/').pop() ?? 'Untitled Library'
           const library: Library = {
             id: libraryId,

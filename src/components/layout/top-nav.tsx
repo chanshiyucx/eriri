@@ -164,8 +164,6 @@ export function TopNav() {
   const handleScrollLeft = useCallback(() => scroll('left'), [scroll])
   const handleScrollRight = useCallback(() => scroll('right'), [scroll])
 
-  console.log('Render TopNav: ', activeTab)
-
   return (
     <div className="bg-base flex h-8 shrink-0 items-center border-b px-2">
       <Button className="mx-1 h-6 w-6" onClick={toggleSidebar}>
