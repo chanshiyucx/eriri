@@ -44,18 +44,6 @@ const TableOfContents = memo(function TableOfContents({
   isCollapsed,
   onSelect,
 }: TableOfContentsProps) {
-  const handleClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement
-      const item = target.closest('[data-index]')
-      if (item) {
-        const index = item.getAttribute('data-index')
-        if (index !== null) onSelect(Number(index))
-      }
-    },
-    [onSelect],
-  )
-
   return (
     <div
       className={cn(
@@ -64,16 +52,16 @@ const TableOfContents = memo(function TableOfContents({
       )}
     >
       <ScrollArea className="h-full">
-        <div className="pb-12" onClick={handleClick}>
+        <div className="pb-12">
           {images.map((image, i) => (
             <div
               key={i}
-              data-index={i}
               className={cn(
                 'hover:bg-overlay flex w-full cursor-pointer gap-1 truncate px-4 py-2 text-left text-sm',
                 visibleIndicesSet.has(i) && 'bg-overlay text-love',
                 image.deleted && 'opacity-40',
               )}
+              onClick={() => onSelect(i)}
             >
               <Star
                 className={cn(

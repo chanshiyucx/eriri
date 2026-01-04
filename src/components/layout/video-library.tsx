@@ -13,23 +13,27 @@ interface VideoItemProps {
   index: number
   video: Video
   isSelected: boolean
+  onClick: (id: string) => void
+  onTags: (video: Video, tags: FileTags) => Promise<void>
 }
 
 const VideoItem = memo(function VideoItem({
   index,
   video,
   isSelected,
+  onClick,
+  onTags,
 }: VideoItemProps) {
   return (
     <div
       data-index={index}
-      data-video-id={video.id}
       className={cn(
         'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
         isSelected && 'bg-overlay ring-rose ring-2',
         video.deleted && 'opacity-40',
         video.starred ? 'bg-love/50' : 'hover:bg-overlay',
       )}
+      onClick={() => onClick(video.id)}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
         <img
@@ -42,8 +46,11 @@ const VideoItem = memo(function VideoItem({
 
         <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between opacity-0 group-hover:opacity-100">
           <Button
-            data-action="star"
             className="h-6 w-6 bg-transparent hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation()
+              void onTags(video, { starred: !video.starred })
+            }}
           >
             <Star
               className={cn(
@@ -54,8 +61,11 @@ const VideoItem = memo(function VideoItem({
           </Button>
 
           <Button
-            data-action="delete"
             className="h-6 w-6 bg-transparent hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation()
+              void onTags(video, { deleted: !video.deleted })
+            }}
           >
             <Trash2
               className={cn(
@@ -117,44 +127,12 @@ export const VideoLibrary = memo(function VideoLibrary({
     [updateVideoTags],
   )
 
-  const handleVideoListClick = useCallback(
-    (e: React.MouseEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement
-
-      // Check for action buttons first
-      const actionBtn = target.closest('[data-action]')
-      if (actionBtn) {
-        e.stopPropagation()
-        const action = actionBtn.getAttribute('data-action')
-        const videoItem = actionBtn.closest('[data-video-id]')
-        const videoIdAttr = videoItem?.getAttribute('data-video-id')
-        if (!videoIdAttr) return
-
-        const targetVideo = videos.find((v) => v.id === videoIdAttr)
-        if (!targetVideo) return
-
-        if (action === 'star') {
-          void handleSetVideoTags(targetVideo, {
-            starred: !targetVideo.starred,
-          })
-        } else if (action === 'delete') {
-          void handleSetVideoTags(targetVideo, {
-            deleted: !targetVideo.deleted,
-          })
-        }
-        return
-      }
-
-      // Handle video selection
-      const videoItem = target.closest('[data-video-id]')
-      const clickedVideoId = videoItem?.getAttribute('data-video-id')
-      if (clickedVideoId && clickedVideoId !== videoId) {
-        updateLibrary(selectedLibrary.id, {
-          status: { videoId: clickedVideoId },
-        })
-      }
+  const handleSelectVideo = useCallback(
+    (id: string) => {
+      if (id === videoId) return
+      updateLibrary(selectedLibrary.id, { status: { videoId: id } })
     },
-    [videos, videoId, selectedLibrary.id, updateLibrary, handleSetVideoTags],
+    [selectedLibrary.id, updateLibrary, videoId],
   )
 
   return (
@@ -182,16 +160,15 @@ export const VideoLibrary = memo(function VideoLibrary({
         </div>
         <ScrollArea className="h-0 flex-1">
           <div className="p-4">
-            <div
-              className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3"
-              onClick={handleVideoListClick}
-            >
+            <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
               {videos.map((v, i) => (
                 <VideoItem
                   key={v.id}
                   index={i}
                   video={v}
                   isSelected={videoId === v.id}
+                  onClick={handleSelectVideo}
+                  onTags={handleSetVideoTags}
                 />
               ))}
             </div>
