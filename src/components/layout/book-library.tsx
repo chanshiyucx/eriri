@@ -7,7 +7,7 @@ import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import type { Book, Library } from '@/types/library'
-import { BookReader } from './BookReader'
+import { BookReader } from './book-reader'
 
 interface BookLibraryProps {
   selectedLibrary: Library

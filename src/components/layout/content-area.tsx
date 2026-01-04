@@ -2,10 +2,10 @@ import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 import { LibraryType } from '@/types/library'
-import { BookLibrary } from './BookLibrary'
-import { ComicLibrary } from './ComicLibrary'
-import { TabContent } from './TabContent'
-import { VideoLibrary } from './VideoLibrary'
+import { BookLibrary } from './book-library'
+import { ComicLibrary } from './comic-library'
+import { TabContent } from './tab-content'
+import { VideoLibrary } from './video-library'
 
 export function ContentArea() {
   const tabs = useTabsStore((s) => s.tabs)

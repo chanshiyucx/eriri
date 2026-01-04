@@ -1,5 +1,5 @@
 import '@/styles/tailwindcss.css'
-import { AppLayout } from '@/components/layout/AppLayout'
+import { AppLayout } from '@/components/layout/app-layout'
 
 function App() {
   return <AppLayout />

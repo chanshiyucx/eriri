@@ -1,6 +1,6 @@
-import { ContentArea } from './ContentArea'
-import { Sidebar } from './Sidebar'
-import { TopNav } from './TopNav'
+import { ContentArea } from './content-area'
+import { Sidebar } from './sidebar'
+import { TopNav } from './top-nav'
 
 export function AppLayout() {
   return (

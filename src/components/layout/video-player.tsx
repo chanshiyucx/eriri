@@ -24,7 +24,18 @@ export function VideoPlayer({ videoId }: VideoPlayerProps) {
         className="h-full max-h-full max-w-full [&_video]:!h-full"
       >
         <MediaProvider />
-        <PlyrLayout icons={plyrLayoutIcons} />
+        <PlyrLayout
+          icons={plyrLayoutIcons}
+          controls={[
+            'play-large',
+            'play',
+            'progress',
+            'current-time',
+            'duration',
+            'mute+volume',
+            'settings',
+          ]}
+        />
       </MediaPlayer>
     </div>
   )

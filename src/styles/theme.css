@@ -1,5 +1,4 @@
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
-/* @custom-variant dark (&:is(.dark *)); */
 
 /* https://rosepinetheme.com/zh-cn/palette/ingredients/ */
 @theme {
@@ -60,7 +59,7 @@
 }
 
 /* shadcn ui */
-@theme inline {
+/* @theme inline {
   --radius: 0.625rem;
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -100,4 +99,4 @@
   --color-sidebar-accent-foreground: var(--color-text);
   --color-sidebar-border: var(--color-overlay);
   --color-sidebar-ring: var(--color-subtle);
-}
+} */

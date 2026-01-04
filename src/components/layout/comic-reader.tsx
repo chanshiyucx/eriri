@@ -10,7 +10,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useComicNavigation } from '@/hooks/useComicNavigation'
+import { useComicNavigation } from '@/hooks/use-comic-navigation'
 import { throttle } from '@/lib/helper'
 import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
@@ -417,7 +417,7 @@ const ComicReader = memo(({ comicId }: ComicReaderProps) => {
           <Button
             className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
             onClick={toggleViewMode}
-            title={`Switch to ${viewMode === 'single' ? 'Double' : 'Single'} Column`}
+            title={`切换到 ${viewMode === 'single' ? '双栏' : '单栏'}`}
           >
             {viewMode === 'single' ? (
               <Square className="h-4 w-4" />

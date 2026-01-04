@@ -9,7 +9,7 @@ import { memo, useCallback, useEffect, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useCollapse } from '@/hooks/useCollapse'
+import { useCollapse } from '@/hooks/use-collapse'
 import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -370,7 +370,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             <Button
               className="h-6 w-6"
               onClick={handleContinueReading}
-              title="Continue Reading"
+              title="继续阅读"
             >
               <StepForward className="h-4 w-4" />
             </Button>
