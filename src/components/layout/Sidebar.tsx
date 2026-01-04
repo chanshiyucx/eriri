@@ -7,8 +7,8 @@ import {
   Trash2,
 } from 'lucide-react'
 import { useMemo } from 'react'
-import { CacheInfo } from '@/components/layout/CacheInfo'
-import { ThemeSwitcher } from '@/components/layout/ThemeSwitcher'
+import { CacheInfo } from '@/components/layout/cache-info'
+import { ThemeSwitcher } from '@/components/layout/theme-switcher'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { getCacheDir, setCacheDir } from '@/lib/scanner'

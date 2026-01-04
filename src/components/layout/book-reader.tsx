@@ -110,13 +110,6 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
           progress.startCharIndex,
         )
 
-        console.log(
-          'Restoring to line:',
-          targetLine,
-          'from char:',
-          progress.startCharIndex,
-        )
-
         virtuosoRef.current.scrollToIndex({
           index: targetLine,
           align: 'start',
@@ -267,7 +260,7 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
           <Button
             className="h-6 w-6"
             onClick={handleContinueReading}
-            title="Continue Reading"
+            title="继续阅读"
           >
             <StepForward className="h-4 w-4" />
           </Button>
@@ -276,7 +269,7 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
         <Button
           className="h-6 w-6"
           onClick={() => void handleSetBookTags({ deleted: !book.deleted })}
-          title="Mark Delete"
+          title="标记删除"
         >
           <Trash2 className={cn('h-4 w-4', book.deleted && 'text-subtle/60')} />
         </Button>
@@ -284,7 +277,7 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
         <Button
           className={cn('h-6 w-6', book.deleted && 'hidden')}
           onClick={() => void handleSetBookTags({ starred: !book.starred })}
-          title="Mark Star"
+          title="标记收藏"
         >
           <Star
             className={cn('h-4 w-4', book.starred && 'text-love fill-gold/80')}
