@@ -1,5 +1,9 @@
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
+import {
+  createJSONStorage,
+  persist,
+  subscribeWithSelector,
+} from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { createIDBStorage } from '@/lib/storage'
 
@@ -14,46 +18,53 @@ interface UIState {
   setTheme: (theme: ThemeMode) => void
 }
 
-// Apply theme helper function
-export const applyTheme = (theme: ThemeMode) => {
+const applyTheme = (theme: ThemeMode) => {
   if (typeof window === 'undefined') return
 
-  if (theme === 'system') {
-    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
-      .matches
-      ? 'dark'
-      : 'light'
-    document.documentElement.setAttribute('data-theme', systemTheme)
-  } else {
-    document.documentElement.setAttribute('data-theme', theme)
-  }
+  const resolvedTheme =
+    theme === 'system'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light'
+      : theme
+
+  document.documentElement.setAttribute('data-theme', resolvedTheme)
 }
 
 export const useUIStore = create<UIState>()(
-  persist(
-    immer((set) => ({
-      isSidebarCollapsed: false,
-      isImmersive: false,
-      theme: 'system',
+  subscribeWithSelector(
+    persist(
+      immer((set) => ({
+        isSidebarCollapsed: false,
+        isImmersive: false,
+        theme: 'system',
 
-      toggleSidebar: () =>
-        set((state) => {
-          state.isSidebarCollapsed = !state.isSidebarCollapsed
-        }),
+        toggleSidebar: () =>
+          set((state) => {
+            state.isSidebarCollapsed = !state.isSidebarCollapsed
+          }),
 
-      toggleImmersive: () =>
-        set((state) => {
-          state.isImmersive = !state.isImmersive
-        }),
+        toggleImmersive: () =>
+          set((state) => {
+            state.isImmersive = !state.isImmersive
+          }),
 
-      setTheme: (theme) => {
-        applyTheme(theme)
-        set({ theme })
+        setTheme: (theme) => set({ theme }),
+      })),
+      {
+        name: 'eriri-ui-storage',
+        storage: createJSONStorage(() => createIDBStorage()),
+        onRehydrateStorage: () => (state) => {
+          if (state?.theme) {
+            applyTheme(state.theme)
+          }
+        },
       },
-    })),
-    {
-      name: 'eriri-ui-storage',
-      storage: createJSONStorage(() => createIDBStorage()),
-    },
+    ),
   ),
+)
+
+useUIStore.subscribe(
+  (state) => state.theme,
+  (theme) => applyTheme(theme),
 )

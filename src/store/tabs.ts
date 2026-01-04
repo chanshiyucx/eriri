@@ -14,7 +14,6 @@ export interface Tab {
 interface TabsState {
   tabs: Tab[]
   activeTab: string
-  getActiveTab: () => Tab | null
   addTab: (tab: Tab) => void
   removeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
@@ -23,14 +22,9 @@ interface TabsState {
 
 export const useTabsStore = create<TabsState>()(
   persist(
-    immer((set, get) => ({
+    immer((set) => ({
       tabs: [],
       activeTab: '',
-
-      getActiveTab: () => {
-        const state = get()
-        return state.tabs.find((t) => t.path === state.activeTab) ?? null
-      },
 
       addTab: (newTab) =>
         set((state) => {

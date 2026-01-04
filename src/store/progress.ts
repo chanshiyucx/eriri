@@ -24,6 +24,8 @@ interface ProgressState {
 
   updateComicProgress: (comicId: string, progress: ComicProgress) => void
   updateBookProgress: (bookId: string, progress: BookProgress) => void
+  removeComicProgress: (comicId: string) => void
+  removeBookProgress: (bookId: string) => void
 }
 
 export const useProgressStore = create<ProgressState>()(
@@ -40,6 +42,16 @@ export const useProgressStore = create<ProgressState>()(
       updateBookProgress: (bookId, progress) =>
         set((state) => {
           state.books[bookId] = progress
+        }),
+
+      removeComicProgress: (comicId) =>
+        set((state) => {
+          delete state.comics[comicId]
+        }),
+
+      removeBookProgress: (bookId) =>
+        set((state) => {
+          delete state.books[bookId]
         }),
     })),
     {
