@@ -72,21 +72,15 @@ export function useComicNavigation({
   )
 
   const goNext = useCallback(() => {
+    const step = visibleIndices.length || 1
     setCurrentIndex((prev) => {
-      const currentVisibleCount = getVisibleIndices(
-        prev,
-        images,
-        viewMode,
-        containerSize,
-      ).length
-      const nextIndex = Math.min(prev + currentVisibleCount, images.length - 1)
-
+      const nextIndex = Math.min(prev + step, images.length - 1)
       if (nextIndex !== prev) {
         onIndexChange?.(nextIndex)
       }
       return nextIndex
     })
-  }, [images, viewMode, containerSize, onIndexChange])
+  }, [visibleIndices.length, images.length, onIndexChange])
 
   const goPrev = useCallback(() => {
     setCurrentIndex((prev) => {
