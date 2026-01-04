@@ -12,7 +12,11 @@ interface TabContentProps {
   isImmersive: boolean
 }
 
-const TabContent = memo(({ tab, isActive, isImmersive }: TabContentProps) => {
+const TabContent = memo(function TabContent({
+  tab,
+  isActive,
+  isImmersive,
+}: TabContentProps) {
   const { type, id } = tab
 
   return (
@@ -33,7 +37,5 @@ const TabContent = memo(({ tab, isActive, isImmersive }: TabContentProps) => {
     </div>
   )
 })
-
-TabContent.displayName = 'TabContent'
 
 export { TabContent }

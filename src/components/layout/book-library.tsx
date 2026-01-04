@@ -19,43 +19,44 @@ interface BookListItemProps {
   onClick: (id: string) => void
 }
 
-const BookListItem = memo(
-  ({ book, isSelected, onClick }: BookListItemProps) => {
-    const progress = useProgressStore((s) => s.books[book.id])
+const BookListItem = memo(function BookListItem({
+  book,
+  isSelected,
+  onClick,
+}: BookListItemProps) {
+  const progress = useProgressStore((s) => s.books[book.id])
 
-    return (
-      <Button
-        onClick={() => onClick(book.id)}
-        className={cn(
-          'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm transition-colors',
-          isSelected ? 'bg-overlay' : 'bg-surface',
-          book.deleted && 'text-subtle/60',
-        )}
-      >
-        {book.deleted ? (
-          <Trash2 className="z-10 h-4 w-4 shrink-0" />
-        ) : book.starred ? (
-          <Star className="text-love fill-gold/80 z-10 h-4 w-4 shrink-0" />
-        ) : (
-          <BookIcon className="z-10 h-4 w-4 shrink-0" />
-        )}
-        <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-          <span className="truncate">{book.title}</span>
-          <span className="text-subtle/60 flex shrink-0 items-center gap-1 text-xs whitespace-nowrap">
-            {progress && progress.percent > 0 && (
-              <>
-                <span>{Math.round(progress.percent)}%</span>
-                <span>•</span>
-              </>
-            )}
-            <span>{(book.size / 1024).toFixed(1)}k</span>
-          </span>
-        </div>
-      </Button>
-    )
-  },
-)
-BookListItem.displayName = 'BookListItem'
+  return (
+    <Button
+      onClick={() => onClick(book.id)}
+      className={cn(
+        'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm transition-colors',
+        isSelected ? 'bg-overlay' : 'bg-surface',
+        book.deleted && 'text-subtle/60',
+      )}
+    >
+      {book.deleted ? (
+        <Trash2 className="z-10 h-4 w-4 shrink-0" />
+      ) : book.starred ? (
+        <Star className="text-love fill-gold/80 z-10 h-4 w-4 shrink-0" />
+      ) : (
+        <BookIcon className="z-10 h-4 w-4 shrink-0" />
+      )}
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+        <span className="truncate">{book.title}</span>
+        <span className="text-subtle/60 flex shrink-0 items-center gap-1 text-xs whitespace-nowrap">
+          {progress && progress.percent > 0 && (
+            <>
+              <span>{Math.round(progress.percent)}%</span>
+              <span>•</span>
+            </>
+          )}
+          <span>{(book.size / 1024).toFixed(1)}k</span>
+        </span>
+      </div>
+    </Button>
+  )
+})
 
 interface AuthorListItemProps {
   author: Author
@@ -63,8 +64,12 @@ interface AuthorListItemProps {
   onSelect: (id: string) => void
 }
 
-const AuthorListItem = memo(
-  ({ author, isSelected, onSelect }: AuthorListItemProps) => (
+const AuthorListItem = memo(function AuthorListItem({
+  author,
+  isSelected,
+  onSelect,
+}: AuthorListItemProps) {
+  return (
     <Button
       onClick={() => onSelect(author.id)}
       className={cn(
@@ -78,11 +83,12 @@ const AuthorListItem = memo(
         <span className="text-subtle/60 text-xs">{author.bookCount}</span>
       </div>
     </Button>
-  ),
-)
-AuthorListItem.displayName = 'AuthorListItem'
+  )
+})
 
-export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
+export const BookLibrary = memo(function BookLibrary({
+  selectedLibrary,
+}: BookLibraryProps) {
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
 
   const { authorId, bookId } = selectedLibrary.status
@@ -160,4 +166,4 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
       {bookId && <BookReader bookId={bookId} showReading />}
     </div>
   )
-}
+})

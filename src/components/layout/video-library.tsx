@@ -1,6 +1,5 @@
 import { PanelLeftClose, PanelLeftOpen, Star, Trash2 } from 'lucide-react'
-import { memo, useCallback } from 'react'
-import { useShallow } from 'zustand/react/shallow'
+import { memo, useCallback, useMemo } from 'react'
 import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -14,106 +13,94 @@ interface VideoItemProps {
   index: number
   video: Video
   isSelected: boolean
-  onClick: (id: string) => void
-  onTags: (video: Video, tags: FileTags) => Promise<void>
 }
 
-const VideoItem = memo(
-  ({ index, video, isSelected, onClick, onTags }: VideoItemProps) => {
-    return (
-      <div
-        data-index={index}
-        className={cn(
-          'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
-          isSelected && 'bg-overlay ring-rose ring-2',
-          video.deleted && 'opacity-40',
-          video.starred ? 'bg-love/50' : 'hover:bg-overlay',
-        )}
-        onClick={() => onClick(video.id)}
-      >
-        <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
-          <img
-            src={video.cover}
-            alt={video.title}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-            loading="lazy"
-            decoding="async"
-          />
+const VideoItem = memo(function VideoItem({
+  index,
+  video,
+  isSelected,
+}: VideoItemProps) {
+  return (
+    <div
+      data-index={index}
+      data-video-id={video.id}
+      className={cn(
+        'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+        isSelected && 'bg-overlay ring-rose ring-2',
+        video.deleted && 'opacity-40',
+        video.starred ? 'bg-love/50' : 'hover:bg-overlay',
+      )}
+    >
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
+        <img
+          src={video.cover}
+          alt={video.title}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+          decoding="async"
+        />
 
-          <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between opacity-0 group-hover:opacity-100">
-            <Button
-              className="h-6 w-6 bg-transparent hover:bg-transparent"
-              onClick={(e) => {
-                e.stopPropagation()
-                void onTags(video, { starred: !video.starred })
-              }}
-            >
-              <Star
-                className={cn(
-                  'text-love h-5 w-5',
-                  video.starred && 'fill-gold/80',
-                )}
-              />
-            </Button>
+        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between opacity-0 group-hover:opacity-100">
+          <Button
+            data-action="star"
+            className="h-6 w-6 bg-transparent hover:bg-transparent"
+          >
+            <Star
+              className={cn(
+                'text-love h-5 w-5',
+                video.starred && 'fill-gold/80',
+              )}
+            />
+          </Button>
 
-            <Button
-              className="h-6 w-6 bg-transparent hover:bg-transparent"
-              onClick={(e) => {
-                e.stopPropagation()
-                void onTags(video, { deleted: !video.deleted })
-              }}
-            >
-              <Trash2
-                className={cn(
-                  'text-love h-5 w-5',
-                  video.deleted && 'fill-gold/80',
-                )}
-              />
-            </Button>
-          </div>
-        </div>
-        <div
-          className={cn(
-            'truncate text-center text-sm transition-colors',
-            isSelected && 'text-love',
-          )}
-        >
-          {video.title}
+          <Button
+            data-action="delete"
+            className="h-6 w-6 bg-transparent hover:bg-transparent"
+          >
+            <Trash2
+              className={cn(
+                'text-love h-5 w-5',
+                video.deleted && 'fill-gold/80',
+              )}
+            />
+          </Button>
         </div>
       </div>
-    )
-  },
-)
-
-VideoItem.displayName = 'VideoItem'
+      <div
+        className={cn(
+          'truncate text-center text-sm transition-colors',
+          isSelected && 'text-love',
+        )}
+      >
+        {video.title}
+      </div>
+    </div>
+  )
+})
 
 interface VideoLibraryProps {
   selectedLibrary: Library
 }
 
-export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
+export const VideoLibrary = memo(function VideoLibrary({
+  selectedLibrary,
+}: VideoLibraryProps) {
   const { collapsed, setCollapsed } = useCollapse()
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateVideoTags = useLibraryStore((s) => s.updateVideoTags)
 
-  const videos = useLibraryStore(
-    useShallow((s) => {
-      const videoIds = s.libraryVideos[selectedLibrary.id] || []
-      return videoIds.map((id) => s.videos[id]).filter(Boolean)
-    }),
+  const videoIds = useLibraryStore(
+    (s) => s.libraryVideos[selectedLibrary.id] || [],
+  )
+  const videosMap = useLibraryStore((s) => s.videos)
+  const videos = useMemo(
+    () => videoIds.map((id) => videosMap[id]).filter(Boolean),
+    [videoIds, videosMap],
   )
 
   const { videoId } = selectedLibrary.status
   const video = useLibraryStore((s) =>
     videoId ? s.videos[videoId] : undefined,
-  )
-
-  const handleSelectVideo = useCallback(
-    (id: string) => {
-      if (id === videoId) return
-      updateLibrary(selectedLibrary.id, { status: { videoId: id } })
-    },
-    [selectedLibrary.id, updateLibrary, videoId],
   )
 
   const handleSetVideoTags = useCallback(
@@ -128,6 +115,46 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
       }
     },
     [updateVideoTags],
+  )
+
+  const handleVideoListClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement
+
+      // Check for action buttons first
+      const actionBtn = target.closest('[data-action]')
+      if (actionBtn) {
+        e.stopPropagation()
+        const action = actionBtn.getAttribute('data-action')
+        const videoItem = actionBtn.closest('[data-video-id]')
+        const videoIdAttr = videoItem?.getAttribute('data-video-id')
+        if (!videoIdAttr) return
+
+        const targetVideo = videos.find((v) => v.id === videoIdAttr)
+        if (!targetVideo) return
+
+        if (action === 'star') {
+          void handleSetVideoTags(targetVideo, {
+            starred: !targetVideo.starred,
+          })
+        } else if (action === 'delete') {
+          void handleSetVideoTags(targetVideo, {
+            deleted: !targetVideo.deleted,
+          })
+        }
+        return
+      }
+
+      // Handle video selection
+      const videoItem = target.closest('[data-video-id]')
+      const clickedVideoId = videoItem?.getAttribute('data-video-id')
+      if (clickedVideoId && clickedVideoId !== videoId) {
+        updateLibrary(selectedLibrary.id, {
+          status: { videoId: clickedVideoId },
+        })
+      }
+    },
+    [videos, videoId, selectedLibrary.id, updateLibrary, handleSetVideoTags],
   )
 
   return (
@@ -155,15 +182,16 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
         </div>
         <ScrollArea className="h-0 flex-1">
           <div className="p-4">
-            <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
+            <div
+              className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3"
+              onClick={handleVideoListClick}
+            >
               {videos.map((v, i) => (
                 <VideoItem
                   key={v.id}
                   index={i}
                   video={v}
                   isSelected={videoId === v.id}
-                  onClick={handleSelectVideo}
-                  onTags={handleSetVideoTags}
                 />
               ))}
             </div>
@@ -195,4 +223,4 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
       </div>
     </div>
   )
-}
+})

@@ -16,21 +16,30 @@ import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import { FileTags, LibraryType } from '@/types/library'
 
-const BookLine = memo(({ line, index }: { line: string; index: number }) => (
-  <p
-    data-index={index}
-    className="text-text mx-auto w-full max-w-3xl px-8 pb-4 font-serif leading-relaxed break-words whitespace-pre-wrap"
-  >
-    {line}
-  </p>
-))
-BookLine.displayName = 'BookLine'
+const BookLine = memo(function BookLine({
+  line,
+  index,
+}: {
+  line: string
+  index: number
+}) {
+  return (
+    <p
+      data-index={index}
+      className="text-text mx-auto w-full max-w-3xl px-8 pb-4 font-serif leading-relaxed break-words whitespace-pre-wrap"
+    >
+      {line}
+    </p>
+  )
+})
 
-const BookHeader = memo(() => <div className="h-16" />)
-BookHeader.displayName = 'BookHeader'
+const BookHeader = memo(function BookHeader() {
+  return <div className="h-16" />
+})
 
-const BookFooter = memo(() => <div className="h-32" />)
-BookFooter.displayName = 'BookFooter'
+const BookFooter = memo(function BookFooter() {
+  return <div className="h-32" />
+})
 
 const VIRTUOSO_COMPONENTS = {
   Header: BookHeader,
@@ -44,13 +53,13 @@ interface TableOfContentsProps {
   onSelect: (lineIndex: number) => void
 }
 
-const TableOfContents = memo(
-  ({
-    chapters,
-    currentChapterTitle,
-    isCollapsed,
-    onSelect,
-  }: TableOfContentsProps) => (
+const TableOfContents = memo(function TableOfContents({
+  chapters,
+  currentChapterTitle,
+  isCollapsed,
+  onSelect,
+}: TableOfContentsProps) {
+  return (
     <div
       className={cn(
         'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-all duration-300 ease-in-out',
@@ -74,16 +83,18 @@ const TableOfContents = memo(
         </div>
       </ScrollArea>
     </div>
-  ),
-)
-TableOfContents.displayName = 'TableOfContents'
+  )
+})
 
 interface BookReaderProps {
   bookId: string
   showReading?: boolean
 }
 
-const BookReader = memo(({ bookId, showReading = false }: BookReaderProps) => {
+const BookReader = memo(function BookReader({
+  bookId,
+  showReading = false,
+}: BookReaderProps) {
   const [content, setContent] = useState<BookContent | null>(null)
   const [currentChapterTitle, setCurrentChapterTitle] = useState<string>('')
   const virtuosoRef = useRef<VirtuosoHandle>(null)
@@ -314,7 +325,5 @@ const BookReader = memo(({ bookId, showReading = false }: BookReaderProps) => {
     </div>
   )
 })
-
-BookReader.displayName = 'BookReader'
 
 export { BookReader }
