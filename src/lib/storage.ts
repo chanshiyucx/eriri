@@ -13,16 +13,39 @@ export const createIDBStorage = (): StateStorage => ({
   },
 })
 
-export const createDebouncedIDBStorage = (wait = 2000): StateStorage => {
-  const pending = new Map<string, ReturnType<typeof setTimeout>>()
+interface DebouncedStorage extends StateStorage {
+  flush: () => Promise<void>
+}
+
+export const createDebouncedIDBStorage = (wait = 2000): DebouncedStorage => {
+  const pending = new Map<
+    string,
+    { timeout: ReturnType<typeof setTimeout>; value: string }
+  >()
+
+  const flushItem = async (name: string) => {
+    const item = pending.get(name)
+    if (item) {
+      clearTimeout(item.timeout)
+      pending.delete(name)
+      await set(name, item.value)
+    }
+  }
 
   return {
     getItem: async (name: string): Promise<string | null> => {
+      // Return pending value if exists (for consistency)
+      const pendingItem = pending.get(name)
+      if (pendingItem) {
+        return pendingItem.value
+      }
       return (await get<string>(name)) ?? null
     },
-    setItem: (name: string, value: string): void | Promise<void> => {
-      if (pending.has(name)) {
-        clearTimeout(pending.get(name))
+
+    setItem: (name: string, value: string): void => {
+      const existing = pending.get(name)
+      if (existing) {
+        clearTimeout(existing.timeout)
       }
 
       const timeout = setTimeout(async () => {
@@ -30,14 +53,24 @@ export const createDebouncedIDBStorage = (wait = 2000): StateStorage => {
         await set(name, value)
       }, wait)
 
-      pending.set(name, timeout)
+      pending.set(name, { timeout, value })
     },
+
     removeItem: async (name: string): Promise<void> => {
-      if (pending.has(name)) {
-        clearTimeout(pending.get(name))
+      const existing = pending.get(name)
+      if (existing) {
+        clearTimeout(existing.timeout)
         pending.delete(name)
       }
       await del(name)
+    },
+
+    /**
+     * Flush all pending writes immediately
+     */
+    flush: async (): Promise<void> => {
+      const flushPromises = Array.from(pending.keys()).map(flushItem)
+      await Promise.all(flushPromises)
     },
   }
 }

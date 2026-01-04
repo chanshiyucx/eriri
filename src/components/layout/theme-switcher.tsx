@@ -2,20 +2,22 @@ import { Monitor, Moon, Sun } from 'lucide-react'
 import { useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/style'
-import { applyTheme, useUIStore, type ThemeMode } from '@/store/ui'
+import { useUIStore, type ThemeMode } from '@/store/ui'
 
 export function ThemeSwitcher() {
   const { theme, setTheme } = useUIStore()
 
+  // Listen for system theme changes when in system mode
   useEffect(() => {
-    applyTheme(theme)
+    if (theme !== 'system') return
 
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      const handleChange = () => applyTheme('system')
-      mediaQuery.addEventListener('change', handleChange)
-      return () => mediaQuery.removeEventListener('change', handleChange)
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    const handleChange = () => {
+      // Re-trigger store to apply system theme
+      useUIStore.getState().setTheme('system')
     }
+    mediaQuery.addEventListener('change', handleChange)
+    return () => mediaQuery.removeEventListener('change', handleChange)
   }, [theme])
 
   const themes: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [

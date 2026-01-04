@@ -10,7 +10,8 @@ import {
   scanVideoLibrary,
 } from '@/lib/scanner'
 import { createIDBStorage } from '@/lib/storage'
-import { useTabsStore, type Tab } from '@/store/tabs'
+import { useProgressStore } from '@/store/progress'
+import { useTabsStore } from '@/store/tabs'
 import {
   LibraryType,
   type Author,
@@ -27,6 +28,8 @@ import {
 const MAX_CACHE_SIZE = 30
 
 interface LibraryState {
+  isScanning: boolean
+
   libraries: Record<string, Library>
   comics: Record<string, Comic>
   authors: Record<string, Author>
@@ -52,8 +55,6 @@ interface LibraryState {
   selectedLibraryId: string | null
   setSelectedLibraryId: (id: string | null) => void
 
-  isScanning: boolean
-
   getComicImages: (comicId: string) => Promise<Image[]>
   addComicImages: (comicId: string, images: Image[]) => void
   removeComicImages: (comicId: string) => void
@@ -66,6 +67,41 @@ interface LibraryState {
     filename: string,
     tags: FileTags,
   ) => void
+}
+
+/**
+ * Apply scanned library data to state (DRY helper)
+ * Note: state type is inferred from immer's Draft<LibraryState>
+ */
+function applyScannedLibrary(
+  state: LibraryState,
+  libraryId: string,
+  scannedLibrary: ScannedLibrary,
+) {
+  const { comics = [], authors = [], videos = [] } = scannedLibrary
+
+  // Apply comics
+  state.libraryComics[libraryId] = comics.map((c) => {
+    state.comics[c.id] = c
+    return c.id
+  })
+
+  // Apply videos
+  state.libraryVideos[libraryId] = videos.map((v) => {
+    state.videos[v.id] = v
+    return v.id
+  })
+
+  // Apply authors and their books
+  state.libraryAuthors[libraryId] = authors.map((a) => {
+    const { books = [], ...authorInfo } = a
+    state.authors[a.id] = authorInfo
+    state.authorBooks[a.id] = books.map((b) => {
+      state.books[b.id] = b
+      return b.id
+    })
+    return a.id
+  })
 }
 
 export const useLibraryStore = create<LibraryState>()(
@@ -86,79 +122,19 @@ export const useLibraryStore = create<LibraryState>()(
 
       addLibrary: (library, scannedLibrary) =>
         set((state) => {
-          const { comics = [], authors = [], videos = [] } = scannedLibrary
           state.libraries[library.id] = library
-
-          const comicIds: string[] = []
-          comics.forEach((c) => {
-            state.comics[c.id] = c
-            comicIds.push(c.id)
-          })
-          state.libraryComics[library.id] = comicIds
-
-          const videoIds: string[] = []
-          videos.forEach((v) => {
-            state.videos[v.id] = v
-            videoIds.push(v.id)
-          })
-          state.libraryVideos[library.id] = videoIds
-
-          const authorIds: string[] = []
-          authors.forEach((a) => {
-            const { books = [], ...authorInfo } = a
-            state.authors[a.id] = authorInfo
-            authorIds.push(a.id)
-
-            const bookIds: string[] = []
-            books.forEach((b) => {
-              state.books[b.id] = b
-              bookIds.push(b.id)
-            })
-            state.authorBooks[a.id] = bookIds
-          })
-          state.libraryAuthors[library.id] = authorIds
+          applyScannedLibrary(state, library.id, scannedLibrary)
         }),
 
       updateLibrary: (id, data, scannedLibrary) =>
         set((state) => {
           const library = state.libraries[id]
-          if (library) {
-            Object.assign(library, data)
+          if (!library) return
+          Object.assign(library, data)
+
+          if (scannedLibrary) {
+            applyScannedLibrary(state, id, scannedLibrary)
           }
-
-          if (!scannedLibrary) return
-
-          const { comics = [], authors = [], videos = [] } = scannedLibrary
-          state.libraries[library.id] = library
-
-          const comicIds: string[] = []
-          comics.forEach((c) => {
-            state.comics[c.id] = c
-            comicIds.push(c.id)
-          })
-          state.libraryComics[library.id] = comicIds
-
-          const authorIds: string[] = []
-          authors.forEach((a) => {
-            const { books = [], ...authorInfo } = a
-            state.authors[a.id] = authorInfo
-            authorIds.push(a.id)
-
-            const bookIds: string[] = []
-            books.forEach((b) => {
-              state.books[b.id] = b
-              bookIds.push(b.id)
-            })
-            state.authorBooks[a.id] = bookIds
-          })
-          state.libraryAuthors[library.id] = authorIds
-
-          const videoIds: string[] = []
-          videos.forEach((v) => {
-            state.videos[v.id] = v
-            videoIds.push(v.id)
-          })
-          state.libraryVideos[library.id] = videoIds
         }),
 
       removeLibrary: (id) =>
@@ -170,37 +146,44 @@ export const useLibraryStore = create<LibraryState>()(
             (aId) => state.authorBooks[aId] ?? [],
           )
 
-          const tabsStore = useTabsStore.getState()
-          let tabsToRemove: Tab[] = []
+          const idsToRemove = new Set([...comicIds, ...bookIds])
 
-          comicIds.forEach((cId) => {
+          const progressStore = useProgressStore.getState()
+          const tabsStore = useTabsStore.getState()
+
+          const tabsToRemove = tabsStore.tabs.filter((t) =>
+            idsToRemove.has(t.id),
+          )
+
+          for (const cId of comicIds) {
             delete state.comics[cId]
             delete state.comicImages[cId]
-            tabsToRemove = tabsStore.tabs.filter((t) => t.id === cId)
-          })
+            progressStore.removeComicProgress(cId)
+          }
 
-          authorIds.forEach((aId) => {
+          for (const aId of authorIds) {
             delete state.authors[aId]
             delete state.authorBooks[aId]
-          })
+          }
 
-          videoIds.forEach((vId) => {
-            delete state.videos[vId]
-          })
-
-          bookIds.forEach((bId) => {
+          for (const bId of bookIds) {
             delete state.books[bId]
-            tabsToRemove = tabsStore.tabs.filter((t) => t.id === bId)
-          })
+            progressStore.removeBookProgress(bId)
+          }
+
+          for (const vId of videoIds) {
+            delete state.videos[vId]
+          }
 
           delete state.libraryComics[id]
           delete state.libraryAuthors[id]
           delete state.libraryVideos[id]
           delete state.libraries[id]
+
           tabsToRemove.forEach((t) => tabsStore.removeTab(t.path))
 
           if (state.selectedLibraryId === id) {
-            state.selectedLibraryId = ''
+            state.selectedLibraryId = null
           }
         }),
 
@@ -258,9 +241,9 @@ export const useLibraryStore = create<LibraryState>()(
             scannedLibrary.comics = await scanComicLibrary(lib.path, lib.id)
             const comicIds = scannedLibrary.comics?.map((c) => c.id) ?? []
             set((state) => {
-              comicIds.forEach((comicId) => {
+              for (const comicId of comicIds) {
                 delete state.comicImages[comicId]
-              })
+              }
             })
           }
           get().updateLibrary(id, {}, scannedLibrary)
@@ -275,7 +258,8 @@ export const useLibraryStore = create<LibraryState>()(
         set((state) => {
           const book = state.books[bookId]
           if (book) {
-            Object.assign(book, tags)
+            if (tags.starred !== undefined) book.starred = tags.starred
+            if (tags.deleted !== undefined) book.deleted = tags.deleted
           }
         }),
 
@@ -283,7 +267,8 @@ export const useLibraryStore = create<LibraryState>()(
         set((state) => {
           const comic = state.comics[comicId]
           if (comic) {
-            Object.assign(comic, tags)
+            if (tags.starred !== undefined) comic.starred = tags.starred
+            if (tags.deleted !== undefined) comic.deleted = tags.deleted
           }
         }),
 
@@ -291,16 +276,20 @@ export const useLibraryStore = create<LibraryState>()(
         set((state) => {
           const video = state.videos[videoId]
           if (video) {
-            Object.assign(video, tags)
+            if (tags.starred !== undefined) video.starred = tags.starred
+            if (tags.deleted !== undefined) video.deleted = tags.deleted
           }
         }),
 
       updateComicImageTags: (comicId, filename, tags) =>
         set((state) => {
           const comicImages = state.comicImages[comicId]
+          if (!comicImages) return
+
           const image = comicImages.images.find((i) => i.filename === filename)
           if (image) {
-            Object.assign(image, tags)
+            if (tags.starred !== undefined) image.starred = tags.starred
+            if (tags.deleted !== undefined) image.deleted = tags.deleted
           }
         }),
 
@@ -330,19 +319,14 @@ export const useLibraryStore = create<LibraryState>()(
               timestamp: Date.now(),
             }
 
-            if (Object.keys(state.comicImages).length > MAX_CACHE_SIZE) {
-              const sortedCaches = Object.values(state.comicImages).sort(
-                (a, b) => a.timestamp - b.timestamp,
-              )
-              // Remove surplus + buffer to prevent frequent cleaning
-              const itemsToRemove = sortedCaches.slice(
-                0,
-                sortedCaches.length - MAX_CACHE_SIZE + 5,
-              )
-              itemsToRemove.forEach((item) => {
-                delete state.comicImages[item.comicId]
-              })
-            }
+            const entries = Object.values(state.comicImages)
+            if (entries.length <= MAX_CACHE_SIZE) return
+
+            entries
+              .sort((a, b) => a.timestamp - b.timestamp)
+              .slice(0, entries.length - MAX_CACHE_SIZE + 5)
+              .forEach((item) => delete state.comicImages[item.comicId])
+
             const c = state.comics[comicId]
             if (c) {
               c.pageCount = images.length
@@ -358,8 +342,11 @@ export const useLibraryStore = create<LibraryState>()(
 
       addComicImages: (comicId, images) =>
         set((state) => {
-          const newItem = { comicId, images, timestamp: Date.now() }
-          state.comicImages[comicId] = newItem
+          state.comicImages[comicId] = {
+            comicId,
+            images,
+            timestamp: Date.now(),
+          }
         }),
 
       removeComicImages: (comicId) =>

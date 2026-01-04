@@ -21,7 +21,7 @@ const shouldPair = (
 const getVisibleIndices = (
   startIndex: number,
   images: Image[],
-  viewMode: 'single' | 'double',
+  viewMode: ViewMode,
   containerSize: { width: number; height: number },
 ): number[] => {
   if (startIndex < 0 || startIndex >= images.length) return []
