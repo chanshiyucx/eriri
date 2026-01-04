@@ -6,7 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
-import type { Book, Library } from '@/types/library'
+import type { Author, Book, Library } from '@/types/library'
 import { BookReader } from './book-reader'
 
 interface BookLibraryProps {
@@ -48,7 +48,7 @@ const BookListItem = memo(
                 <span>•</span>
               </>
             )}
-            <span>{(book.size / 1024).toFixed(1)}k</span>{' '}
+            <span>{(book.size / 1024).toFixed(1)}k</span>
           </span>
         </div>
       </Button>
@@ -56,6 +56,31 @@ const BookListItem = memo(
   },
 )
 BookListItem.displayName = 'BookListItem'
+
+interface AuthorListItemProps {
+  author: Author
+  isSelected: boolean
+  onSelect: (id: string) => void
+}
+
+const AuthorListItem = memo(
+  ({ author, isSelected, onSelect }: AuthorListItemProps) => (
+    <Button
+      onClick={() => onSelect(author.id)}
+      className={cn(
+        'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm transition-colors',
+        isSelected ? 'bg-overlay' : 'bg-surface',
+      )}
+    >
+      <Folder className="h-4 w-4 shrink-0" />
+      <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
+        <span className="truncate">{author.name}</span>
+        <span className="text-subtle/60 text-xs">{author.bookCount}</span>
+      </div>
+    </Button>
+  ),
+)
+AuthorListItem.displayName = 'AuthorListItem'
 
 export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
@@ -77,10 +102,15 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
     }),
   )
 
-  const handleSelectAuthor = (id: string) => {
-    if (id === authorId) return
-    updateLibrary(selectedLibrary.id, { status: { authorId: id, bookId: '' } })
-  }
+  const handleSelectAuthor = useCallback(
+    (id: string) => {
+      if (id === authorId) return
+      updateLibrary(selectedLibrary.id, {
+        status: { authorId: id, bookId: '' },
+      })
+    },
+    [selectedLibrary.id, updateLibrary, authorId],
+  )
 
   const handleSelectBook = useCallback(
     (id: string) => {
@@ -89,8 +119,6 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
     },
     [selectedLibrary.id, updateLibrary, authorId, bookId],
   )
-
-  console.log('Render BookLibrary: ', books.length)
 
   return (
     <div className="flex h-full w-full">
@@ -101,22 +129,12 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
         </div>
         <ScrollArea className="h-0 flex-1">
           {authors.map((author) => (
-            <Button
+            <AuthorListItem
               key={author.id}
-              onClick={() => handleSelectAuthor(author.id)}
-              className={cn(
-                'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm transition-colors',
-                authorId === author.id ? 'bg-overlay' : 'bg-surface',
-              )}
-            >
-              <Folder className="h-4 w-4 shrink-0" />
-              <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
-                <span className="truncate">{author.name}</span>
-                <span className="text-subtle/60 text-xs">
-                  {author.bookCount}
-                </span>
-              </div>
-            </Button>
+              author={author}
+              isSelected={authorId === author.id}
+              onSelect={handleSelectAuthor}
+            />
           ))}
         </ScrollArea>
       </div>
@@ -139,7 +157,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
       </div>
 
       {/* Column 3: Preview */}
-      {bookId && <BookReader bookId={bookId} showToc />}
+      {bookId && <BookReader bookId={bookId} showReading />}
     </div>
   )
 }

@@ -3,7 +3,12 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { findLineIndexByOffset, parseBook, type BookContent } from '@/lib/book'
+import {
+  findLineIndexByOffset,
+  parseBook,
+  type BookContent,
+  type Chapter,
+} from '@/lib/book'
 import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -32,16 +37,58 @@ const VIRTUOSO_COMPONENTS = {
   Footer: BookFooter,
 }
 
-interface BookReaderProps {
-  bookId: string
-  showToc?: boolean
+interface TableOfContentsProps {
+  chapters: Chapter[]
+  currentChapterTitle: string
+  isCollapsed: boolean
+  onSelect: (lineIndex: number) => void
 }
 
-const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
+const TableOfContents = memo(
+  ({
+    chapters,
+    currentChapterTitle,
+    isCollapsed,
+    onSelect,
+  }: TableOfContentsProps) => (
+    <div
+      className={cn(
+        'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-all duration-300 ease-in-out',
+        isCollapsed ? '-translate-x-full' : 'translate-x-0',
+      )}
+    >
+      <ScrollArea className="h-full">
+        <div className="pb-12">
+          {chapters.map((chapter, i) => (
+            <div
+              key={i}
+              className={cn(
+                'hover:bg-overlay w-full cursor-pointer truncate px-4 py-2 text-left text-sm',
+                currentChapterTitle === chapter.title && 'bg-overlay text-love',
+              )}
+              onClick={() => onSelect(chapter.lineIndex)}
+            >
+              {chapter.title}
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
+  ),
+)
+TableOfContents.displayName = 'TableOfContents'
+
+interface BookReaderProps {
+  bookId: string
+  showReading?: boolean
+}
+
+const BookReader = memo(({ bookId, showReading = false }: BookReaderProps) => {
   const [content, setContent] = useState<BookContent | null>(null)
   const [currentChapterTitle, setCurrentChapterTitle] = useState<string>('')
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
+  const currentChapterRef = useRef(currentChapterTitle)
 
   const book = useLibraryStore((s) => s.books[bookId])
   const updateBookTags = useLibraryStore((s) => s.updateBookTags)
@@ -51,6 +98,7 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
   const memoizedLines = useMemo(() => content?.lines ?? [], [content])
+  const totalChars = useMemo(() => content?.totalChars ?? 0, [content])
 
   const throttleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestProgressRef = useRef<{
@@ -60,14 +108,14 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
     currentChapterTitle?: string
   } | null>(null)
 
-  // Cleanup throttle on unmount and ensure last update is sent
+  currentChapterRef.current = currentChapterTitle
+
   useEffect(() => {
     return () => {
       if (throttleTimeoutRef.current) {
         clearTimeout(throttleTimeoutRef.current)
         throttleTimeoutRef.current = null
       }
-      // If we have pending progress, flush it immediately
       if (latestProgressRef.current) {
         updateBookProgress(bookId, {
           ...latestProgressRef.current,
@@ -79,7 +127,7 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
   }, [bookId, updateBookProgress])
 
   useEffect(() => {
-    if (!book.path) return
+    if (!book?.path) return
     let mounted = true
     const load = async () => {
       try {
@@ -95,40 +143,22 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
     return () => {
       mounted = false
     }
-  }, [book.path])
+  }, [book?.path])
 
-  useEffect(() => {
-    if (!content || !virtuosoRef.current) return
+  const initialTopIndex = useMemo(() => {
+    if (!content) return 0
+    const progress = useProgressStore.getState().books[bookId]
 
-    const timer = setTimeout(() => {
-      if (!virtuosoRef.current) return
-      const progress = useProgressStore.getState().books[bookId]
-
-      if (progress?.startCharIndex) {
-        const targetLine = findLineIndexByOffset(
-          content.lineStartOffsets,
-          progress.startCharIndex,
-        )
-
-        virtuosoRef.current.scrollToIndex({
-          index: targetLine,
-          align: 'start',
-          behavior: 'auto',
-        })
-      } else if (progress?.percent) {
-        const targetLine = Math.floor(
-          (progress.percent / 100) * content.lines.length,
-        )
-        virtuosoRef.current.scrollToIndex({
-          index: targetLine,
-          align: 'start',
-          behavior: 'auto',
-        })
-      }
-    }, 60)
-
-    return () => clearTimeout(timer)
-  }, [content, bookId, activeTab])
+    if (progress?.startCharIndex) {
+      return findLineIndexByOffset(
+        content.lineStartOffsets,
+        progress.startCharIndex,
+      )
+    } else if (progress?.percent) {
+      return Math.floor((progress.percent / 100) * content.lines.length)
+    }
+    return 0
+  }, [content, bookId])
 
   const toggleToc = useCallback(() => {
     setTocCollapsed((prev) => !prev)
@@ -171,22 +201,19 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
       if (!content) return
 
       const totalLines = content.lines.length
-      // Use the top of visible range as current position for stable restoration
       const currentLine = range.startIndex
       const safeLineIndex = Math.min(Math.max(0, currentLine), totalLines - 1)
-      const percent = (safeLineIndex / (totalLines - 1)) * 100
+      const percent =
+        totalLines > 1 ? (safeLineIndex / (totalLines - 1)) * 100 : 0
 
       const startCharIndex = content.lineStartOffsets[safeLineIndex] ?? 0
-      const totalChars =
-        content.lineStartOffsets[content.lineStartOffsets.length - 1] +
-        (content.lines[content.lines.length - 1]?.length || 0)
 
       const match = content.chapters.findLast(
         (c) => c.lineIndex <= safeLineIndex,
       )
       const chapterTitle = match?.title ?? ''
 
-      if (chapterTitle !== currentChapterTitle) {
+      if (chapterTitle !== currentChapterRef.current) {
         setCurrentChapterTitle(chapterTitle)
       }
 
@@ -209,7 +236,7 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
         throttleTimeoutRef.current = null
       }, 300)
     },
-    [content, currentChapterTitle, bookId, updateBookProgress],
+    [content, bookId, updateBookProgress, totalChars],
   )
 
   const renderItem = useCallback(
@@ -217,46 +244,29 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
     [],
   )
 
-  console.log('Render BookReader: ', book?.title)
+  if (!book) return null
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
-      {showToc && content?.chapters && (
-        <div
-          className={cn(
-            'bg-base absolute top-8 left-0 z-100 flex h-full flex-col transition-all duration-300 ease-in-out',
-            isTocCollapsed ? 'w-0' : 'w-64 border-r',
-          )}
-        >
-          <ScrollArea className="h-0 flex-1">
-            <div className="w-64">
-              {content?.chapters?.map((chapter, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    'hover:bg-overlay w-full cursor-pointer truncate px-4 py-2 text-left text-sm',
-                    currentChapterTitle === chapter.title &&
-                      'bg-overlay text-love',
-                  )}
-                  onClick={() => handleChapterClick(chapter.lineIndex)}
-                >
-                  {chapter.title}
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
+      {content?.chapters && (
+        <TableOfContents
+          chapters={content.chapters}
+          currentChapterTitle={currentChapterTitle}
+          isCollapsed={isTocCollapsed}
+          onSelect={handleChapterClick}
+        />
       )}
 
       <div className="bg-base text-subtle flex h-8 w-full items-center gap-2 border-b px-2 text-xs">
-        {showToc ? (
-          <Button
-            className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
-            onClick={toggleToc}
-          >
-            <SquareMenu className="h-4 w-4" />
-          </Button>
-        ) : (
+        <Button
+          className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
+          onClick={toggleToc}
+          title="展开目录"
+        >
+          <SquareMenu className="h-4 w-4" />
+        </Button>
+
+        {showReading && (
           <Button
             className="h-6 w-6"
             onClick={handleContinueReading}
@@ -285,19 +295,21 @@ const BookReader = memo(({ bookId, showToc = false }: BookReaderProps) => {
         </Button>
 
         <h3 className="flex-1 truncate text-center">
-          {currentChapterTitle || book?.title}
+          {currentChapterTitle || book.title}
         </h3>
       </div>
 
       <Virtuoso
+        key={bookId}
         ref={virtuosoRef}
         className="h-full w-full flex-1"
         data={memoizedLines}
         totalCount={memoizedLines.length}
+        initialTopMostItemIndex={initialTopIndex}
         rangeChanged={handleRangeChanged}
         itemContent={renderItem}
         components={VIRTUOSO_COMPONENTS}
-        increaseViewportBy={{ top: 0, bottom: 400 }}
+        increaseViewportBy={{ top: 0, bottom: 200 }}
       />
     </div>
   )

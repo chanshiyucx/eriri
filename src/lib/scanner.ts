@@ -10,7 +10,7 @@ import {
 
 export async function generateUuid(input: string): Promise<string> {
   try {
-    return await invoke<string>('generate_uuid', {
+    return await invoke<string>('generate_uuid_command', {
       input,
     })
   } catch (error) {
@@ -37,7 +37,6 @@ export async function scanBookLibrary(
   libraryId: string,
 ): Promise<Author[]> {
   try {
-    console.log('Log: scanBookLibrary: ', libraryPath, libraryId)
     return await invoke<Author[]>('scan_book_library', {
       libraryPath,
       libraryId,
@@ -53,7 +52,6 @@ export async function scanComicLibrary(
   libraryId: string,
 ): Promise<Comic[]> {
   try {
-    console.log('Log: scanComicLibrary: ', libraryPath, libraryId)
     return await invoke<Comic[]>('scan_comic_library', {
       libraryPath,
       libraryId,
@@ -69,7 +67,6 @@ export async function scanVideoLibrary(
   libraryId: string,
 ): Promise<Video[]> {
   try {
-    console.log('Log: scanVideoLibrary: ', libraryPath, libraryId)
     return await invoke<Video[]>('scan_video_library', {
       libraryPath,
       libraryId,
@@ -82,7 +79,6 @@ export async function scanVideoLibrary(
 
 export async function scanComicImages(comicPath: string): Promise<Image[]> {
   try {
-    console.log('Log: scanComicImages: ', comicPath)
     return await invoke<Image[]>('scan_comic_images', {
       comicPath,
     })
@@ -94,7 +90,6 @@ export async function scanComicImages(comicPath: string): Promise<Image[]> {
 
 export async function cleanThumbnailCache(): Promise<void> {
   try {
-    console.log('Log: cleanThumbnailCache: ')
     return await invoke('clean_thumbnail_cache', {
       daysOld: 30,
       maxSizeMb: 1024,
@@ -106,7 +101,6 @@ export async function cleanThumbnailCache(): Promise<void> {
 
 export async function getThumbnailStats(): Promise<ImageCache> {
   try {
-    console.log('Log: getThumbnailStats: ')
     const [count, size] = await invoke<[number, number]>(
       'get_thumbnail_stats',
       {},
@@ -123,11 +117,11 @@ export async function setFileTag(
   tags: { starred?: boolean; deleted?: boolean },
 ): Promise<boolean> {
   try {
-    console.log('Log: setFileTag: ', path, tags)
-    return await invoke<boolean>('set_file_tag', {
+    await invoke('set_file_tag', {
       path,
       tags,
     })
+    return true
   } catch (error) {
     console.error('Failed to tag file:', error)
     return false

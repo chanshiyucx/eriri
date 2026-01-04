@@ -314,8 +314,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     [comic, images.length, updateComicProgress, addTab],
   )
 
-  console.log('Render ComicLibrary: ', comics.length)
-
   return (
     <div className="flex h-full w-full">
       {/* Left Column: Comic List */}
