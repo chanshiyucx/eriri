@@ -17,7 +17,6 @@ import {
   useState,
 } from 'react'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { useComicNavigation } from '@/hooks/use-comic-navigation'
 import { throttle } from '@/lib/helper'
 import { setFileTag } from '@/lib/scanner'
@@ -44,36 +43,82 @@ const TableOfContents = memo(function TableOfContents({
   isCollapsed,
   onSelect,
 }: TableOfContentsProps) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to keep visible items in view
+  useEffect(() => {
+    if (isCollapsed || !scrollRef.current) return
+    const firstVisible = Array.from(visibleIndicesSet)[0]
+    if (firstVisible === undefined) return
+
+    const container = scrollRef.current
+    const item = container.querySelector(`[data-index="${firstVisible}"]`)
+    if (item) {
+      item.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'center',
+      })
+    }
+  }, [visibleIndicesSet, isCollapsed])
+
   return (
     <div
       className={cn(
-        'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-all duration-300 ease-in-out',
-        isCollapsed ? '-translate-x-full' : 'translate-x-0',
+        'bg-base absolute right-0 bottom-0 left-0 z-100 border-t',
+        'transition-[transform,opacity] duration-300 ease-in-out',
+        isCollapsed
+          ? 'pointer-events-none translate-y-full opacity-0'
+          : 'translate-y-0 opacity-100',
       )}
     >
-      <ScrollArea className="h-full">
-        <div className="pb-12">
-          {images.map((image, i) => (
-            <div
-              key={i}
-              className={cn(
-                'hover:bg-overlay flex w-full cursor-pointer gap-1 truncate px-4 py-2 text-left text-sm',
-                visibleIndicesSet.has(i) && 'bg-overlay text-love',
-                image.deleted && 'opacity-40',
-              )}
-              onClick={() => onSelect(i)}
-            >
-              <Star
-                className={cn(
-                  'text-love fill-gold/80 h-4 w-4 opacity-0',
-                  image.starred && 'opacity-100',
-                )}
+      <div
+        ref={scrollRef}
+        className="scrollbar-hide flex gap-2 overflow-x-auto p-2"
+      >
+        {images.map((image, i) => (
+          <div
+            key={i}
+            data-index={i}
+            className={cn(
+              'group flex w-[100px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+              visibleIndicesSet.has(i) && 'bg-overlay ring-rose ring-2',
+              image.deleted && 'opacity-40',
+              image.starred ? 'bg-love/50' : 'hover:bg-overlay',
+            )}
+            onClick={() => onSelect(i)}
+          >
+            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
+              <img
+                src={image.thumbnail}
+                alt={image.filename}
+                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                loading="lazy"
+                decoding="async"
               />
-              <span>{image.filename}</span>
+
+              <div className="absolute top-1 right-1 left-1 flex justify-between">
+                <Star
+                  className={cn(
+                    'text-love h-4 w-4',
+                    image.starred
+                      ? 'fill-gold'
+                      : 'opacity-0 group-hover:opacity-100',
+                  )}
+                />
+                <Trash2
+                  className={cn(
+                    'text-love h-4 w-4',
+                    image.deleted
+                      ? 'fill-gold/80'
+                      : 'opacity-0 group-hover:opacity-100',
+                  )}
+                />
+              </div>
             </div>
-          ))}
-        </div>
-      </ScrollArea>
+          </div>
+        ))}
+      </div>
     </div>
   )
 })
