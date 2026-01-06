@@ -371,6 +371,8 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      e.stopPropagation()
+
       const { activeTab, comicPath, images, visibleIndices } = stateRef.current
       if (activeTab !== comicPath) return
 

@@ -62,6 +62,10 @@ export function TopNav() {
   const removeTab = useTabsStore((s) => s.removeTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
+  const stateRef = useRef({ tabs, activeTab })
+  // eslint-disable-next-line react-hooks/refs
+  stateRef.current = { tabs, activeTab }
+
   const updateArrowVisibility = useCallback(() => {
     if (rafIdRef.current !== null) return
 
@@ -115,6 +119,8 @@ export function TopNav() {
     const handleKeyDown = (e: KeyboardEvent) => {
       e.preventDefault()
 
+      const { tabs, activeTab } = stateRef.current
+
       if (e.key === 'Spacebar' || e.key === ' ') {
         toggleImmersive()
       } else if (e.key === 'x' || e.key === 'X') {
@@ -146,7 +152,7 @@ export function TopNav() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [tabs, activeTab, setActiveTab, toggleImmersive, removeTab, toggleSidebar])
+  }, [toggleImmersive, removeTab, toggleSidebar, setActiveTab])
 
   const scroll = useCallback((direction: 'left' | 'right') => {
     const container = scrollContainerRef.current
