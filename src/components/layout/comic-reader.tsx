@@ -205,7 +205,7 @@ interface ComicReaderProps {
 const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
   const [images, setImages] = useState<Image[]>([])
   const [isTocCollapsed, setTocCollapsed] = useState(true)
-  const [viewMode, setViewMode] = useState<ViewMode>('single')
+  const [viewMode, setViewMode] = useState<ViewMode>('double')
 
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
@@ -221,8 +221,9 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
 
   const comic = useLibraryStore((s) => s.comics[comicId])
   const getComicImages = useLibraryStore((s) => s.getComicImages)
-  const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
+  const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
+  const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
   const isImmersive = useUIStore((s) => s.isImmersive)
   const activeTab = useTabsStore((s) => s.activeTab)
 
@@ -406,6 +407,21 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
     [comicId, updateComicImageTags],
   )
 
+  const handleSetComicTags = useCallback(
+    async (tags: FileTags) => {
+      if (!comic) return
+      try {
+        const isSuccess = await setFileTag(comic.path, tags)
+        if (isSuccess) {
+          updateComicTags(comic.id, tags)
+        }
+      } catch (error) {
+        console.error('Failed to set comic tags:', error)
+      }
+    },
+    [comic, updateComicTags],
+  )
+
   const throttledNextRef = useRef<ReturnType<typeof throttle> | null>(null)
   const throttledPrevRef = useRef<ReturnType<typeof throttle> | null>(null)
 
@@ -494,6 +510,32 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
             ) : (
               <Columns2 className="h-4 w-4" />
             )}
+          </Button>
+
+          <Button
+            className="h-6 w-6"
+            onClick={() => void handleSetComicTags({ deleted: !comic.deleted })}
+            title="标记删除"
+          >
+            <Trash2
+              className={cn(
+                'h-4 w-4',
+                comic.deleted && 'text-love fill-gold/80',
+              )}
+            />
+          </Button>
+
+          <Button
+            className={cn('h-6 w-6', comic.deleted && 'hidden')}
+            onClick={() => void handleSetComicTags({ starred: !comic.starred })}
+            title="标记收藏"
+          >
+            <Star
+              className={cn(
+                'h-4 w-4',
+                comic.starred && 'text-love fill-gold/80',
+              )}
+            />
           </Button>
 
           <h3 className="flex flex-1 justify-evenly truncate text-center">
