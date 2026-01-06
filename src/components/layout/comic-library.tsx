@@ -5,7 +5,7 @@ import {
   StepForward,
   Trash2,
 } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -231,7 +231,11 @@ export const ComicLibrary = memo(function ComicLibrary({
   const comicProgress = useProgressStore(useShallow((s) => s.comics))
 
   const { comicId } = selectedLibrary.status
-  const comic = useLibraryStore((s) => (comicId ? s.comics[comicId] : ''))
+  const comic = useLibraryStore((s) => (comicId ? s.comics[comicId] : null))
+
+  const stateRef = useRef({ activeTab, comic })
+  // eslint-disable-next-line react-hooks/refs
+  stateRef.current = { activeTab, comic }
 
   useEffect(() => {
     if (activeTab) return
@@ -263,6 +267,24 @@ export const ComicLibrary = memo(function ComicLibrary({
     },
     [updateComicTags],
   )
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.stopPropagation()
+
+      const { activeTab, comic } = stateRef.current
+      if (activeTab || !comic) return
+
+      if (e.key === 'n' || e.key === 'N') {
+        void handleSetComicTags(comic, { starred: !comic.starred })
+      } else if (e.key === 'j' || e.key === 'J') {
+        void handleSetComicTags(comic, { deleted: !comic.deleted })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSetComicTags])
 
   const handleSetImageTags = useCallback(
     async (image: Image, tags: FileTags) => {
