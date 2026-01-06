@@ -467,12 +467,14 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
             deleted: !secondImage.deleted,
           })
         }
+      } else if (e.key === 't' || e.key === 'T') {
+        void toggleToc()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleViewMode, handleSetImageTags])
+  }, [toggleViewMode, handleSetImageTags, toggleToc])
 
   const visibleIndicesSet = useMemo(
     () => new Set(visibleIndices),
