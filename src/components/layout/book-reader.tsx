@@ -292,7 +292,9 @@ const BookReader = memo(function BookReader({
           onClick={() => void handleSetBookTags({ deleted: !book.deleted })}
           title="标记删除"
         >
-          <Trash2 className={cn('h-4 w-4', book.deleted && 'text-subtle/60')} />
+          <Trash2
+            className={cn('h-4 w-4', book.deleted && 'text-love fill-gold/80')}
+          />
         </Button>
 
         <Button
