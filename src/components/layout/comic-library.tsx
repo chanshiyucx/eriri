@@ -5,12 +5,11 @@ import {
   StepForward,
   Trash2,
 } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCollapse } from '@/hooks/use-collapse'
-import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -23,13 +22,88 @@ import {
   type Library,
 } from '@/types/library'
 
+interface ImageItemProps {
+  index: number
+  image: Image
+  onClick: (index: number) => void
+  onTags: (image: Image, tags: FileTags) => void
+}
+
+const ImageItem = memo(function ImageItem({
+  index,
+  image,
+  onClick,
+  onTags,
+}: ImageItemProps) {
+  return (
+    <div
+      data-index={index}
+      className={cn(
+        'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+        image.deleted && 'opacity-40',
+        image.starred ? 'bg-love/50' : 'hover:bg-overlay',
+      )}
+      onClick={() => onClick(index)}
+    >
+      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
+        <img
+          src={image.thumbnail}
+          alt={image.filename}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+          decoding="async"
+        />
+
+        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
+          <Button
+            className="h-6 w-6 bg-transparent hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation()
+              void onTags(image, { starred: !image.starred })
+            }}
+          >
+            <Star
+              className={cn(
+                'text-love h-5 w-5',
+                image.starred
+                  ? 'fill-gold'
+                  : 'opacity-0 group-hover:opacity-100',
+              )}
+            />
+          </Button>
+
+          <Button
+            className="h-6 w-6 bg-transparent hover:bg-transparent"
+            onClick={(e) => {
+              e.stopPropagation()
+              void onTags(image, { deleted: !image.deleted })
+            }}
+          >
+            <Trash2
+              className={cn(
+                'text-love h-5 w-5',
+                image.deleted
+                  ? 'fill-gold/80'
+                  : 'opacity-0 group-hover:opacity-100',
+              )}
+            />
+          </Button>
+        </div>
+      </div>
+      <div className="truncate text-center text-sm transition-colors">
+        {image.filename}
+      </div>
+    </div>
+  )
+})
+
 interface ComicItemProps {
   index: number
   comic: Comic
   isSelected: boolean
   progress?: { percent: number }
   onClick: (id: string) => void
-  onTags: (comic: Comic, tags: FileTags) => Promise<void>
+  onTags: (comic: Comic, tags: FileTags) => void
 }
 
 const ComicItem = memo(function ComicItem({
@@ -125,81 +199,6 @@ const ComicItem = memo(function ComicItem({
   )
 })
 
-interface ImageItemProps {
-  index: number
-  image: Image
-  onClick: (index: number) => void
-  onTags: (image: Image, tags: FileTags) => Promise<void>
-}
-
-const ImageItem = memo(function ImageItem({
-  index,
-  image,
-  onClick,
-  onTags,
-}: ImageItemProps) {
-  return (
-    <div
-      data-index={index}
-      className={cn(
-        'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
-        image.deleted && 'opacity-40',
-        image.starred ? 'bg-love/50' : 'hover:bg-overlay',
-      )}
-      onClick={() => onClick(index)}
-    >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
-        <img
-          src={image.thumbnail}
-          alt={image.filename}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-          decoding="async"
-        />
-
-        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
-          <Button
-            className="h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(image, { starred: !image.starred })
-            }}
-          >
-            <Star
-              className={cn(
-                'text-love h-5 w-5',
-                image.starred
-                  ? 'fill-gold'
-                  : 'opacity-0 group-hover:opacity-100',
-              )}
-            />
-          </Button>
-
-          <Button
-            className="h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(image, { deleted: !image.deleted })
-            }}
-          >
-            <Trash2
-              className={cn(
-                'text-love h-5 w-5',
-                image.deleted
-                  ? 'fill-gold/80'
-                  : 'opacity-0 group-hover:opacity-100',
-              )}
-            />
-          </Button>
-        </div>
-      </div>
-      <div className="truncate text-center text-sm transition-colors">
-        {image.filename}
-      </div>
-    </div>
-  )
-})
-
 interface ComicLibraryProps {
   selectedLibrary: Library
 }
@@ -207,10 +206,8 @@ interface ComicLibraryProps {
 export const ComicLibrary = memo(function ComicLibrary({
   selectedLibrary,
 }: ComicLibraryProps) {
-  const [images, setImages] = useState<Image[]>([])
   const { collapsed, setCollapsed } = useCollapse()
 
-  const isScanning = useLibraryStore((s) => s.isScanning)
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
@@ -232,38 +229,24 @@ export const ComicLibrary = memo(function ComicLibrary({
 
   const { comicId } = selectedLibrary.status
   const comic = useLibraryStore((s) => (comicId ? s.comics[comicId] : null))
+  const images = useLibraryStore(
+    (s) => s.comicImages[comicId ?? '']?.images ?? [],
+  )
 
   const stateRef = useRef({ activeTab, comic })
   // eslint-disable-next-line react-hooks/refs
   stateRef.current = { activeTab, comic }
 
   useEffect(() => {
-    if (activeTab) return
-    let isMounted = true
-    const load = async () => {
-      if (!comicId) return
-      setImages([])
-      const res = await getComicImages(comicId)
-      if (isMounted) {
-        setImages(res)
-      }
+    if (activeTab || !comicId) return
+    if (images.length === 0) {
+      void getComicImages(comicId)
     }
-    void load()
-    return () => {
-      isMounted = false
-    }
-  }, [comicId, getComicImages, activeTab, isScanning])
+  }, [comicId, getComicImages, activeTab, images.length])
 
   const handleSetComicTags = useCallback(
-    async (comic: Comic, tags: FileTags) => {
-      try {
-        const isSuccess = await setFileTag(comic.path, tags)
-        if (isSuccess) {
-          updateComicTags(comic.id, tags)
-        }
-      } catch (error) {
-        console.error('Failed to set comic tags:', error)
-      }
+    (comic: Comic, tags: FileTags) => {
+      void updateComicTags(comic.id, tags)
     },
     [updateComicTags],
   )
@@ -287,21 +270,9 @@ export const ComicLibrary = memo(function ComicLibrary({
   }, [handleSetComicTags])
 
   const handleSetImageTags = useCallback(
-    async (image: Image, tags: FileTags) => {
-      try {
-        if (!comic) return
-        const isSuccess = await setFileTag(image.path, tags)
-        if (isSuccess) {
-          updateComicImageTags(comic.id, image.filename, tags)
-          setImages((prev) =>
-            prev.map((img) =>
-              img.filename === image.filename ? { ...img, ...tags } : img,
-            ),
-          )
-        }
-      } catch (error) {
-        console.error('Failed to set image tags:', error)
-      }
+    (image: Image, tags: FileTags) => {
+      if (!comic) return
+      void updateComicImageTags(comic.id, image.filename, tags)
     },
     [updateComicImageTags, comic],
   )
