@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { createDebouncedIDBStorage } from '@/lib/storage'
+import { createDebouncedTauriFileStorage } from '@/lib/storage'
 
 export interface ComicProgress {
   current: number
@@ -55,8 +55,10 @@ export const useProgressStore = create<ProgressState>()(
         }),
     })),
     {
-      name: 'eriri-progress-storage',
-      storage: createJSONStorage(() => createDebouncedIDBStorage(2000)),
+      name: 'progress',
+      storage: createJSONStorage(() =>
+        createDebouncedTauriFileStorage('progress', 2000),
+      ),
     },
   ),
 )

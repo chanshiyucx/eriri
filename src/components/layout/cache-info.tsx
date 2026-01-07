@@ -1,9 +1,10 @@
 import { ask, open as openDialog } from '@tauri-apps/plugin-dialog'
-import { FolderOpen, Settings, Trash2 } from 'lucide-react'
+import { FolderOpen, Trash2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
-  cleanThumbnailCache,
+  cleanAllThumbnailCache,
+  cleanExpiredThumbnailCache,
   getCacheDir,
   getThumbnailStats,
   openPathNative,
@@ -28,6 +29,7 @@ export function CacheInfo() {
     const stats = await getThumbnailStats()
     setCache(stats)
     const dir = await getCacheDir()
+    console.log('dir---', dir)
     setCacheDirState(dir)
   }
 
@@ -36,15 +38,20 @@ export function CacheInfo() {
   }, [])
 
   const handleCleanCache = async () => {
-    const yes = await ask('确认清理缩略图缓存？', {
+    const cleanAll = await ask('选择清理过期或清理全部缓存。', {
       title: '清理缓存',
-      kind: 'warning',
+      kind: 'info',
+      okLabel: '清理全部',
+      cancelLabel: '清理过期',
     })
-    if (!yes) return
 
     setIsLoading(true)
     try {
-      await cleanThumbnailCache()
+      if (cleanAll) {
+        await cleanAllThumbnailCache()
+      } else {
+        await cleanExpiredThumbnailCache()
+      }
       await loadData()
     } catch (error) {
       console.error('Failed to clean cache:', error)
@@ -53,25 +60,41 @@ export function CacheInfo() {
     }
   }
 
-  const handleSetCacheDir = async () => {
+  const selectAndSetCacheDir = async (title: string) => {
     try {
       const selected = await openDialog({
         directory: true,
         multiple: false,
         recursive: true,
-        title: 'Select Cache Directory',
+        title,
       })
       if (!selected || typeof selected !== 'string') return
 
-      await setCacheDir(selected)
-      await loadData()
+      if (selected !== cacheDir) {
+        await setCacheDir(selected)
+        window.location.reload()
+      }
     } catch (error) {
       console.error('Failed to set cache dir:', error)
     }
   }
 
-  const handleOpenCacheDir = async () => {
-    if (cacheDir) {
+  const handleCacheDir = async () => {
+    if (!cacheDir) {
+      await selectAndSetCacheDir('选择缓存目录')
+      return
+    }
+
+    const wantChange = await ask('选择打开或更换缓存目录。', {
+      title: '缓存目录',
+      kind: 'info',
+      okLabel: '更换',
+      cancelLabel: '打开',
+    })
+
+    if (wantChange) {
+      await selectAndSetCacheDir('更换缓存目录')
+    } else {
       await openPathNative(cacheDir)
     }
   }
@@ -84,26 +107,14 @@ export function CacheInfo() {
       </div>
       <Button
         onClick={() => {
-          void handleSetCacheDir()
+          void handleCacheDir()
         }}
         disabled={isLoading}
         className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
-        title="设置缓存目录"
+        title={cacheDir ? '打开/更换缓存目录' : '设置缓存目录'}
       >
-        <Settings className="h-4 w-4" />
+        <FolderOpen className="h-4 w-4" />
       </Button>
-      {cacheDir && (
-        <Button
-          onClick={() => {
-            void handleOpenCacheDir()
-          }}
-          disabled={isLoading}
-          className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
-          title="打开缓存目录"
-        >
-          <FolderOpen className="h-4 w-4" />
-        </Button>
-      )}
       <Button
         onClick={() => {
           void handleCleanCache()

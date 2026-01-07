@@ -5,7 +5,10 @@ import {
   subscribeWithSelector,
 } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { createIDBStorage } from '@/lib/storage'
+import { createTauriFileStorage } from '@/lib/storage'
+
+// Stable storage instance for async persistence
+const uiStorage = createTauriFileStorage('ui')
 
 export type ThemeMode = 'light' | 'dark' | 'system'
 
@@ -52,8 +55,8 @@ export const useUIStore = create<UIState>()(
         setTheme: (theme) => set({ theme }),
       })),
       {
-        name: 'eriri-ui-storage',
-        storage: createJSONStorage(() => createIDBStorage()),
+        name: 'ui',
+        storage: createJSONStorage(() => uiStorage),
         onRehydrateStorage: () => (state) => {
           if (state?.theme) {
             applyTheme(state.theme)

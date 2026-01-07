@@ -10,7 +10,7 @@ import {
   scanVideoLibrary,
   setFileTag,
 } from '@/lib/scanner'
-import { createIDBStorage } from '@/lib/storage'
+import { createTauriFileStorage } from '@/lib/storage'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import {
@@ -25,6 +25,9 @@ import {
   type ScannedLibrary,
   type Video,
 } from '@/types/library'
+
+// Stable storage instance for async persistence
+const libraryStorage = createTauriFileStorage('library')
 
 const MAX_CACHE_SIZE = 30
 
@@ -372,12 +375,12 @@ export const useLibraryStore = create<LibraryState>()(
         }),
     })),
     {
-      name: 'eriri-library-storage',
-      storage: createJSONStorage(() => createIDBStorage()),
+      name: 'library',
+      storage: createJSONStorage(() => libraryStorage),
       partialize: (state) => {
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { isScanning, ...persistedState } = state
-        return persistedState
+        const { isScanning, ...rest } = state
+        return rest
       },
     },
   ),

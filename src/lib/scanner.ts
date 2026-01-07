@@ -88,14 +88,25 @@ export async function scanComicImages(comicPath: string): Promise<Image[]> {
   }
 }
 
-export async function cleanThumbnailCache(): Promise<void> {
+export async function cleanExpiredThumbnailCache(): Promise<void> {
   try {
-    return await invoke('clean_thumbnail_cache', {
+    await invoke('clean_thumbnail_cache', {
       daysOld: 30,
       maxSizeMb: 1024,
     })
   } catch (error) {
-    console.error('Failed to clean thumbnail cache:', error)
+    console.error('Failed to clean expired thumbnail cache:', error)
+  }
+}
+
+export async function cleanAllThumbnailCache(): Promise<void> {
+  try {
+    await invoke('clean_thumbnail_cache', {
+      daysOld: 0,
+      maxSizeMb: 0,
+    })
+  } catch (error) {
+    console.error('Failed to clean all thumbnail cache:', error)
   }
 }
 

@@ -1,76 +1,112 @@
-import { del, get, set } from 'idb-keyval'
+import { invoke } from '@tauri-apps/api/core'
 import type { StateStorage } from 'zustand/middleware'
 
-export const createIDBStorage = (): StateStorage => ({
-  getItem: async (name: string): Promise<string | null> => {
-    return (await get<string>(name)) ?? null
+/**
+ * Create a Tauri file-based storage adapter for Zustand persistence.
+ * Stores data in cache_dir/store/{storeName}.json
+ *
+ * If cache_dir is not configured, getItem returns null (store uses defaults),
+ * and setItem/removeItem are no-ops.
+ */
+export const createTauriFileStorage = (storeName: string): StateStorage => ({
+  getItem: async (): Promise<string | null> => {
+    try {
+      return await invoke<string | null>('read_store_data', { key: storeName })
+    } catch {
+      return null
+    }
   },
-  setItem: async (name: string, value: string): Promise<void> => {
-    await set(name, value)
+  setItem: async (_name: string, value: string): Promise<void> => {
+    try {
+      await invoke('write_store_data', { key: storeName, data: value })
+    } catch {
+      // Silently fail if cache dir not configured
+    }
   },
-  removeItem: async (name: string): Promise<void> => {
-    await del(name)
+  removeItem: async (): Promise<void> => {
+    try {
+      await invoke('remove_store_data', { key: storeName })
+    } catch {
+      // Silently fail if cache dir not configured
+    }
   },
 })
 
-interface DebouncedStorage extends StateStorage {
-  flush: () => Promise<void>
-}
+/**
+ * Create a debounced Tauri file storage adapter for high-frequency writes.
+ * Batches writes to reduce disk I/O.
+ */
+export const createDebouncedTauriFileStorage = (
+  storeName: string,
+  wait = 2000,
+): StateStorage => {
+  let pending: {
+    timeout: ReturnType<typeof setTimeout>
+    value: string
+  } | null = null
 
-export const createDebouncedIDBStorage = (wait = 2000): DebouncedStorage => {
-  const pending = new Map<
-    string,
-    { timeout: ReturnType<typeof setTimeout>; value: string }
-  >()
-
-  const flushItem = async (name: string) => {
-    const item = pending.get(name)
-    if (item) {
-      clearTimeout(item.timeout)
-      pending.delete(name)
-      await set(name, item.value)
+  const flush = async () => {
+    if (pending) {
+      clearTimeout(pending.timeout)
+      const value = pending.value
+      pending = null
+      try {
+        await invoke('write_store_data', { key: storeName, data: value })
+      } catch {
+        // Silently fail if cache dir not configured
+      }
     }
   }
 
+  // Flush on page unload to prevent data loss
+  if (typeof window !== 'undefined') {
+    window.addEventListener('beforeunload', () => {
+      void flush()
+    })
+  }
+
   return {
-    getItem: async (name: string): Promise<string | null> => {
+    getItem: async (): Promise<string | null> => {
       // Return pending value if exists (for consistency)
-      const pendingItem = pending.get(name)
-      if (pendingItem) {
-        return pendingItem.value
+      if (pending) {
+        return pending.value
       }
-      return (await get<string>(name)) ?? null
+      try {
+        return await invoke<string | null>('read_store_data', {
+          key: storeName,
+        })
+      } catch {
+        return null
+      }
     },
 
-    setItem: (name: string, value: string): void => {
-      const existing = pending.get(name)
-      if (existing) {
-        clearTimeout(existing.timeout)
+    setItem: (_name: string, value: string): void => {
+      if (pending) {
+        clearTimeout(pending.timeout)
       }
 
       const timeout = setTimeout(async () => {
-        pending.delete(name)
-        await set(name, value)
+        pending = null
+        try {
+          await invoke('write_store_data', { key: storeName, data: value })
+        } catch {
+          // Silently fail if cache dir not configured
+        }
       }, wait)
 
-      pending.set(name, { timeout, value })
+      pending = { timeout, value }
     },
 
-    removeItem: async (name: string): Promise<void> => {
-      const existing = pending.get(name)
-      if (existing) {
-        clearTimeout(existing.timeout)
-        pending.delete(name)
+    removeItem: async (): Promise<void> => {
+      if (pending) {
+        clearTimeout(pending.timeout)
+        pending = null
       }
-      await del(name)
-    },
-
-    /**
-     * Flush all pending writes immediately
-     */
-    flush: async (): Promise<void> => {
-      const flushPromises = Array.from(pending.keys()).map(flushItem)
-      await Promise.all(flushPromises)
+      try {
+        await invoke('remove_store_data', { key: storeName })
+      } catch {
+        // Silently fail if cache dir not configured
+      }
     },
   }
 }
