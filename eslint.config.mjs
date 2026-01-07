@@ -6,7 +6,13 @@ import tseslint from 'typescript-eslint'
 
 export default [
   {
-    ignores: ['out/**', 'dist/**', 'node_modules/**', '**/*.d.ts'],
+    ignores: [
+      'out/**',
+      'dist/**',
+      'node_modules/**',
+      'src-tauri/**',
+      '**/*.d.ts',
+    ],
   },
 
   js.configs.recommended,
