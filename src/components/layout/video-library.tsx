@@ -108,9 +108,7 @@ export const VideoLibrary = memo(function VideoLibrary({
   )
 
   const { videoId } = selectedLibrary.status
-  const video = useLibraryStore((s) =>
-    videoId ? s.videos[videoId] : undefined,
-  )
+  const video = useLibraryStore((s) => (videoId ? s.videos[videoId] : null))
 
   const stateRef = useRef({ video })
   // eslint-disable-next-line react-hooks/refs

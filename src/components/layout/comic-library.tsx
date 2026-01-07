@@ -271,10 +271,10 @@ export const ComicLibrary = memo(function ComicLibrary({
 
   const handleSetImageTags = useCallback(
     (image: Image, tags: FileTags) => {
-      if (!comic) return
-      void updateComicImageTags(comic.id, image.filename, tags)
+      if (!comicId) return
+      void updateComicImageTags(comicId, image.filename, tags)
     },
-    [updateComicImageTags, comic],
+    [updateComicImageTags, comicId],
   )
 
   const handleSelectComic = useCallback(

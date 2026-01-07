@@ -90,7 +90,7 @@ interface BookReaderProps {
   showReading?: boolean
 }
 
-const BookReader = memo(function BookReader({
+export const BookReader = memo(function BookReader({
   bookId,
   showReading = false,
 }: BookReaderProps) {
@@ -140,7 +140,7 @@ const BookReader = memo(function BookReader({
   }, [bookId, updateBookProgress])
 
   useEffect(() => {
-    if (!book?.path) return
+    if (!book.path) return
     let mounted = true
     const load = async () => {
       try {
@@ -156,7 +156,7 @@ const BookReader = memo(function BookReader({
     return () => {
       mounted = false
     }
-  }, [book?.path])
+  }, [book.path])
 
   const initialTopIndex = useMemo(() => {
     if (!content) return 0
@@ -199,7 +199,7 @@ const BookReader = memo(function BookReader({
     (tags: FileTags) => {
       void updateBookTags(book.id, tags)
     },
-    [updateBookTags, book],
+    [updateBookTags, book.id],
   )
 
   const handleRangeChanged = useCallback(
@@ -255,7 +255,7 @@ const BookReader = memo(function BookReader({
       e.stopPropagation()
 
       const { activeTab, book } = stateRef.current
-      if (activeTab !== book?.path) return
+      if (activeTab !== book.path) return
 
       if (e.key === 't' || e.key === 'T') {
         toggleToc()
@@ -342,5 +342,3 @@ const BookReader = memo(function BookReader({
     </div>
   )
 })
-
-export { BookReader }

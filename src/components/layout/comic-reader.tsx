@@ -197,7 +197,9 @@ interface ComicReaderProps {
   comicId: string
 }
 
-const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
+export const ComicReader = memo(function ComicReader({
+  comicId,
+}: ComicReaderProps) {
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('double')
 
@@ -379,10 +381,9 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
 
   const handleSetComicTags = useCallback(
     (tags: FileTags) => {
-      if (!comic) return
-      void updateComicTags(comic.id, tags)
+      void updateComicTags(comicId, tags)
     },
-    [comic, updateComicTags],
+    [comicId, updateComicTags],
   )
 
   const throttledNextRef = useRef<ReturnType<typeof throttle> | null>(null)
@@ -563,5 +564,3 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
     </div>
   )
 })
-
-export { ComicReader }
