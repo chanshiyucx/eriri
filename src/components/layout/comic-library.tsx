@@ -203,6 +203,8 @@ interface ComicLibraryProps {
   selectedLibrary: Library
 }
 
+const EMPTY_ARRAY: Image[] = []
+
 export const ComicLibrary = memo(function ComicLibrary({
   selectedLibrary,
 }: ComicLibraryProps) {
@@ -230,7 +232,7 @@ export const ComicLibrary = memo(function ComicLibrary({
   const { comicId } = selectedLibrary.status
   const comic = useLibraryStore((s) => (comicId ? s.comics[comicId] : null))
   const images = useLibraryStore(
-    (s) => s.comicImages[comicId ?? '']?.images ?? [],
+    (s) => s.comicImages[comicId ?? '']?.images ?? EMPTY_ARRAY,
   )
 
   const stateRef = useRef({ activeTab, comic })
