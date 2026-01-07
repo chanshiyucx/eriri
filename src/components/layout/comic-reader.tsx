@@ -19,7 +19,6 @@ import {
 import { Button } from '@/components/ui/button'
 import { useComicNavigation } from '@/hooks/use-comic-navigation'
 import { throttle } from '@/lib/helper'
-import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -68,7 +67,7 @@ const TableOfContents = memo(function TableOfContents({
         'bg-base absolute right-0 bottom-0 left-0 z-100 border-t',
         'transition-[transform,opacity] duration-300 ease-in-out',
         isCollapsed
-          ? 'pointer-events-none translate-y-full opacity-0'
+          ? 'translate-y-full opacity-0'
           : 'translate-y-0 opacity-100',
       )}
     >
@@ -101,17 +100,13 @@ const TableOfContents = memo(function TableOfContents({
                 <Star
                   className={cn(
                     'text-love h-4 w-4',
-                    image.starred
-                      ? 'fill-gold'
-                      : 'opacity-0 group-hover:opacity-100',
+                    image.starred ? 'fill-gold' : 'opacity-0',
                   )}
                 />
                 <Trash2
                   className={cn(
                     'text-love h-4 w-4',
-                    image.deleted
-                      ? 'fill-gold/80'
-                      : 'opacity-0 group-hover:opacity-100',
+                    image.deleted ? 'fill-gold/80' : 'opacity-0',
                   )}
                 />
               </div>
@@ -126,7 +121,7 @@ const TableOfContents = memo(function TableOfContents({
 interface ComicImageProps {
   image: Image
   position?: ImagePosition
-  onTags: (image: Image, tags: FileTags) => Promise<void>
+  onTags: (image: Image, tags: FileTags) => void
 }
 
 const ComicImage = memo(function ComicImage({
@@ -203,7 +198,6 @@ interface ComicReaderProps {
 }
 
 const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
-  const [images, setImages] = useState<Image[]>([])
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('double')
 
@@ -220,6 +214,7 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
   const preloadCache = useRef<Map<string, HTMLImageElement>>(new Map())
 
   const comic = useLibraryStore((s) => s.comics[comicId])
+  const images = useLibraryStore((s) => s.comicImages[comicId]?.images ?? [])
   const getComicImages = useLibraryStore((s) => s.getComicImages)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
@@ -235,17 +230,14 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
       initialIndex: 0,
     })
 
-  const comicPath = comic?.path ?? ''
-
   const stateRef = useRef({
     activeTab,
-    comicPath,
+    comic,
     images,
     visibleIndices,
   })
 
-  // Sync ref update - intentionally no useEffect as this is synchronous
-  stateRef.current = { activeTab, comicPath, images, visibleIndices }
+  stateRef.current = { activeTab, comic, images, visibleIndices }
 
   useLayoutEffect(() => {
     const el = containerRef.current
@@ -268,23 +260,13 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
   }, [])
 
   useEffect(() => {
-    let mounted = true
-
-    const load = async () => {
-      try {
-        const data = await getComicImages(comicId)
-        if (mounted) {
-          setImages(data)
-        }
-      } catch (e) {
-        console.error('Failed to load comic images', e)
-      }
+    if (images.length === 0) {
+      void getComicImages(comicId)
     }
+  }, [comicId, images.length, getComicImages])
 
-    void load()
-
+  useEffect(() => {
     return () => {
-      mounted = false
       if (throttleTimeoutRef.current) {
         clearTimeout(throttleTimeoutRef.current)
         throttleTimeoutRef.current = null
@@ -297,18 +279,18 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
         latestProgressRef.current = null
       }
     }
-  }, [comicId, getComicImages, updateComicProgress])
+  }, [comicId, updateComicProgress])
 
   useEffect(() => {
     if (!images.length) return
-    if (activeTab !== comicPath) return
+    if (activeTab !== comic?.path) return
 
     const progress = useProgressStore.getState().comics[comicId]
     if (progress?.current !== undefined) {
       const targetIndex = Math.min(progress.current, images.length - 1)
       jumpTo(targetIndex)
     }
-  }, [images.length, comicPath, comicId, jumpTo, activeTab])
+  }, [images.length, comic?.path, comicId, jumpTo, activeTab])
 
   useEffect(() => {
     if (!images.length) return
@@ -389,35 +371,16 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
   )
 
   const handleSetImageTags = useCallback(
-    async (image: Image, tags: FileTags) => {
-      try {
-        const isSuccess = await setFileTag(image.path, tags)
-        if (isSuccess) {
-          updateComicImageTags(comicId, image.filename, tags)
-          setImages((prev) =>
-            prev.map((img) =>
-              img.filename === image.filename ? { ...img, ...tags } : img,
-            ),
-          )
-        }
-      } catch (error) {
-        console.error('Failed to set image tag:', error)
-      }
+    (image: Image, tags: FileTags) => {
+      void updateComicImageTags(comicId, image.filename, tags)
     },
     [comicId, updateComicImageTags],
   )
 
   const handleSetComicTags = useCallback(
-    async (tags: FileTags) => {
+    (tags: FileTags) => {
       if (!comic) return
-      try {
-        const isSuccess = await setFileTag(comic.path, tags)
-        if (isSuccess) {
-          updateComicTags(comic.id, tags)
-        }
-      } catch (error) {
-        console.error('Failed to set comic tags:', error)
-      }
+      void updateComicTags(comic.id, tags)
     },
     [comic, updateComicTags],
   )
@@ -434,8 +397,8 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
     const handleKeyDown = (e: KeyboardEvent) => {
       e.stopPropagation()
 
-      const { activeTab, comicPath, images, visibleIndices } = stateRef.current
-      if (activeTab !== comicPath) return
+      const { activeTab, comic, images, visibleIndices } = stateRef.current
+      if (activeTab !== comic?.path) return
 
       if (e.key === 'ArrowUp') {
         throttledPrevRef.current?.()
@@ -469,12 +432,16 @@ const ComicReader = memo(function ComicReader({ comicId }: ComicReaderProps) {
         }
       } else if (e.key === 't' || e.key === 'T') {
         void toggleToc()
+      } else if (e.key === 'c' || e.key === 'C') {
+        void handleSetComicTags({ deleted: !comic.deleted })
+      } else if (e.key === 'v' || e.key === 'V') {
+        void handleSetComicTags({ starred: !comic.starred })
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleViewMode, handleSetImageTags, toggleToc])
+  }, [toggleViewMode, handleSetImageTags, toggleToc, handleSetComicTags])
 
   const visibleIndicesSet = useMemo(
     () => new Set(visibleIndices),

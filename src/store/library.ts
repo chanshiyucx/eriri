@@ -8,6 +8,7 @@ import {
   scanComicImages,
   scanComicLibrary,
   scanVideoLibrary,
+  setFileTag,
 } from '@/lib/scanner'
 import { createIDBStorage } from '@/lib/storage'
 import { useProgressStore } from '@/store/progress'
@@ -59,14 +60,14 @@ interface LibraryState {
   addComicImages: (comicId: string, images: Image[]) => void
   removeComicImages: (comicId: string) => void
 
-  updateBookTags: (bookId: string, tags: FileTags) => void
-  updateComicTags: (comicId: string, tags: FileTags) => void
-  updateVideoTags: (videoId: string, tags: FileTags) => void
+  updateBookTags: (bookId: string, tags: FileTags) => Promise<void>
+  updateComicTags: (comicId: string, tags: FileTags) => Promise<void>
+  updateVideoTags: (videoId: string, tags: FileTags) => Promise<void>
   updateComicImageTags: (
     comicId: string,
     filename: string,
     tags: FileTags,
-  ) => void
+  ) => Promise<void>
 }
 
 /**
@@ -106,6 +107,7 @@ function applyScannedLibrary(
 export const useLibraryStore = create<LibraryState>()(
   persist(
     immer((set, get) => ({
+      isScanning: false,
       libraries: {},
       comics: {},
       authors: {},
@@ -117,7 +119,6 @@ export const useLibraryStore = create<LibraryState>()(
       authorBooks: {},
       comicImages: {},
       selectedLibraryId: null,
-      isScanning: false,
 
       addLibrary: (library, scannedLibrary) =>
         set((state) => {
@@ -145,11 +146,10 @@ export const useLibraryStore = create<LibraryState>()(
             (aId) => state.authorBooks[aId] ?? [],
           )
 
-          const idsToRemove = new Set([...comicIds, ...bookIds])
-
           const progressStore = useProgressStore.getState()
           const tabsStore = useTabsStore.getState()
 
+          const idsToRemove = new Set([...comicIds, ...bookIds])
           const tabsToRemove = tabsStore.tabs.filter((t) =>
             idsToRemove.has(t.id),
           )
@@ -187,41 +187,37 @@ export const useLibraryStore = create<LibraryState>()(
         }),
 
       importLibrary: async (path) => {
-        set({ isScanning: true })
-        try {
-          const libraryId = await generateUuid(path)
-          const existingLibrary = get().libraries[libraryId]
-          if (existingLibrary) return
+        const libraryId = await generateUuid(path)
+        const existingLibrary = get().libraries[libraryId]
+        if (existingLibrary) return
 
-          const type = await getLibraryType(path)
-          const libraryName = path.split('/').pop() ?? 'Untitled Library'
-          const library: Library = {
-            id: libraryId,
-            name: libraryName,
-            path,
-            type,
-            createdAt: Date.now(),
-            status: {
-              comicId: '',
-              authorId: '',
-              bookId: '',
-              videoId: '',
-            },
-          }
-
-          const scannedLibrary: ScannedLibrary = {}
-          if (type === LibraryType.book) {
-            scannedLibrary.authors = await scanBookLibrary(path, libraryId)
-          } else if (type === LibraryType.video) {
-            scannedLibrary.videos = await scanVideoLibrary(path, libraryId)
-          } else {
-            scannedLibrary.comics = await scanComicLibrary(path, libraryId)
-          }
-
-          get().addLibrary(library, scannedLibrary)
-        } finally {
-          set({ isScanning: false })
+        const type = await getLibraryType(path)
+        const libraryName = path.split('/').pop() ?? 'Untitled Library'
+        const library: Library = {
+          id: libraryId,
+          name: libraryName,
+          path,
+          type,
+          createdAt: Date.now(),
+          status: {
+            comicId: '',
+            authorId: '',
+            bookId: '',
+            videoId: '',
+          },
         }
+
+        set({ isScanning: true })
+        const scannedLibrary: ScannedLibrary = {}
+        if (type === LibraryType.book) {
+          scannedLibrary.authors = await scanBookLibrary(path, libraryId)
+        } else if (type === LibraryType.video) {
+          scannedLibrary.videos = await scanVideoLibrary(path, libraryId)
+        } else {
+          scannedLibrary.comics = await scanComicLibrary(path, libraryId)
+        }
+        get().addLibrary(library, scannedLibrary)
+        set({ isScanning: false })
       },
 
       refreshLibrary: async (id) => {
@@ -229,67 +225,95 @@ export const useLibraryStore = create<LibraryState>()(
         if (!lib) return
 
         set({ isScanning: true })
-        try {
-          const scannedLibrary: ScannedLibrary = {}
-          if (lib.type === LibraryType.book) {
-            scannedLibrary.authors = await scanBookLibrary(lib.path, lib.id)
-          } else if (lib.type === LibraryType.video) {
-            scannedLibrary.videos = await scanVideoLibrary(lib.path, lib.id)
-          } else {
-            scannedLibrary.comics = await scanComicLibrary(lib.path, lib.id)
-            const comicIds = scannedLibrary.comics?.map((c) => c.id) ?? []
-            set((state) => {
-              for (const comicId of comicIds) {
-                delete state.comicImages[comicId]
-              }
-            })
-          }
-          get().updateLibrary(id, {}, scannedLibrary)
-        } finally {
-          set({ isScanning: false })
+        const scannedLibrary: ScannedLibrary = {}
+        if (lib.type === LibraryType.book) {
+          scannedLibrary.authors = await scanBookLibrary(lib.path, lib.id)
+        } else if (lib.type === LibraryType.video) {
+          scannedLibrary.videos = await scanVideoLibrary(lib.path, lib.id)
+        } else {
+          scannedLibrary.comics = await scanComicLibrary(lib.path, lib.id)
+          const comicIds = scannedLibrary.comics?.map((c) => c.id) ?? []
+          set((state) => {
+            for (const comicId of comicIds) {
+              delete state.comicImages[comicId]
+            }
+          })
         }
+        get().updateLibrary(id, {}, scannedLibrary)
+        set({ isScanning: false })
       },
 
       setSelectedLibraryId: (id) => set({ selectedLibraryId: id }),
 
-      updateBookTags: (bookId, tags) =>
-        set((state) => {
-          const book = state.books[bookId]
-          if (book) {
-            if (tags.starred !== undefined) book.starred = tags.starred
-            if (tags.deleted !== undefined) book.deleted = tags.deleted
-          }
-        }),
+      updateBookTags: async (bookId, tags) => {
+        const book = get().books[bookId]
+        if (!book) return
 
-      updateComicTags: (comicId, tags) =>
-        set((state) => {
-          const comic = state.comics[comicId]
-          if (comic) {
-            if (tags.starred !== undefined) comic.starred = tags.starred
-            if (tags.deleted !== undefined) comic.deleted = tags.deleted
-          }
-        }),
+        const isSuccess = await setFileTag(book.path, tags)
+        if (isSuccess) {
+          set((state) => {
+            const b = state.books[bookId]
+            if (b) {
+              if (tags.starred !== undefined) b.starred = tags.starred
+              if (tags.deleted !== undefined) b.deleted = tags.deleted
+            }
+          })
+        }
+      },
 
-      updateVideoTags: (videoId, tags) =>
-        set((state) => {
-          const video = state.videos[videoId]
-          if (video) {
-            if (tags.starred !== undefined) video.starred = tags.starred
-            if (tags.deleted !== undefined) video.deleted = tags.deleted
-          }
-        }),
+      updateComicTags: async (comicId, tags) => {
+        const comic = get().comics[comicId]
+        if (!comic) return
 
-      updateComicImageTags: (comicId, filename, tags) =>
-        set((state) => {
-          const comicImages = state.comicImages[comicId]
-          if (!comicImages) return
+        const isSuccess = await setFileTag(comic.path, tags)
+        if (isSuccess) {
+          set((state) => {
+            const c = state.comics[comicId]
+            if (c) {
+              if (tags.starred !== undefined) c.starred = tags.starred
+              if (tags.deleted !== undefined) c.deleted = tags.deleted
+            }
+          })
+        }
+      },
 
-          const image = comicImages.images.find((i) => i.filename === filename)
-          if (image) {
-            if (tags.starred !== undefined) image.starred = tags.starred
-            if (tags.deleted !== undefined) image.deleted = tags.deleted
-          }
-        }),
+      updateVideoTags: async (videoId, tags) => {
+        const video = get().videos[videoId]
+        if (!video) return
+
+        const isSuccess = await setFileTag(video.path, tags)
+        if (isSuccess) {
+          set((state) => {
+            const v = state.videos[videoId]
+            if (v) {
+              if (tags.starred !== undefined) v.starred = tags.starred
+              if (tags.deleted !== undefined) v.deleted = tags.deleted
+            }
+          })
+        }
+      },
+
+      updateComicImageTags: async (comicId, filename, tags) => {
+        const comicImages = get().comicImages[comicId]
+        if (!comicImages) return
+
+        const image = comicImages.images.find((i) => i.filename === filename)
+        if (!image) return
+
+        const isSuccess = await setFileTag(image.path, tags)
+        if (isSuccess) {
+          set((state) => {
+            const ci = state.comicImages[comicId]
+            if (!ci) return
+
+            const img = ci.images.find((i) => i.filename === filename)
+            if (img) {
+              if (tags.starred !== undefined) img.starred = tags.starred
+              if (tags.deleted !== undefined) img.deleted = tags.deleted
+            }
+          })
+        }
+      },
 
       getComicImages: async (comicId) => {
         const cache = get().comicImages[comicId]
@@ -307,35 +331,30 @@ export const useLibraryStore = create<LibraryState>()(
         const comic = get().comics[comicId]
         if (!comic) return []
 
-        try {
-          const images = await scanComicImages(comic.path)
+        const images = await scanComicImages(comic.path)
 
-          set((state) => {
-            state.comicImages[comicId] = {
-              comicId,
-              images,
-              timestamp: Date.now(),
-            }
+        set((state) => {
+          state.comicImages[comicId] = {
+            comicId,
+            images,
+            timestamp: Date.now(),
+          }
 
-            const entries = Object.values(state.comicImages)
-            if (entries.length <= MAX_CACHE_SIZE) return
+          const entries = Object.values(state.comicImages)
+          if (entries.length <= MAX_CACHE_SIZE) return
 
-            entries
-              .sort((a, b) => a.timestamp - b.timestamp)
-              .slice(0, entries.length - MAX_CACHE_SIZE + 5)
-              .forEach((item) => delete state.comicImages[item.comicId])
+          entries
+            .sort((a, b) => a.timestamp - b.timestamp)
+            .slice(0, entries.length - MAX_CACHE_SIZE + 5)
+            .forEach((item) => delete state.comicImages[item.comicId])
 
-            const c = state.comics[comicId]
-            if (c) {
-              c.pageCount = images.length
-            }
-          })
+          const c = state.comics[comicId]
+          if (c) {
+            c.pageCount = images.length
+          }
+        })
 
-          return images
-        } catch (error) {
-          console.error('Failed to scan comic images:', error)
-          return []
-        }
+        return images
       },
 
       addComicImages: (comicId, images) =>

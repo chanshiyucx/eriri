@@ -9,12 +9,11 @@ import {
   type BookContent,
   type Chapter,
 } from '@/lib/book'
-import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
-import { FileTags, LibraryType } from '@/types/library'
+import { LibraryType, type FileTags } from '@/types/library'
 
 const BookLine = memo(function BookLine({
   line,
@@ -121,6 +120,9 @@ const BookReader = memo(function BookReader({
 
   currentChapterRef.current = currentChapterTitle
 
+  const stateRef = useRef({ activeTab, book })
+  stateRef.current = { activeTab, book }
+
   useEffect(() => {
     return () => {
       if (throttleTimeoutRef.current) {
@@ -194,15 +196,8 @@ const BookReader = memo(function BookReader({
   }, [addTab, activeTab, setActiveTab, book])
 
   const handleSetBookTags = useCallback(
-    async (tags: FileTags) => {
-      try {
-        const isSuccess = await setFileTag(book.path, tags)
-        if (isSuccess) {
-          updateBookTags(book.id, tags)
-        }
-      } catch (error) {
-        console.error('Failed to set book tags:', error)
-      }
+    (tags: FileTags) => {
+      void updateBookTags(book.id, tags)
     },
     [updateBookTags, book],
   )
@@ -254,6 +249,26 @@ const BookReader = memo(function BookReader({
     (index: number, line: string) => <BookLine index={index} line={line} />,
     [],
   )
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.stopPropagation()
+
+      const { activeTab, book } = stateRef.current
+      if (activeTab !== book?.path) return
+
+      if (e.key === 't' || e.key === 'T') {
+        toggleToc()
+      } else if (e.key === 'c' || e.key === 'C') {
+        void handleSetBookTags({ deleted: !book.deleted })
+      } else if (e.key === 'v' || e.key === 'V') {
+        void handleSetBookTags({ starred: !book.starred })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSetBookTags, toggleToc])
 
   if (!book) return null
 

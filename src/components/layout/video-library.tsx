@@ -1,10 +1,9 @@
 import { PanelLeftClose, PanelLeftOpen, Star, Trash2 } from 'lucide-react'
-import { memo, useCallback, useMemo } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCollapse } from '@/hooks/use-collapse'
-import { setFileTag } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { type FileTags, type Library, type Video } from '@/types/library'
@@ -14,7 +13,7 @@ interface VideoItemProps {
   video: Video
   isSelected: boolean
   onClick: (id: string) => void
-  onTags: (video: Video, tags: FileTags) => Promise<void>
+  onTags: (video: Video, tags: FileTags) => void
 }
 
 const VideoItem = memo(function VideoItem({
@@ -113,16 +112,13 @@ export const VideoLibrary = memo(function VideoLibrary({
     videoId ? s.videos[videoId] : undefined,
   )
 
+  const stateRef = useRef({ video })
+  // eslint-disable-next-line react-hooks/refs
+  stateRef.current = { video }
+
   const handleSetVideoTags = useCallback(
-    async (video: Video, tags: FileTags) => {
-      try {
-        const isSuccess = await setFileTag(video.path, tags)
-        if (isSuccess) {
-          updateVideoTags(video.id, tags)
-        }
-      } catch (error) {
-        console.error('Failed to set video tags:', error)
-      }
+    (video: Video, tags: FileTags) => {
+      void updateVideoTags(video.id, tags)
     },
     [updateVideoTags],
   )
@@ -134,6 +130,24 @@ export const VideoLibrary = memo(function VideoLibrary({
     },
     [selectedLibrary.id, updateLibrary, videoId],
   )
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.stopPropagation()
+
+      const { video } = stateRef.current
+      if (!video) return
+
+      if (e.key === 'c' || e.key === 'C') {
+        void handleSetVideoTags(video, { deleted: !video.deleted })
+      } else if (e.key === 'v' || e.key === 'V') {
+        void handleSetVideoTags(video, { starred: !video.starred })
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [handleSetVideoTags])
 
   return (
     <div className="flex h-full w-full">

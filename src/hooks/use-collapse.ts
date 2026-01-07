@@ -4,10 +4,12 @@ export function useCollapse() {
   const [collapsed, setCollapsed] = useState(1) // 0 1 2
 
   useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 's') {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      e.stopPropagation()
+
+      if (e.key === 's') {
         setCollapsed((prev) => Math.max(0, prev - 1))
-      } else if (event.key === 'd') {
+      } else if (e.key === 'd') {
         setCollapsed((prev) => Math.min(2, prev + 1))
       }
     }
