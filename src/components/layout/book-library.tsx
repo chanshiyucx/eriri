@@ -9,10 +9,6 @@ import { useProgressStore } from '@/store/progress'
 import type { Author, Book, Library } from '@/types/library'
 import { BookReader } from './book-reader'
 
-interface BookLibraryProps {
-  selectedLibrary: Library
-}
-
 interface BookListItemProps {
   book: Book
   isSelected: boolean
@@ -85,6 +81,10 @@ const AuthorListItem = memo(function AuthorListItem({
     </Button>
   )
 })
+
+interface BookLibraryProps {
+  selectedLibrary: Library
+}
 
 export const BookLibrary = memo(function BookLibrary({
   selectedLibrary,
