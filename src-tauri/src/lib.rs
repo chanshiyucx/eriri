@@ -14,6 +14,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             scanner::utils::generate_uuid_command,
             scanner::utils::get_library_type,
+            scanner::utils::open_path_native,
             scanner::book::scan_book_library,
             scanner::video::scan_video_library,
             scanner::comic::scan_comic_library,
@@ -23,7 +24,9 @@ pub fn run() {
             thumbnail::get_cache_dir,
             thumbnail::set_cache_dir,
             tags::set_file_tag,
-            scanner::utils::open_path_native,
+            config::read_store_data,
+            config::write_store_data,
+            config::remove_store_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

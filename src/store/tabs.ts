@@ -1,8 +1,11 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { createIDBStorage } from '@/lib/storage'
+import { createTauriFileStorage } from '@/lib/storage'
 import { LibraryType } from '@/types/library'
+
+// Stable storage instance for async persistence
+const tabsStorage = createTauriFileStorage('tabs')
 
 export interface Tab {
   type: LibraryType
@@ -56,8 +59,8 @@ export const useTabsStore = create<TabsState>()(
       clearAllTabs: () => set({ tabs: [], activeTab: '' }),
     })),
     {
-      name: 'eriri-tabs-storage',
-      storage: createJSONStorage(() => createIDBStorage()),
+      name: 'tabs',
+      storage: createJSONStorage(() => tabsStorage),
     },
   ),
 )
