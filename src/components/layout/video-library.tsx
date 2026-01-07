@@ -91,6 +91,8 @@ interface VideoLibraryProps {
   selectedLibrary: Library
 }
 
+const EMPTY_ARRAY: string[] = []
+
 export const VideoLibrary = memo(function VideoLibrary({
   selectedLibrary,
 }: VideoLibraryProps) {
@@ -99,7 +101,7 @@ export const VideoLibrary = memo(function VideoLibrary({
   const updateVideoTags = useLibraryStore((s) => s.updateVideoTags)
 
   const videoIds = useLibraryStore(
-    (s) => s.libraryVideos[selectedLibrary.id] || [],
+    (s) => s.libraryVideos[selectedLibrary.id] ?? EMPTY_ARRAY,
   )
   const videosMap = useLibraryStore((s) => s.videos)
   const videos = useMemo(

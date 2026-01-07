@@ -37,21 +37,25 @@ const ENCODE_SET: percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERI
 // Image file extensions
 pub const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png"];
 
+
 /// Get the thumbnail cache directory, respecting user configuration
 pub fn get_thumbnail_dir(app: &AppHandle) -> PathBuf {
-    let config = config::load_config(app);
-    if let Some(custom_path) = config.cache_dir {
-        let path = PathBuf::from(custom_path);
-        if !path.exists() {
-            let _ = fs::create_dir_all(&path);
-        }
-        return path;
+    let config = config::get(app);
+    let base_path = if let Some(custom_path) = config.cache_dir {
+        PathBuf::from(custom_path)
+    } else {
+        app.path()
+            .app_cache_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+    };
+
+    let thumb_dir = base_path.join("thumbnail");
+
+    if !thumb_dir.exists() {
+        let _ = fs::create_dir_all(&thumb_dir);
     }
 
-    app.path()
-        .app_cache_dir()
-        .unwrap_or_else(|_| PathBuf::from("."))
-        .join("thumbnails")
+    thumb_dir
 }
 
 /// Check if data is JPEG format
@@ -425,13 +429,13 @@ pub fn get_thumbnail_stats(app: AppHandle) -> Result<(usize, u64), String> {
 /// Get configured cache directory
 #[tauri::command]
 pub fn get_cache_dir(app: AppHandle) -> Option<String> {
-    config::load_config(&app).cache_dir
+    config::get(&app).cache_dir
 }
 
 /// Set cache directory configuration
 #[tauri::command]
 pub fn set_cache_dir(app: AppHandle, path: String) -> Result<(), String> {
-    let mut config = config::load_config(&app);
+    let mut config = config::get(&app);
     config.cache_dir = Some(path);
     config::save_config(&app, &config)
 }

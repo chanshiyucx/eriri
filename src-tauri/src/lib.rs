@@ -11,6 +11,10 @@ pub fn run() {
         .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
+        .setup(|app| {
+            config::init(app)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             scanner::utils::generate_uuid_command,
             scanner::utils::get_library_type,

@@ -197,6 +197,8 @@ interface ComicReaderProps {
   comicId: string
 }
 
+const EMPTY_ARRAY: Image[] = []
+
 export const ComicReader = memo(function ComicReader({
   comicId,
 }: ComicReaderProps) {
@@ -216,7 +218,9 @@ export const ComicReader = memo(function ComicReader({
   const preloadCache = useRef<Map<string, HTMLImageElement>>(new Map())
 
   const comic = useLibraryStore((s) => s.comics[comicId])
-  const images = useLibraryStore((s) => s.comicImages[comicId]?.images ?? [])
+  const images = useLibraryStore(
+    (s) => s.comicImages[comicId]?.images ?? EMPTY_ARRAY,
+  )
   const getComicImages = useLibraryStore((s) => s.getComicImages)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
