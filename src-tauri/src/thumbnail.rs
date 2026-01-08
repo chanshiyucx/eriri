@@ -17,9 +17,8 @@ use turbojpeg::{Decompressor, Image, PixelFormat, ScalingFactor};
 
 use crate::config;
 
-// Thumbnail settings
 pub const THUMB_WIDTH: u32 = 256;
-pub const THUMB_HEIGHT: u32 = 384;  
+pub const THUMB_HEIGHT: u32 = 384;
 const THUMB_QUALITY: u8 = 70;
 
 // URL encoding set for asset protocol
@@ -34,11 +33,8 @@ const ENCODE_SET: percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERI
     .remove(b'(')
     .remove(b')');
 
-// Image file extensions
 pub const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png"];
 
-
-/// Get the thumbnail cache directory, respecting user configuration
 pub fn get_thumbnail_dir(app: &AppHandle) -> PathBuf {
     let config = config::get(app);
     let base_path = if let Some(custom_path) = config.cache_dir {
@@ -58,12 +54,10 @@ pub fn get_thumbnail_dir(app: &AppHandle) -> PathBuf {
     thumb_dir
 }
 
-/// Check if data is JPEG format
 fn is_jpeg(data: &[u8]) -> bool {
-    data.len() > 2 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF
+    data.len() >= 3 && data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF
 }
 
-/// Generate thumbnail hash based on file metadata
 pub fn get_thumbnail_hash(metadata: &fs::Metadata) -> String {
     let mut hasher = Sha256::new();
     hasher.update(metadata.ino().to_le_bytes());
@@ -72,14 +66,12 @@ pub fn get_thumbnail_hash(metadata: &fs::Metadata) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-/// Check if path is an image file
 pub fn is_image_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
         .is_some_and(|ext_str| IMAGE_EXTENSIONS.iter().any(|&x| x.eq_ignore_ascii_case(ext_str)))
 }
 
-/// Get image dimensions quickly without full decode
 pub fn get_image_dimensions_fast(path: &Path) -> Result<(u32, u32), Box<dyn std::error::Error>> {
     let file = File::open(path)?;
     let reader = BufReader::new(file);
@@ -88,14 +80,12 @@ pub fn get_image_dimensions_fast(path: &Path) -> Result<(u32, u32), Box<dyn std:
     Ok((width, height))
 }
 
-/// Process image and generate thumbnail, returning original dimensions
 pub fn process_and_get_dimensions(
     source_path: &Path,
     thumb_path: &Path,
     decompressor: &mut Decompressor,
     resizer: &mut fr::Resizer,
 ) -> Result<(u32, u32), Box<dyn std::error::Error>> {
-    // If thumbnail exists, just read its dimensions
     if thumb_path.exists() {
         if let Ok((w, h)) = get_image_dimensions_fast(thumb_path) {
             return Ok((w, h));
@@ -164,7 +154,6 @@ pub fn process_and_get_dimensions(
     }
 }
 
-/// Resize and save thumbnail image
 fn resize_and_save(
     src_pixels: Vec<u8>,
     src_w: u32,
@@ -212,7 +201,6 @@ fn resize_and_save(
     Ok((target_width, target_height))
 }
 
-/// Find cover image for a comic folder
 pub fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
     // Try to find 1001.jpg/png first (common cover naming)
     for &ext in IMAGE_EXTENSIONS {
@@ -263,7 +251,7 @@ pub fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
                 }
 
                 // Track the first image by natural sort order
-                let name = entry.file_name().to_string_lossy().to_string();
+                let name = entry.file_name().to_string_lossy().into_owned();
 
                 let is_new_min = match &fallback_first_name {
                     None => true,
@@ -281,7 +269,6 @@ pub fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
     fallback_first_path
 }
 
-/// Generate video thumbnail using sidecar executable
 pub fn generate_video_thumbnail(
     input_path: &Path,
     output_path: &Path,
@@ -300,13 +287,11 @@ pub fn generate_video_thumbnail(
     }
 }
 
-/// Convert file path to asset:// URL
 pub fn convert_file_src(path: &str) -> String {
     let encoded_path = utf8_percent_encode(path, &ENCODE_SET).to_string();
     format!("asset://localhost/{encoded_path}")
 }
 
-/// Clean thumbnail cache based on age and size limits
 #[tauri::command]
 pub async fn clean_thumbnail_cache(
     app: AppHandle,
@@ -400,7 +385,6 @@ pub async fn clean_thumbnail_cache(
     Ok((deleted_count, freed_bytes))
 }
 
-/// Get thumbnail cache statistics
 #[tauri::command]
 pub fn get_thumbnail_stats(app: AppHandle) -> Result<(usize, u64), String> {
     let thumb_dir = get_thumbnail_dir(&app);
@@ -426,13 +410,11 @@ pub fn get_thumbnail_stats(app: AppHandle) -> Result<(usize, u64), String> {
     Ok((count, total_size))
 }
 
-/// Get configured cache directory
 #[tauri::command]
 pub fn get_cache_dir(app: AppHandle) -> Option<String> {
     config::get(&app).cache_dir
 }
 
-/// Set cache directory configuration
 #[tauri::command]
 pub fn set_cache_dir(app: AppHandle, path: String) -> Result<(), String> {
     let mut config = config::get(&app);

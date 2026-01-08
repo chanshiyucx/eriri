@@ -14,7 +14,6 @@ use super::utils::{
     remove_extension,
 };
 
-/// Scan video library and return videos with thumbnails
 #[tauri::command]
 pub fn scan_video_library(
     app: AppHandle,
@@ -42,13 +41,13 @@ pub fn scan_video_library(
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
     let tasks: Vec<_> = entries
         .flatten()
-        .filter(|entry| {
+        .filter_map(|entry| {
             let entry_path = entry.path();
-            !is_hidden(&entry_path)
+            let is_valid = !is_hidden(&entry_path)
                 && entry.file_type().map(|ft| ft.is_file()).unwrap_or(false)
-                && is_video_file(&entry_path)
+                && is_video_file(&entry_path);
+            is_valid.then_some(entry_path)
         })
-        .map(|entry| entry.path())
         .collect();
 
     let processed_videos: Vec<Video> = tasks

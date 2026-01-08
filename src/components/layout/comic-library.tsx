@@ -1,11 +1,13 @@
 import {
+  Grid2x2,
   PanelLeftClose,
   PanelLeftOpen,
+  Rows2,
   Star,
   StepForward,
   Trash2,
 } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -21,6 +23,8 @@ import {
   type Image,
   type Library,
 } from '@/types/library'
+
+type ViewMode = 'grid' | 'scroll'
 
 interface ImageItemProps {
   index: number
@@ -92,6 +96,63 @@ const ImageItem = memo(function ImageItem({
       </div>
       <div className="truncate text-center text-sm transition-colors">
         {image.filename}
+      </div>
+    </div>
+  )
+})
+
+const ScrollImageItem = memo(function ScrollImageItem({
+  index,
+  image,
+  onClick,
+  onTags,
+}: ImageItemProps) {
+  return (
+    <div
+      className={cn(
+        'group relative cursor-pointer',
+        image.deleted && 'opacity-40',
+      )}
+      onClick={() => onClick(index)}
+    >
+      <img
+        src={image.url}
+        alt={image.filename}
+        className="w-full"
+        loading="lazy"
+        decoding="async"
+      />
+
+      <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
+        <Button
+          className="h-8 w-8 bg-transparent hover:bg-transparent"
+          onClick={(e) => {
+            e.stopPropagation()
+            void onTags(image, { starred: !image.starred })
+          }}
+        >
+          <Star
+            className={cn(
+              'text-love h-6 w-6',
+              image.starred ? 'fill-gold/80' : 'opacity-0 hover:opacity-100',
+            )}
+          />
+        </Button>
+
+        <Button
+          className="h-8 w-8 bg-transparent hover:bg-transparent"
+          onClick={(e) => {
+            e.stopPropagation()
+            void onTags(image, { deleted: !image.deleted })
+          }}
+        >
+          <Trash2
+            className={cn(
+              'text-love h-6 w-6',
+              image.deleted ? 'fill-gold/80' : 'opacity-0 hover:opacity-100',
+            )}
+          />
+        </Button>
       </div>
     </div>
   )
@@ -209,6 +270,7 @@ export const ComicLibrary = memo(function ComicLibrary({
   selectedLibrary,
 }: ComicLibraryProps) {
   const { collapsed, setCollapsed } = useCollapse()
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
 
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
@@ -372,6 +434,19 @@ export const ComicLibrary = memo(function ComicLibrary({
           <div className="flex gap-2">
             <Button
               className="h-6 w-6"
+              onClick={() =>
+                setViewMode(viewMode === 'grid' ? 'scroll' : 'grid')
+              }
+              title={viewMode === 'grid' ? '原图预览' : '网格模式'}
+            >
+              {viewMode === 'grid' ? (
+                <Rows2 className="h-4 w-4" />
+              ) : (
+                <Grid2x2 className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              className="h-6 w-6"
               onClick={handleContinueReading}
               title="继续阅读"
             >
@@ -390,10 +465,24 @@ export const ComicLibrary = memo(function ComicLibrary({
           </div>
         </div>
         <ScrollArea className="h-0 flex-1">
-          <div className="p-4">
-            <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
+          {viewMode === 'grid' ? (
+            <div className="p-4">
+              <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
+                {images.map((img, i) => (
+                  <ImageItem
+                    key={img.path}
+                    index={i}
+                    image={img}
+                    onClick={handleImageClick}
+                    onTags={handleSetImageTags}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col">
               {images.map((img, i) => (
-                <ImageItem
+                <ScrollImageItem
                   key={img.path}
                   index={i}
                   image={img}
@@ -402,7 +491,7 @@ export const ComicLibrary = memo(function ComicLibrary({
                 />
               ))}
             </div>
-          </div>
+          )}
         </ScrollArea>
       </div>
     </div>

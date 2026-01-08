@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// Book metadata structure
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct Book {
     pub id: String,
@@ -17,7 +16,6 @@ pub struct Book {
     pub deleted: bool,
 }
 
-/// Author with collection of books
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Author {
     pub id: String,
@@ -29,7 +27,6 @@ pub struct Author {
     pub books: Vec<Book>,
 }
 
-/// Comic metadata structure
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Comic {
     pub id: String,
@@ -44,7 +41,6 @@ pub struct Comic {
     pub deleted: bool,
 }
 
-/// Video metadata structure
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Video {
     pub id: String,
@@ -62,7 +58,6 @@ pub struct Video {
     pub deleted: bool,
 }
 
-/// Comic image metadata structure
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ComicImage {
     pub path: String,
@@ -75,7 +70,6 @@ pub struct ComicImage {
     pub deleted: bool,
 }
 
-/// File tags update structure
 #[derive(Deserialize)]
 pub struct FileTags {
     pub starred: Option<bool>,

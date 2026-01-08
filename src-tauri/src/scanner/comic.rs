@@ -17,7 +17,6 @@ use crate::thumbnail::{
 
 use super::utils::{current_time_millis, generate_uuid, get_created_time, is_hidden};
 
-/// Scan comic library and return comics with covers
 #[tauri::command]
 pub fn scan_comic_library(
     app: AppHandle,
@@ -50,7 +49,7 @@ pub fn scan_comic_library(
 
                 let comic_path = entry.path();
                 let path_str = comic_path.to_string_lossy();
-                let comic_name = entry.file_name().to_string_lossy().to_string();
+                let comic_name = entry.file_name().to_string_lossy().into_owned();
                 let comic_id = generate_uuid(&path_str);
 
                 let created_at = entry
@@ -58,10 +57,9 @@ pub fn scan_comic_library(
                     .map(|m| get_created_time(&m))
                     .unwrap_or_else(|_| current_time_millis());
 
-                let mut cover = String::new();
-
-                if let Some(cover_path) = find_cover_image(&comic_path) {
-                    if let Ok(cover_meta) = fs::metadata(&cover_path) {
+                let cover = find_cover_image(&comic_path)
+                    .and_then(|cover_path| fs::metadata(&cover_path).ok().map(|m| (cover_path, m)))
+                    .map(|(cover_path, cover_meta)| {
                         let hash = get_thumbnail_hash(&cover_meta);
                         let thumb_path = thumb_dir.join(format!("{hash}.jpg"));
 
@@ -76,13 +74,13 @@ pub fn scan_comic_library(
                             }
                         }
 
-                        cover = if thumb_path.exists() {
+                        if thumb_path.exists() {
                             convert_file_src(&thumb_path.to_string_lossy())
                         } else {
                             convert_file_src(&cover_path.to_string_lossy())
-                        };
-                    }
-                }
+                        }
+                    })
+                    .unwrap_or_default();
 
                 let (starred, deleted) = get_file_tags(&comic_path);
 
@@ -113,7 +111,6 @@ pub fn scan_comic_library(
     Ok(comics)
 }
 
-/// Scan comic images and generate thumbnails
 #[tauri::command]
 pub fn scan_comic_images(
     app: AppHandle,
@@ -127,13 +124,13 @@ pub fn scan_comic_images(
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
     let image_paths: Vec<PathBuf> = entries
         .flatten()
-        .filter(|e| {
+        .filter_map(|e| {
             let path = e.path();
-            !is_hidden(&path)
+            let is_valid = !is_hidden(&path)
                 && e.file_type().map(|ft| ft.is_file()).unwrap_or(false)
-                && is_image_file(&path)
+                && is_image_file(&path);
+            is_valid.then_some(path)
         })
-        .map(|e| e.path())
         .collect();
 
     info!(count = image_paths.len(), "Found images");
@@ -152,7 +149,7 @@ pub fn scan_comic_images(
                     .file_name()
                     .unwrap_or_default()
                     .to_string_lossy()
-                    .to_string();
+                    .into_owned();
 
                 let hash = match fs::metadata(file_path) {
                     Ok(metadata) => get_thumbnail_hash(&metadata),
