@@ -121,16 +121,17 @@ export function TopNav() {
 
       const { tabs, activeTab } = stateRef.current
 
-      if (e.key === 'Spacebar' || e.key === ' ') {
+      const key = e.key.toUpperCase()
+      if (key === 'SPACEBAR' || key === ' ') {
         toggleImmersive()
-      } else if (e.key === 'x' || e.key === 'X') {
+      } else if (key === 'X') {
         removeTab(activeTab)
-      } else if (e.key === 'a' || e.key === 'A') {
+      } else if (key === 'A') {
         toggleSidebar()
-      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+      } else if (key === 'ARROWLEFT' || key === 'ARROWRIGHT') {
         const currentIndex = tabs.findIndex((tab) => tab.path === activeTab)
 
-        if (e.key === 'ArrowLeft') {
+        if (key === 'ARROWLEFT') {
           if (currentIndex > 0) {
             setActiveTab(tabs[currentIndex - 1].path)
           } else if (currentIndex === -1 && tabs.length > 0) {
@@ -138,7 +139,7 @@ export function TopNav() {
           } else if (currentIndex === 0) {
             setActiveTab('')
           }
-        } else if (e.key === 'ArrowRight') {
+        } else if (key === 'ARROWRIGHT') {
           if (currentIndex < tabs.length - 1 && currentIndex !== -1) {
             setActiveTab(tabs[currentIndex + 1].path)
           } else if (currentIndex === -1 && tabs.length > 0) {

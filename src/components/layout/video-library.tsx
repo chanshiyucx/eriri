@@ -140,9 +140,10 @@ export const VideoLibrary = memo(function VideoLibrary({
       const { activeTab, video } = stateRef.current
       if (activeTab || !video) return
 
-      if (e.key === 'c' || e.key === 'C') {
+      const key = e.key.toUpperCase()
+      if (key === 'C') {
         void handleSetVideoTags(video, { deleted: !video.deleted })
-      } else if (e.key === 'v' || e.key === 'V') {
+      } else if (key === 'V') {
         void handleSetVideoTags(video, { starred: !video.starred })
       }
     }
