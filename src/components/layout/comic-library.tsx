@@ -322,9 +322,10 @@ export const ComicLibrary = memo(function ComicLibrary({
       const { activeTab, comic } = stateRef.current
       if (activeTab || !comic) return
 
-      if (e.key === 'c' || e.key === 'C') {
+      const key = e.key.toUpperCase()
+      if (key === 'C') {
         void handleSetComicTags(comic, { deleted: !comic.deleted })
-      } else if (e.key === 'v' || e.key === 'V') {
+      } else if (key === 'V') {
         void handleSetComicTags(comic, { starred: !comic.starred })
       }
     }

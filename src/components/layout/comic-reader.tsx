@@ -405,41 +405,42 @@ export const ComicReader = memo(function ComicReader({
       const { activeTab, comic, images, visibleIndices } = stateRef.current
       if (activeTab !== comic?.path) return
 
-      if (e.key === 'ArrowUp') {
+      const key = e.key.toUpperCase()
+      if (key === 'ARROWUP') {
         throttledPrevRef.current?.()
-      } else if (e.key === 'ArrowDown') {
+      } else if (key === 'ARROWDOWN') {
         throttledNextRef.current?.()
-      } else if (e.key === 'd' || e.key === 'D') {
+      } else if (key === 'D') {
         toggleViewMode()
-      } else if (e.key === 'n' || e.key === 'N') {
+      } else if (key === 'N') {
         const firstImage = images[visibleIndices[0]]
         if (firstImage) {
           void handleSetImageTags(firstImage, { starred: !firstImage.starred })
         }
-      } else if (e.key === 'm' || e.key === 'M') {
+      } else if (key === 'M') {
         if (visibleIndices[1] !== undefined) {
           const secondImage = images[visibleIndices[1]]
           void handleSetImageTags(secondImage, {
             starred: !secondImage.starred,
           })
         }
-      } else if (e.key === 'j' || e.key === 'J') {
+      } else if (key === 'J') {
         const firstImage = images[visibleIndices[0]]
         if (firstImage) {
           void handleSetImageTags(firstImage, { deleted: !firstImage.deleted })
         }
-      } else if (e.key === 'k' || e.key === 'K') {
+      } else if (key === 'K') {
         if (visibleIndices[1] !== undefined) {
           const secondImage = images[visibleIndices[1]]
           void handleSetImageTags(secondImage, {
             deleted: !secondImage.deleted,
           })
         }
-      } else if (e.key === 't' || e.key === 'T') {
+      } else if (key === 'T') {
         void toggleToc()
-      } else if (e.key === 'c' || e.key === 'C') {
+      } else if (key === 'C') {
         void handleSetComicTags({ deleted: !comic.deleted })
-      } else if (e.key === 'v' || e.key === 'V') {
+      } else if (key === 'V') {
         void handleSetComicTags({ starred: !comic.starred })
       }
     }

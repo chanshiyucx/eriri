@@ -257,11 +257,12 @@ export const BookReader = memo(function BookReader({
       const { activeTab, book } = stateRef.current
       if (activeTab || !book) return
 
-      if (e.key === 't' || e.key === 'T') {
+      const key = e.key.toUpperCase()
+      if (key === 'T') {
         toggleToc()
-      } else if (e.key === 'c' || e.key === 'C') {
+      } else if (key === 'C') {
         void handleSetBookTags({ deleted: !book.deleted })
-      } else if (e.key === 'v' || e.key === 'V') {
+      } else if (key === 'V') {
         void handleSetBookTags({ starred: !book.starred })
       }
     }
