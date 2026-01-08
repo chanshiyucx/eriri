@@ -98,7 +98,13 @@ pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(),
     }
 
     let file_path = store_dir.join(format!("{key}.json"));
-    fs::write(file_path, data).map_err(|e| e.to_string())
+    let tmp_path = store_dir.join(format!("{key}.tmp"));
+
+    // Write to temp file first
+    fs::write(&tmp_path, data).map_err(|e| e.to_string())?;
+
+    // Atomic rename
+    fs::rename(&tmp_path, file_path).map_err(|e| e.to_string())
 }
 
 /// Remove store data file
