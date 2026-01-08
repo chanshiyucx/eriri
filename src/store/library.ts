@@ -335,27 +335,7 @@ export const useLibraryStore = create<LibraryState>()(
         if (!comic) return []
 
         const images = await scanComicImages(comic.path)
-
-        set((state) => {
-          state.comicImages[comicId] = {
-            comicId,
-            images,
-            timestamp: Date.now(),
-          }
-
-          const entries = Object.values(state.comicImages)
-          if (entries.length <= MAX_CACHE_SIZE) return
-
-          entries
-            .sort((a, b) => a.timestamp - b.timestamp)
-            .slice(0, entries.length - MAX_CACHE_SIZE + 5)
-            .forEach((item) => delete state.comicImages[item.comicId])
-
-          const c = state.comics[comicId]
-          if (c) {
-            c.pageCount = images.length
-          }
-        })
+        get().addComicImages(comicId, images)
 
         return images
       },
@@ -367,6 +347,17 @@ export const useLibraryStore = create<LibraryState>()(
             images,
             timestamp: Date.now(),
           }
+
+          const comic = state.comics[comicId]
+          if (comic) comic.pageCount = images.length
+
+          const entries = Object.values(state.comicImages)
+          if (entries.length <= MAX_CACHE_SIZE) return
+
+          entries
+            .sort((a, b) => a.timestamp - b.timestamp)
+            .slice(0, entries.length - MAX_CACHE_SIZE + 5)
+            .forEach((item) => delete state.comicImages[item.comicId])
         }),
 
       removeComicImages: (comicId) =>
@@ -377,11 +368,8 @@ export const useLibraryStore = create<LibraryState>()(
     {
       name: 'library',
       storage: createJSONStorage(() => libraryStorage),
-      partialize: (state) => {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { isScanning, ...rest } = state
-        return rest
-      },
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      partialize: ({ isScanning, comicImages, ...rest }) => rest,
     },
   ),
 )
