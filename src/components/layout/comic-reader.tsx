@@ -500,7 +500,7 @@ export const ComicReader = memo(function ComicReader({
           </Button>
 
           <Button
-            className={cn('h-6 w-6', comic.deleted && 'hidden')}
+            className="h-6 w-6"
             onClick={() => void handleSetComicTags({ starred: !comic.starred })}
             title="标记收藏"
           >

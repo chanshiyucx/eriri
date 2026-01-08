@@ -6,6 +6,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { useCollapse } from '@/hooks/use-collapse'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
+import { useTabsStore } from '@/store/tabs'
 import { type FileTags, type Library, type Video } from '@/types/library'
 
 interface VideoItemProps {
@@ -99,6 +100,7 @@ export const VideoLibrary = memo(function VideoLibrary({
   const { collapsed, setCollapsed } = useCollapse()
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateVideoTags = useLibraryStore((s) => s.updateVideoTags)
+  const activeTab = useTabsStore((s) => s.activeTab)
 
   const videoIds = useLibraryStore(
     (s) => s.libraryVideos[selectedLibrary.id] ?? EMPTY_ARRAY,
@@ -112,9 +114,9 @@ export const VideoLibrary = memo(function VideoLibrary({
   const { videoId } = selectedLibrary.status
   const video = useLibraryStore((s) => (videoId ? s.videos[videoId] : null))
 
-  const stateRef = useRef({ video })
+  const stateRef = useRef({ activeTab, video })
   // eslint-disable-next-line react-hooks/refs
-  stateRef.current = { video }
+  stateRef.current = { activeTab, video }
 
   const handleSetVideoTags = useCallback(
     (video: Video, tags: FileTags) => {
@@ -135,8 +137,8 @@ export const VideoLibrary = memo(function VideoLibrary({
     const handleKeyDown = (e: KeyboardEvent) => {
       e.stopPropagation()
 
-      const { video } = stateRef.current
-      if (!video) return
+      const { activeTab, video } = stateRef.current
+      if (activeTab || !video) return
 
       if (e.key === 'c' || e.key === 'C') {
         void handleSetVideoTags(video, { deleted: !video.deleted })

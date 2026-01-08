@@ -29,7 +29,6 @@ export function CacheInfo() {
     const stats = await getThumbnailStats()
     setCache(stats)
     const dir = await getCacheDir()
-    console.log('dir---', dir)
     setCacheDirState(dir)
   }
 
@@ -66,6 +65,7 @@ export function CacheInfo() {
         directory: true,
         multiple: false,
         recursive: true,
+        defaultPath: cacheDir!,
         title,
       })
       if (!selected || typeof selected !== 'string') return
