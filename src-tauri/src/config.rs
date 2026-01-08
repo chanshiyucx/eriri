@@ -19,16 +19,11 @@ fn get_config_path(app: &AppHandle) -> Option<PathBuf> {
 }
 
 fn load_from_disk(app: &AppHandle) -> Config {
-    if let Some(config_path) = get_config_path(app) {
-        if config_path.exists() {
-            if let Ok(content) = fs::read_to_string(config_path) {
-                if let Ok(config) = serde_json::from_str(&content) {
-                    return config;
-                }
-            }
-        }
-    }
-    Config::default()
+    get_config_path(app)
+        .filter(|p| p.exists())
+        .and_then(|p| fs::read_to_string(p).ok())
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default()
 }
 
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
@@ -38,13 +33,9 @@ pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub fn get(app: &AppHandle) -> Config {
-    if let Some(state) = app.try_state::<ConfigState>() {
-        if let Ok(config) = state.0.lock() {
-            return config.clone();
-        }
-    }
-    // Fallback if state is not initialized (should rarely happen in runtime if setup is correct)
-    load_from_disk(app)
+    app.try_state::<ConfigState>()
+        .and_then(|state| state.0.lock().ok().map(|g| g.clone()))
+        .unwrap_or_else(|| load_from_disk(app))
 }
 
 pub fn save_config(app: &AppHandle, config: &Config) -> Result<(), String> {
@@ -68,13 +59,11 @@ pub fn save_config(app: &AppHandle, config: &Config) -> Result<(), String> {
     }
 }
 
-/// Get the store directory path (cache_dir/store)
 fn get_store_dir(app: &AppHandle) -> Option<PathBuf> {
     let config = get(app);
     config.cache_dir.map(|dir| PathBuf::from(dir).join("store"))
 }
 
-/// Read store data from cache_dir/store/{key}.json
 #[tauri::command]
 pub fn read_store_data(app: AppHandle, key: String) -> Option<String> {
     let store_dir = get_store_dir(&app)?;
@@ -87,7 +76,6 @@ pub fn read_store_data(app: AppHandle, key: String) -> Option<String> {
     }
 }
 
-/// Write store data to cache_dir/store/{key}.json
 #[tauri::command]
 pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(), String> {
     let store_dir = get_store_dir(&app).ok_or("Cache directory not configured")?;
@@ -107,11 +95,10 @@ pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(),
     fs::rename(&tmp_path, file_path).map_err(|e| e.to_string())
 }
 
-/// Remove store data file
 #[tauri::command]
 pub fn remove_store_data(app: AppHandle, key: String) -> Result<(), String> {
     let Some(store_dir) = get_store_dir(&app) else {
-        return Ok(()); // No cache dir configured, nothing to remove
+        return Ok(());
     };
 
     let file_path = store_dir.join(format!("{key}.json"));

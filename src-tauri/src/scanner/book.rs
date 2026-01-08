@@ -9,7 +9,6 @@ use super::utils::{
     current_time_millis, generate_uuid, get_created_time, is_book_file, is_hidden, remove_extension,
 };
 
-/// Scan book library and return authors with their books
 #[tauri::command]
 pub fn scan_book_library(
     library_path: &str,
@@ -27,7 +26,7 @@ pub fn scan_book_library(
             continue;
         }
 
-        let author_name = entry.file_name().to_string_lossy().to_string();
+        let author_name = entry.file_name().to_string_lossy().into_owned();
         let author_id = generate_uuid(&author_path.to_string_lossy());
 
         let mut books = Vec::new();
@@ -52,7 +51,7 @@ pub fn scan_book_library(
                 books.push(Book {
                     id: book_id,
                     title,
-                    path: book_path.to_string_lossy().to_string(),
+                    path: book_path.to_string_lossy().into_owned(),
                     author_id: author_id.clone(),
                     library_id: library_id.to_string(),
                     size,
@@ -66,7 +65,7 @@ pub fn scan_book_library(
         authors.push(Author {
             id: author_id,
             name: author_name,
-            path: author_path.to_string_lossy().to_string(),
+            path: author_path.to_string_lossy().into_owned(),
             library_id: library_id.to_string(),
             book_count: u32::try_from(books.len()).unwrap_or(u32::MAX),
             books,

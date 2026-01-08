@@ -2,29 +2,24 @@ use std::path::Path;
 
 use crate::models::FileTags;
 
-// macOS extended attribute keys
 const TAG_KEY: &str = "com.apple.metadata:_kMDItemUserTags";
 const FINDER_INFO_KEY: &str = "com.apple.FinderInfo";
 
-// Tag names and values
 const STAR_TAG_NAME: &str = "STAR";
 const STAR_TAG_VALUE: &str = "STAR\n5";
 const DELETE_TAG_NAME: &str = "DELETE";
 const DELETE_TAG_VALUE: &str = "DELETE\n6";
 
-/// Extract tag name (before newline) from tag string
 fn get_tag_name(tag: &str) -> &str {
     tag.split('\n').next().unwrap_or("")
 }
 
-/// Check if tags list contains a specific tag name
 fn has_tag(tags_list: &[String], tag_name: &str) -> bool {
     tags_list
         .iter()
         .any(|t| get_tag_name(t).eq_ignore_ascii_case(tag_name))
 }
 
-/// Update a specific tag in the tags list
 fn update_tag(tags_list: &mut Vec<String>, tag_name: &str, tag_value: &str, should_have: Option<bool>) {
     let Some(should_have) = should_have else {
         return;
@@ -39,7 +34,6 @@ fn update_tag(tags_list: &mut Vec<String>, tag_name: &str, tag_value: &str, shou
     }
 }
 
-/// Read file tags from macOS extended attributes
 /// Returns (starred, deleted)
 pub fn get_file_tags(path: &Path) -> (bool, bool) {
     let Ok(Some(value)) = xattr::get(path, TAG_KEY) else {
@@ -71,7 +65,6 @@ pub fn get_file_tags(path: &Path) -> (bool, bool) {
     (starred, deleted)
 }
 
-/// Set file tags using macOS extended attributes
 pub fn set_file_tag_impl(path: &Path, tags: FileTags) -> Result<(), Box<dyn std::error::Error>> {
     let mut tags_list = Vec::new();
     if let Ok(Some(value)) = xattr::get(path, TAG_KEY) {
@@ -104,7 +97,6 @@ pub fn set_file_tag_impl(path: &Path, tags: FileTags) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-/// Tauri command to set file tags
 #[tauri::command]
 pub fn set_file_tag(path: String, tags: FileTags) -> Result<(), String> {
     set_file_tag_impl(Path::new(&path), tags).map_err(|e| e.to_string())
