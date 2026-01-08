@@ -255,7 +255,7 @@ export const BookReader = memo(function BookReader({
       e.stopPropagation()
 
       const { activeTab, book } = stateRef.current
-      if (activeTab !== book.path) return
+      if (activeTab || !book) return
 
       if (e.key === 't' || e.key === 'T') {
         toggleToc()
@@ -313,7 +313,7 @@ export const BookReader = memo(function BookReader({
         </Button>
 
         <Button
-          className={cn('h-6 w-6', book.deleted && 'hidden')}
+          className="h-6 w-6"
           onClick={() => void handleSetBookTags({ starred: !book.starred })}
           title="标记收藏"
         >
