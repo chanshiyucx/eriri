@@ -1,4 +1,5 @@
 import {
+  Funnel,
   Grid2x2,
   PanelLeftClose,
   PanelLeftOpen,
@@ -272,6 +273,8 @@ export const ComicLibrary = memo(function ComicLibrary({
 }: ComicLibraryProps) {
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [filterComic, setFilterComic] = useState<boolean>(false)
+  const [filterImage, setFilterImage] = useState<boolean>(false)
 
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
@@ -302,6 +305,18 @@ export const ComicLibrary = memo(function ComicLibrary({
   // eslint-disable-next-line react-hooks/refs
   stateRef.current = { activeTab, comic }
 
+  const toggleViewMode = useCallback(() => {
+    setViewMode(viewMode === 'grid' ? 'scroll' : 'grid')
+  }, [viewMode])
+
+  const toggleFilterComic = useCallback(() => {
+    setFilterComic((prev) => !prev)
+  }, [])
+
+  const toggleFilterImage = useCallback(() => {
+    setFilterImage((prev) => !prev)
+  }, [])
+
   useEffect(() => {
     if (activeTab || !comicId) return
     if (images.length === 0) {
@@ -328,12 +343,18 @@ export const ComicLibrary = memo(function ComicLibrary({
         void handleSetComicTags(comic, { deleted: !comic.deleted })
       } else if (key === 'V') {
         void handleSetComicTags(comic, { starred: !comic.starred })
+      } else if (key === 'B') {
+        toggleViewMode()
+      } else if (key === 'F') {
+        toggleFilterComic()
+      } else if (key === 'G') {
+        toggleFilterImage()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSetComicTags])
+  }, [handleSetComicTags, toggleViewMode, toggleFilterComic, toggleFilterImage])
 
   const handleSetImageTags = useCallback(
     (image: Image, tags: FileTags) => {
@@ -395,6 +416,14 @@ export const ComicLibrary = memo(function ComicLibrary({
     [handleImageClick, handleSetImageTags],
   )
 
+  const showComics = useMemo(() => {
+    return filterComic ? comics.filter((c) => c.starred) : comics
+  }, [comics, filterComic])
+
+  const showImages = useMemo(() => {
+    return filterImage ? images.filter((img) => img.starred) : images
+  }, [images, filterImage])
+
   return (
     <div className="flex h-full w-full">
       {/* Left Column: Comic List */}
@@ -406,22 +435,31 @@ export const ComicLibrary = memo(function ComicLibrary({
         )}
       >
         <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>Comics ({comics.length})</span>
-          <Button
-            className="h-6 w-6"
-            onClick={() => setCollapsed(collapsed === 1 ? 0 : 1)}
-          >
-            {collapsed === 0 ? (
-              <PanelLeftOpen className="h-4 w-4" />
-            ) : (
-              <PanelLeftClose className="h-4 w-4" />
-            )}
-          </Button>
+          <span>Comics ({showComics.length})</span>
+          <div className="flex gap-2">
+            <Button
+              className="h-6 w-6"
+              onClick={toggleFilterComic}
+              title="过滤漫画"
+            >
+              <Funnel className="h-4 w-4" />
+            </Button>
+            <Button
+              className="h-6 w-6"
+              onClick={() => setCollapsed(collapsed === 1 ? 0 : 1)}
+            >
+              {collapsed === 0 ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
         <ScrollArea className="h-0 flex-1">
           <div className="p-4">
             <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-              {comics.map((c, i) => (
+              {showComics.map((c, i) => (
                 <ComicItem
                   key={c.id}
                   index={i}
@@ -445,13 +483,11 @@ export const ComicLibrary = memo(function ComicLibrary({
         )}
       >
         <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>Images ({images.length})</span>
+          <span>Images ({showImages.length})</span>
           <div className="flex gap-2">
             <Button
               className="h-6 w-6"
-              onClick={() =>
-                setViewMode(viewMode === 'grid' ? 'scroll' : 'grid')
-              }
+              onClick={toggleViewMode}
               title={viewMode === 'grid' ? '原图预览' : '网格模式'}
             >
               {viewMode === 'grid' ? (
@@ -459,6 +495,13 @@ export const ComicLibrary = memo(function ComicLibrary({
               ) : (
                 <Grid2x2 className="h-4 w-4" />
               )}
+            </Button>
+            <Button
+              className="h-6 w-6"
+              onClick={toggleFilterImage}
+              title="过滤图片"
+            >
+              <Funnel className="h-4 w-4" />
             </Button>
             <Button
               className="h-6 w-6"
@@ -483,7 +526,7 @@ export const ComicLibrary = memo(function ComicLibrary({
           <ScrollArea className="h-0 flex-1">
             <div className="p-4">
               <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-                {images.map((img, i) => (
+                {showImages.map((img, i) => (
                   <ImageItem
                     key={img.path}
                     index={i}
@@ -499,8 +542,8 @@ export const ComicLibrary = memo(function ComicLibrary({
           <Virtuoso
             key={comicId}
             className="h-full w-full flex-1"
-            data={images}
-            totalCount={images.length}
+            data={showImages}
+            totalCount={showImages.length}
             itemContent={renderScrollImageItem}
             increaseViewportBy={{ top: 0, bottom: 3000 }}
           />

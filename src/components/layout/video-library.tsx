@@ -1,5 +1,11 @@
-import { PanelLeftClose, PanelLeftOpen, Star, Trash2 } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useRef } from 'react'
+import {
+  Funnel,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Star,
+  Trash2,
+} from 'lucide-react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -97,6 +103,7 @@ const EMPTY_ARRAY: string[] = []
 export const VideoLibrary = memo(function VideoLibrary({
   selectedLibrary,
 }: VideoLibraryProps) {
+  const [filterVideo, setFilterVideo] = useState(false)
   const { collapsed, setCollapsed } = useCollapse()
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateVideoTags = useLibraryStore((s) => s.updateVideoTags)
@@ -133,6 +140,10 @@ export const VideoLibrary = memo(function VideoLibrary({
     [selectedLibrary.id, updateLibrary, videoId],
   )
 
+  const toggleFilterVideo = useCallback(() => {
+    setFilterVideo((prev) => !prev)
+  }, [])
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       e.stopPropagation()
@@ -152,6 +163,10 @@ export const VideoLibrary = memo(function VideoLibrary({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleSetVideoTags])
 
+  const showVideos = useMemo(() => {
+    return filterVideo ? videos.filter((v) => !v.starred) : videos
+  }, [videos, filterVideo])
+
   return (
     <div className="flex h-full w-full">
       {/* Left Column: Video List */}
@@ -163,22 +178,31 @@ export const VideoLibrary = memo(function VideoLibrary({
         )}
       >
         <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>Videos ({videos.length})</span>
-          <Button
-            className="h-6 w-6"
-            onClick={() => setCollapsed(collapsed === 1 ? 0 : 1)}
-          >
-            {collapsed === 0 ? (
-              <PanelLeftOpen className="h-4 w-4" />
-            ) : (
-              <PanelLeftClose className="h-4 w-4" />
-            )}
-          </Button>
+          <span>Videos ({showVideos.length})</span>
+          <div className="flex gap-2">
+            <Button
+              className="h-6 w-6"
+              onClick={toggleFilterVideo}
+              title="过滤视频"
+            >
+              <Funnel className="h-4 w-4" />
+            </Button>
+            <Button
+              className="h-6 w-6"
+              onClick={() => setCollapsed(collapsed === 1 ? 0 : 1)}
+            >
+              {collapsed === 0 ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
         <ScrollArea className="h-0 flex-1">
           <div className="p-4">
             <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-              {videos.map((v, i) => (
+              {showVideos.map((v, i) => (
                 <VideoItem
                   key={v.id}
                   index={i}
