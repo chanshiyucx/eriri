@@ -76,6 +76,7 @@ export interface Image {
   deleted: boolean
   width: number
   height: number
+  index: number
 }
 
 export interface ImageCache {

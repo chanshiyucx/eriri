@@ -68,6 +68,7 @@ pub struct ComicImage {
     pub height: u32,
     pub starred: bool,
     pub deleted: bool,
+    pub index: u32,
 }
 
 #[derive(Deserialize)]
