@@ -8,6 +8,7 @@ import {
   Trash2,
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Virtuoso } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -119,8 +120,8 @@ const ScrollImageItem = memo(function ScrollImageItem({
         src={image.url}
         alt={image.filename}
         className="w-full"
-        loading="lazy"
-        decoding="async"
+        // loading="lazy"
+        // decoding="async"
       />
 
       <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
@@ -381,6 +382,19 @@ export const ComicLibrary = memo(function ComicLibrary({
     setActiveTab(comic.path)
   }, [addTab, activeTab, setActiveTab, comic])
 
+  const renderScrollImageItem = useCallback(
+    (index: number, img: Image) => (
+      <ScrollImageItem
+        key={img.path}
+        index={index}
+        image={img}
+        onClick={handleImageClick}
+        onTags={handleSetImageTags}
+      />
+    ),
+    [handleImageClick, handleSetImageTags],
+  )
+
   return (
     <div className="flex h-full w-full">
       {/* Left Column: Comic List */}
@@ -465,8 +479,8 @@ export const ComicLibrary = memo(function ComicLibrary({
             </Button>
           </div>
         </div>
-        <ScrollArea className="h-0 flex-1">
-          {viewMode === 'grid' ? (
+        {viewMode === 'grid' ? (
+          <ScrollArea className="h-0 flex-1">
             <div className="p-4">
               <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
                 {images.map((img, i) => (
@@ -480,20 +494,17 @@ export const ComicLibrary = memo(function ComicLibrary({
                 ))}
               </div>
             </div>
-          ) : (
-            <div className="flex flex-col">
-              {images.map((img, i) => (
-                <ScrollImageItem
-                  key={img.path}
-                  index={i}
-                  image={img}
-                  onClick={handleImageClick}
-                  onTags={handleSetImageTags}
-                />
-              ))}
-            </div>
-          )}
-        </ScrollArea>
+          </ScrollArea>
+        ) : (
+          <Virtuoso
+            key={comicId}
+            className="h-full w-full flex-1"
+            data={images}
+            totalCount={images.length}
+            itemContent={renderScrollImageItem}
+            increaseViewportBy={{ top: 0, bottom: 3000 }}
+          />
+        )}
       </div>
     </div>
   )
