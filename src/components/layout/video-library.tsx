@@ -1,5 +1,6 @@
 import { Funnel, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -83,13 +84,11 @@ export const VideoLibrary = memo(function VideoLibrary({
   const updateVideoTags = useLibraryStore((s) => s.updateVideoTags)
   const activeTab = useTabsStore((s) => s.activeTab)
 
-  const videoIds = useLibraryStore(
-    (s) => s.libraryVideos[selectedLibrary.id] ?? EMPTY_ARRAY,
-  )
-  const videosMap = useLibraryStore((s) => s.videos)
-  const videos = useMemo(
-    () => videoIds.map((id) => videosMap[id]).filter(Boolean),
-    [videoIds, videosMap],
+  const videos = useLibraryStore(
+    useShallow((s) => {
+      const videoIds = s.libraryVideos[selectedLibrary.id] ?? EMPTY_ARRAY
+      return videoIds.map((id) => s.videos[id]).filter(Boolean)
+    }),
   )
 
   const { videoId } = selectedLibrary.status
@@ -130,12 +129,14 @@ export const VideoLibrary = memo(function VideoLibrary({
         void handleSetVideoTags(video, { deleted: !video.deleted })
       } else if (key === 'V') {
         void handleSetVideoTags(video, { starred: !video.starred })
+      } else if (key === 'F') {
+        toggleFilterVideo()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSetVideoTags])
+  }, [handleSetVideoTags, toggleFilterVideo])
 
   const showVideos = useMemo(() => {
     return filterVideo ? videos.filter((v) => v.starred) : videos

@@ -207,11 +207,11 @@ export const ComicLibrary = memo(function ComicLibrary({
   const addTab = useTabsStore((s) => s.addTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  const comicIds = useLibraryStore((s) => s.libraryComics[selectedLibrary.id])
-  const comicsMap = useLibraryStore((s) => s.comics)
-  const comics = useMemo(
-    () => comicIds.map((id) => comicsMap[id]),
-    [comicIds, comicsMap],
+  const comics = useLibraryStore(
+    useShallow((s) => {
+      const comicIds = s.libraryComics[selectedLibrary.id]
+      return comicIds.map((id) => s.comics[id])
+    }),
   )
 
   const comicProgress = useProgressStore(useShallow((s) => s.comics))
@@ -223,6 +223,7 @@ export const ComicLibrary = memo(function ComicLibrary({
   )
 
   const stateRef = useRef({ activeTab, comic })
+
   // eslint-disable-next-line react-hooks/refs
   stateRef.current = { activeTab, comic }
 
@@ -237,6 +238,17 @@ export const ComicLibrary = memo(function ComicLibrary({
   const toggleFilterImage = useCallback(() => {
     setFilterImage((prev) => !prev)
   }, [])
+
+  const handleContinueReading = useCallback(() => {
+    if (!comic || activeTab === comic.path) return
+    addTab({
+      type: LibraryType.comic,
+      id: comic.id,
+      title: comic.title,
+      path: comic.path,
+    })
+    setActiveTab(comic.path)
+  }, [addTab, activeTab, setActiveTab, comic])
 
   useEffect(() => {
     if (activeTab || !comicId) return
@@ -270,12 +282,20 @@ export const ComicLibrary = memo(function ComicLibrary({
         toggleFilterComic()
       } else if (key === 'G') {
         toggleFilterImage()
+      } else if (key === 'P') {
+        handleContinueReading()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSetComicTags, toggleViewMode, toggleFilterComic, toggleFilterImage])
+  }, [
+    handleSetComicTags,
+    handleContinueReading,
+    toggleViewMode,
+    toggleFilterComic,
+    toggleFilterImage,
+  ])
 
   const handleSetImageTags = useCallback(
     (image: Image, tags: FileTags) => {
@@ -312,17 +332,6 @@ export const ComicLibrary = memo(function ComicLibrary({
     },
     [comic, images.length, updateComicProgress, addTab],
   )
-
-  const handleContinueReading = useCallback(() => {
-    if (!comic || activeTab === comic.path) return
-    addTab({
-      type: LibraryType.comic,
-      id: comic.id,
-      title: comic.title,
-      path: comic.path,
-    })
-    setActiveTab(comic.path)
-  }, [addTab, activeTab, setActiveTab, comic])
 
   const renderScrollImageItem = useCallback(
     (_index: number, img: Image) => (
