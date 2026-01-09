@@ -17,6 +17,7 @@ import {
   useState,
 } from 'react'
 import { Button } from '@/components/ui/button'
+import { TagButtons } from '@/components/ui/tag-buttons'
 import { useComicNavigation } from '@/hooks/use-comic-navigation'
 import { throttle } from '@/lib/helper'
 import { cn } from '@/lib/style'
@@ -80,7 +81,7 @@ const TableOfContents = memo(function TableOfContents({
             key={i}
             data-index={i}
             className={cn(
-              'group flex w-[100px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+              'flex w-[100px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
               visibleIndicesSet.has(i) && 'bg-overlay ring-rose ring-2',
               image.deleted && 'opacity-40',
               image.starred ? 'bg-love/50' : 'hover:bg-overlay',
@@ -91,25 +92,16 @@ const TableOfContents = memo(function TableOfContents({
               <img
                 src={image.thumbnail}
                 alt={image.filename}
-                className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="h-full w-full object-cover"
                 loading="lazy"
                 decoding="async"
               />
 
-              <div className="absolute top-1 right-1 left-1 flex justify-between">
-                <Star
-                  className={cn(
-                    'text-love h-4 w-4',
-                    image.starred ? 'fill-gold' : 'opacity-0',
-                  )}
-                />
-                <Trash2
-                  className={cn(
-                    'text-love h-4 w-4',
-                    image.deleted ? 'fill-gold/80' : 'opacity-0',
-                  )}
-                />
-              </div>
+              <TagButtons
+                starred={image.starred}
+                deleted={image.deleted}
+                size="sm"
+              />
             </div>
           </div>
         ))}
@@ -152,42 +144,19 @@ const ComicImage = memo(function ComicImage({
           decoding="async"
           loading="eager"
         />
-
-        <div className="group absolute top-1.5 right-1.5 left-1.5 flex justify-between">
-          <Button
-            className="h-8 w-8 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(image, { starred: !image.starred })
-            }}
-          >
-            <Star
-              className={cn(
-                'text-love h-6 w-6',
-                image.starred
-                  ? 'fill-gold/80'
-                  : 'opacity-0 group-hover:opacity-100',
-              )}
-            />
-          </Button>
-
-          <Button
-            className="h-8 w-8 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(image, { deleted: !image.deleted })
-            }}
-          >
-            <Trash2
-              className={cn(
-                'text-love h-6 w-6',
-                image.deleted
-                  ? 'fill-gold/80'
-                  : 'opacity-0 group-hover:opacity-100',
-              )}
-            />
-          </Button>
-        </div>
+        <TagButtons
+          starred={image.starred}
+          deleted={image.deleted}
+          onStar={(e) => {
+            e.stopPropagation()
+            void onTags(image, { starred: !image.starred })
+          }}
+          onDelete={(e) => {
+            e.stopPropagation()
+            void onTags(image, { deleted: !image.deleted })
+          }}
+          size="md"
+        />
       </figure>
     </div>
   )

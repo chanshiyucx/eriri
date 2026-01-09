@@ -1,14 +1,9 @@
-import {
-  Funnel,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Star,
-  Trash2,
-} from 'lucide-react'
+import { Funnel, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { TagButtons } from '@/components/ui/tag-buttons'
 import { useCollapse } from '@/hooks/use-collapse'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -16,7 +11,6 @@ import { useTabsStore } from '@/store/tabs'
 import { type FileTags, type Library, type Video } from '@/types/library'
 
 interface VideoItemProps {
-  index: number
   video: Video
   isSelected: boolean
   onClick: (id: string) => void
@@ -24,7 +18,6 @@ interface VideoItemProps {
 }
 
 const VideoItem = memo(function VideoItem({
-  index,
   video,
   isSelected,
   onClick,
@@ -32,9 +25,8 @@ const VideoItem = memo(function VideoItem({
 }: VideoItemProps) {
   return (
     <div
-      data-index={index}
       className={cn(
-        'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+        'flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
         isSelected && 'bg-overlay ring-rose ring-2',
         video.deleted && 'opacity-40',
         video.starred ? 'bg-love/50' : 'hover:bg-overlay',
@@ -45,42 +37,24 @@ const VideoItem = memo(function VideoItem({
         <img
           src={video.cover}
           alt={video.title}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
         />
 
-        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between opacity-0 group-hover:opacity-100">
-          <Button
-            className="h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(video, { starred: !video.starred })
-            }}
-          >
-            <Star
-              className={cn(
-                'text-love h-5 w-5',
-                video.starred && 'fill-gold/80',
-              )}
-            />
-          </Button>
-
-          <Button
-            className="h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(video, { deleted: !video.deleted })
-            }}
-          >
-            <Trash2
-              className={cn(
-                'text-love h-5 w-5',
-                video.deleted && 'fill-gold/80',
-              )}
-            />
-          </Button>
-        </div>
+        <TagButtons
+          starred={video.starred}
+          deleted={video.deleted}
+          onStar={(e) => {
+            e.stopPropagation()
+            void onTags(video, { starred: !video.starred })
+          }}
+          onDelete={(e) => {
+            e.stopPropagation()
+            void onTags(video, { deleted: !video.deleted })
+          }}
+          size="sm"
+        />
       </div>
       <div
         className={cn(
@@ -164,7 +138,7 @@ export const VideoLibrary = memo(function VideoLibrary({
   }, [handleSetVideoTags])
 
   const showVideos = useMemo(() => {
-    return filterVideo ? videos.filter((v) => !v.starred) : videos
+    return filterVideo ? videos.filter((v) => v.starred) : videos
   }, [videos, filterVideo])
 
   return (
@@ -202,12 +176,11 @@ export const VideoLibrary = memo(function VideoLibrary({
         <ScrollArea className="h-0 flex-1">
           <div className="p-4">
             <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-              {showVideos.map((v, i) => (
+              {showVideos.map((video) => (
                 <VideoItem
-                  key={v.id}
-                  index={i}
-                  video={v}
-                  isSelected={videoId === v.id}
+                  key={video.id}
+                  video={video}
+                  isSelected={videoId === video.id}
                   onClick={handleSelectVideo}
                   onTags={handleSetVideoTags}
                 />

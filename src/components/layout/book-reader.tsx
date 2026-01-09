@@ -15,18 +15,9 @@ import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import { LibraryType, type FileTags } from '@/types/library'
 
-const BookLine = memo(function BookLine({
-  line,
-  index,
-}: {
-  line: string
-  index: number
-}) {
+const BookLine = memo(function BookLine({ line }: { line: string }) {
   return (
-    <p
-      data-index={index}
-      className="text-text mx-auto w-full max-w-3xl px-8 pb-4 font-serif leading-relaxed break-words whitespace-pre-wrap"
-    >
+    <p className="text-text mx-auto w-full max-w-3xl px-8 pb-4 font-serif leading-relaxed break-words whitespace-pre-wrap">
       {line}
     </p>
   )
@@ -246,7 +237,7 @@ export const BookReader = memo(function BookReader({
   )
 
   const renderItem = useCallback(
-    (index: number, line: string) => <BookLine index={index} line={line} />,
+    (_index: number, line: string) => <BookLine line={line} />,
     [],
   )
 
