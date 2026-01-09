@@ -9,19 +9,19 @@ import { useProgressStore } from '@/store/progress'
 import type { Author, Book, Library } from '@/types/library'
 import { BookReader } from './book-reader'
 
-interface BookListItemProps {
+interface BookItemProps {
   book: Book
   isSelected: boolean
+  progress?: { percent: number }
   onClick: (id: string) => void
 }
 
-const BookListItem = memo(function BookListItem({
+const BookItem = memo(function BookItem({
   book,
   isSelected,
+  progress,
   onClick,
-}: BookListItemProps) {
-  const progress = useProgressStore((s) => s.books[book.id])
-
+}: BookItemProps) {
   return (
     <Button
       onClick={() => onClick(book.id)}
@@ -54,17 +54,17 @@ const BookListItem = memo(function BookListItem({
   )
 })
 
-interface AuthorListItemProps {
+interface AuthorItemProps {
   author: Author
   isSelected: boolean
   onSelect: (id: string) => void
 }
 
-const AuthorListItem = memo(function AuthorListItem({
+const AuthorItem = memo(function AuthorItem({
   author,
   isSelected,
   onSelect,
-}: AuthorListItemProps) {
+}: AuthorItemProps) {
   return (
     <Button
       onClick={() => onSelect(author.id)}
@@ -108,6 +108,8 @@ export const BookLibrary = memo(function BookLibrary({
     }),
   )
 
+  const bookProgress = useProgressStore(useShallow((s) => s.books))
+
   const handleSelectAuthor = useCallback(
     (id: string) => {
       if (id === authorId) return
@@ -135,7 +137,7 @@ export const BookLibrary = memo(function BookLibrary({
         </div>
         <ScrollArea className="h-0 flex-1">
           {authors.map((author) => (
-            <AuthorListItem
+            <AuthorItem
               key={author.id}
               author={author}
               isSelected={authorId === author.id}
@@ -152,10 +154,11 @@ export const BookLibrary = memo(function BookLibrary({
         </div>
         <ScrollArea className="h-0 flex-1">
           {books.map((book) => (
-            <BookListItem
+            <BookItem
               key={book.id}
               book={book}
               isSelected={bookId === book.id}
+              progress={bookProgress[book.id]}
               onClick={handleSelectBook}
             />
           ))}

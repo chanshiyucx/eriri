@@ -4,15 +4,14 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Rows2,
-  Star,
   StepForward,
-  Trash2,
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Virtuoso } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { TagButtons } from '@/components/ui/tag-buttons'
 import { useCollapse } from '@/hooks/use-collapse'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -41,9 +40,8 @@ const ImageItem = memo(function ImageItem({
 }: ImageItemProps) {
   return (
     <div
-      data-index={image.index}
       className={cn(
-        'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+        'flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
         image.deleted && 'opacity-40',
         image.starred ? 'bg-love/50' : 'hover:bg-overlay',
       )}
@@ -53,46 +51,23 @@ const ImageItem = memo(function ImageItem({
         <img
           src={image.thumbnail}
           alt={image.filename}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
         />
-
-        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
-          <Button
-            className="h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(image, { starred: !image.starred })
-            }}
-          >
-            <Star
-              className={cn(
-                'text-love h-5 w-5',
-                image.starred
-                  ? 'fill-gold'
-                  : 'opacity-0 group-hover:opacity-100',
-              )}
-            />
-          </Button>
-
-          <Button
-            className="h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(image, { deleted: !image.deleted })
-            }}
-          >
-            <Trash2
-              className={cn(
-                'text-love h-5 w-5',
-                image.deleted
-                  ? 'fill-gold/80'
-                  : 'opacity-0 group-hover:opacity-100',
-              )}
-            />
-          </Button>
-        </div>
+        <TagButtons
+          starred={image.starred}
+          deleted={image.deleted}
+          onStar={(e) => {
+            e.stopPropagation()
+            void onTags(image, { starred: !image.starred })
+          }}
+          onDelete={(e) => {
+            e.stopPropagation()
+            void onTags(image, { deleted: !image.deleted })
+          }}
+          size="sm"
+        />
       </div>
       <div className="truncate text-center text-sm transition-colors">
         {image.filename}
@@ -108,51 +83,28 @@ const ScrollImageItem = memo(function ScrollImageItem({
 }: ImageItemProps) {
   return (
     <div
-      className={cn(
-        'group relative cursor-pointer',
-        image.deleted && 'opacity-40',
-      )}
+      className={cn('relative cursor-pointer', image.deleted && 'opacity-40')}
       onClick={() => onClick(image.index)}
     >
       <img src={image.url} alt={image.filename} className="w-full" />
-
-      <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
-        <Button
-          className="h-8 w-8 bg-transparent hover:bg-transparent"
-          onClick={(e) => {
-            e.stopPropagation()
-            void onTags(image, { starred: !image.starred })
-          }}
-        >
-          <Star
-            className={cn(
-              'text-love h-6 w-6',
-              image.starred ? 'fill-gold/80' : 'opacity-0 hover:opacity-100',
-            )}
-          />
-        </Button>
-
-        <Button
-          className="h-8 w-8 bg-transparent hover:bg-transparent"
-          onClick={(e) => {
-            e.stopPropagation()
-            void onTags(image, { deleted: !image.deleted })
-          }}
-        >
-          <Trash2
-            className={cn(
-              'text-love h-6 w-6',
-              image.deleted ? 'fill-gold/80' : 'opacity-0 hover:opacity-100',
-            )}
-          />
-        </Button>
-      </div>
+      <TagButtons
+        starred={image.starred}
+        deleted={image.deleted}
+        onStar={(e) => {
+          e.stopPropagation()
+          void onTags(image, { starred: !image.starred })
+        }}
+        onDelete={(e) => {
+          e.stopPropagation()
+          void onTags(image, { deleted: !image.deleted })
+        }}
+        size="md"
+      />
     </div>
   )
 })
 
 interface ComicItemProps {
-  index: number
   comic: Comic
   isSelected: boolean
   progress?: { percent: number }
@@ -161,7 +113,6 @@ interface ComicItemProps {
 }
 
 const ComicItem = memo(function ComicItem({
-  index,
   comic,
   isSelected,
   progress,
@@ -170,9 +121,8 @@ const ComicItem = memo(function ComicItem({
 }: ComicItemProps) {
   return (
     <div
-      data-index={index}
       className={cn(
-        'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+        'flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
         isSelected && 'bg-overlay ring-rose ring-2',
         comic.deleted && 'opacity-40',
         comic.starred ? 'bg-love/50' : 'hover:bg-overlay',
@@ -183,43 +133,23 @@ const ComicItem = memo(function ComicItem({
         <img
           src={comic.cover}
           alt={comic.title}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          className="h-full w-full object-cover"
           loading="lazy"
           decoding="async"
         />
-
-        <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between opacity-0 group-hover:opacity-100">
-          <Button
-            className="h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(comic, { starred: !comic.starred })
-            }}
-          >
-            <Star
-              className={cn(
-                'text-love h-5 w-5',
-                comic.starred && 'fill-gold/80',
-              )}
-            />
-          </Button>
-
-          <Button
-            className="h-6 w-6 bg-transparent hover:bg-transparent"
-            onClick={(e) => {
-              e.stopPropagation()
-              void onTags(comic, { deleted: !comic.deleted })
-            }}
-          >
-            <Trash2
-              className={cn(
-                'text-love h-5 w-5',
-                comic.deleted && 'fill-gold/80',
-              )}
-            />
-          </Button>
-        </div>
-
+        <TagButtons
+          starred={comic.starred}
+          deleted={comic.deleted}
+          onStar={(e) => {
+            e.stopPropagation()
+            void onTags(comic, { starred: !comic.starred })
+          }}
+          onDelete={(e) => {
+            e.stopPropagation()
+            void onTags(comic, { deleted: !comic.deleted })
+          }}
+          size="sm"
+        />
         {comic.pageCount && (
           <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-xs text-white">
             <span>{comic.pageCount}P</span>
@@ -297,8 +227,8 @@ export const ComicLibrary = memo(function ComicLibrary({
   stateRef.current = { activeTab, comic }
 
   const toggleViewMode = useCallback(() => {
-    setViewMode(viewMode === 'grid' ? 'scroll' : 'grid')
-  }, [viewMode])
+    setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
+  }, [])
 
   const toggleFilterComic = useCallback(() => {
     setFilterComic((prev) => !prev)
@@ -397,7 +327,6 @@ export const ComicLibrary = memo(function ComicLibrary({
   const renderScrollImageItem = useCallback(
     (_index: number, img: Image) => (
       <ScrollImageItem
-        key={img.path}
         image={img}
         onClick={handleImageClick}
         onTags={handleSetImageTags}
@@ -449,13 +378,12 @@ export const ComicLibrary = memo(function ComicLibrary({
         <ScrollArea className="h-0 flex-1">
           <div className="p-4">
             <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-              {showComics.map((c, i) => (
+              {showComics.map((comic) => (
                 <ComicItem
-                  key={c.id}
-                  index={i}
-                  comic={c}
-                  isSelected={comicId === c.id}
-                  progress={comicProgress[c.id]}
+                  key={comic.id}
+                  comic={comic}
+                  isSelected={comicId === comic.id}
+                  progress={comicProgress[comic.id]}
                   onClick={handleSelectComic}
                   onTags={handleSetComicTags}
                 />
