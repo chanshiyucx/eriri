@@ -29,27 +29,25 @@ import {
 type ViewMode = 'grid' | 'scroll'
 
 interface ImageItemProps {
-  index: number
   image: Image
   onClick: (index: number) => void
   onTags: (image: Image, tags: FileTags) => void
 }
 
 const ImageItem = memo(function ImageItem({
-  index,
   image,
   onClick,
   onTags,
 }: ImageItemProps) {
   return (
     <div
-      data-index={index}
+      data-index={image.index}
       className={cn(
         'group flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
         image.deleted && 'opacity-40',
         image.starred ? 'bg-love/50' : 'hover:bg-overlay',
       )}
-      onClick={() => onClick(index)}
+      onClick={() => onClick(image.index)}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
         <img
@@ -104,7 +102,6 @@ const ImageItem = memo(function ImageItem({
 })
 
 const ScrollImageItem = memo(function ScrollImageItem({
-  index,
   image,
   onClick,
   onTags,
@@ -115,15 +112,9 @@ const ScrollImageItem = memo(function ScrollImageItem({
         'group relative cursor-pointer',
         image.deleted && 'opacity-40',
       )}
-      onClick={() => onClick(index)}
+      onClick={() => onClick(image.index)}
     >
-      <img
-        src={image.url}
-        alt={image.filename}
-        className="w-full"
-        // loading="lazy"
-        // decoding="async"
-      />
+      <img src={image.url} alt={image.filename} className="w-full" />
 
       <div className="absolute top-1.5 right-1.5 left-1.5 flex justify-between">
         <Button
@@ -404,10 +395,9 @@ export const ComicLibrary = memo(function ComicLibrary({
   }, [addTab, activeTab, setActiveTab, comic])
 
   const renderScrollImageItem = useCallback(
-    (index: number, img: Image) => (
+    (_index: number, img: Image) => (
       <ScrollImageItem
         key={img.path}
-        index={index}
         image={img}
         onClick={handleImageClick}
         onTags={handleSetImageTags}
@@ -526,10 +516,9 @@ export const ComicLibrary = memo(function ComicLibrary({
           <ScrollArea className="h-0 flex-1">
             <div className="p-4">
               <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-                {showImages.map((img, i) => (
+                {showImages.map((img) => (
                   <ImageItem
                     key={img.path}
-                    index={i}
                     image={img}
                     onClick={handleImageClick}
                     onTags={handleSetImageTags}

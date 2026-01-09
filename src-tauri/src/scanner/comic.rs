@@ -135,7 +135,7 @@ pub fn scan_comic_images(
 
     info!(count = image_paths.len(), "Found images");
 
-    let images: Vec<ComicImage> = image_paths
+    let mut images: Vec<ComicImage> = image_paths
         .par_iter()
         .map_init(
             || {
@@ -191,20 +191,23 @@ pub fn scan_comic_images(
                     height,
                     starred,
                     deleted,
+                    index: 0,
                 }
             },
         )
         .collect();
 
-    let mut sorted_images = images;
-    sorted_images.sort_by(|a, b| natord::compare(&a.filename, &b.filename));
+    images.sort_by(|a, b| natord::compare(&a.filename, &b.filename));
+    images.iter_mut().enumerate().for_each(|(i, img)| {
+        img.index = i as u32;
+    });
 
     info!(
-        count = sorted_images.len(),
+        count = images.len(),
         duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
-        avg_ms = start.elapsed().as_millis() as f32 / sorted_images.len().max(1) as f32,
+        avg_ms = start.elapsed().as_millis() as f32 / images.len().max(1) as f32,
         "Processed comic images"
     );
 
-    Ok(sorted_images)
+    Ok(images)
 }
