@@ -72,15 +72,21 @@ export function useComicNavigation({
   )
 
   const goNext = useCallback(() => {
-    const step = visibleIndices.length || 1
     setCurrentIndex((prev) => {
+      const currentVisible = getVisibleIndices(
+        prev,
+        images,
+        viewMode,
+        containerSize,
+      )
+      const step = currentVisible.length || 1
       const nextIndex = Math.min(prev + step, images.length - 1)
       if (nextIndex !== prev) {
         onIndexChange?.(nextIndex)
       }
       return nextIndex
     })
-  }, [visibleIndices.length, images.length, onIndexChange])
+  }, [images, viewMode, containerSize, onIndexChange])
 
   const goPrev = useCallback(() => {
     setCurrentIndex((prev) => {
@@ -102,12 +108,16 @@ export function useComicNavigation({
           containerSize.height,
         )
         if (canPair) {
-          onIndexChange?.(prevPrevIndex)
+          if (prevPrevIndex !== prev) {
+            onIndexChange?.(prevPrevIndex)
+          }
           return prevPrevIndex
         }
       }
 
-      onIndexChange?.(candidateIndex)
+      if (candidateIndex !== prev) {
+        onIndexChange?.(candidateIndex)
+      }
       return candidateIndex
     })
   }, [images, viewMode, containerSize, onIndexChange])

@@ -107,7 +107,6 @@ const ScrollImageItem = memo(function ScrollImageItem({
 interface ComicItemProps {
   comic: Comic
   isSelected: boolean
-  progress?: { percent: number }
   onClick: (id: string) => void
   onTags: (comic: Comic, tags: FileTags) => void
 }
@@ -115,10 +114,11 @@ interface ComicItemProps {
 const ComicItem = memo(function ComicItem({
   comic,
   isSelected,
-  progress,
   onClick,
   onTags,
 }: ComicItemProps) {
+  const progress = useProgressStore((s) => s.comics[comic.id])
+
   return (
     <div
       className={cn(
@@ -214,18 +214,16 @@ export const ComicLibrary = memo(function ComicLibrary({
     }),
   )
 
-  const comicProgress = useProgressStore(useShallow((s) => s.comics))
-
   const { comicId } = selectedLibrary.status
   const comic = useLibraryStore((s) => (comicId ? s.comics[comicId] : null))
   const images = useLibraryStore(
     (s) => s.comicImages[comicId ?? '']?.images ?? EMPTY_ARRAY,
   )
 
-  const stateRef = useRef({ activeTab, comic })
+  const stateRef = useRef({ activeTab, comic, images })
 
   // eslint-disable-next-line react-hooks/refs
-  stateRef.current = { activeTab, comic }
+  stateRef.current = { activeTab, comic, images }
 
   const toggleViewMode = useCallback(() => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
@@ -240,7 +238,9 @@ export const ComicLibrary = memo(function ComicLibrary({
   }, [])
 
   const handleContinueReading = useCallback(() => {
-    if (!comic || activeTab === comic.path) return
+    const { comic } = stateRef.current
+    if (!comic) return
+
     addTab({
       type: LibraryType.comic,
       id: comic.id,
@@ -248,13 +248,11 @@ export const ComicLibrary = memo(function ComicLibrary({
       path: comic.path,
     })
     setActiveTab(comic.path)
-  }, [addTab, activeTab, setActiveTab, comic])
+  }, [addTab, setActiveTab])
 
   useEffect(() => {
-    if (activeTab || !comicId) return
-    if (images.length === 0) {
-      void getComicImages(comicId)
-    }
+    if (activeTab || !comicId || images.length) return
+    void getComicImages(comicId)
   }, [comicId, getComicImages, activeTab, images.length])
 
   const handleSetComicTags = useCallback(
@@ -299,23 +297,28 @@ export const ComicLibrary = memo(function ComicLibrary({
 
   const handleSetImageTags = useCallback(
     (image: Image, tags: FileTags) => {
-      if (!comicId) return
-      void updateComicImageTags(comicId, image.filename, tags)
+      const { comic } = stateRef.current
+      if (!comic) return
+
+      void updateComicImageTags(comic.id, image.filename, tags)
     },
-    [updateComicImageTags, comicId],
+    [updateComicImageTags],
   )
 
   const handleSelectComic = useCallback(
     (id: string) => {
-      if (id === comicId) return
+      const { comic } = stateRef.current
+      if (id === comic?.id) return
       updateLibrary(selectedLibrary.id, { status: { comicId: id } })
     },
-    [selectedLibrary.id, updateLibrary, comicId],
+    [selectedLibrary.id, updateLibrary],
   )
 
   const handleImageClick = useCallback(
     (index: number) => {
+      const { comic, images } = stateRef.current
       if (!comic) return
+
       updateComicProgress(comic.id, {
         current: index,
         total: images.length,
@@ -330,7 +333,7 @@ export const ComicLibrary = memo(function ComicLibrary({
         path: comic.path,
       })
     },
-    [comic, images.length, updateComicProgress, addTab],
+    [updateComicProgress, addTab],
   )
 
   const renderScrollImageItem = useCallback(
@@ -392,7 +395,6 @@ export const ComicLibrary = memo(function ComicLibrary({
                   key={comic.id}
                   comic={comic}
                   isSelected={comicId === comic.id}
-                  progress={comicProgress[comic.id]}
                   onClick={handleSelectComic}
                   onTags={handleSetComicTags}
                 />

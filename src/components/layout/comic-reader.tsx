@@ -171,11 +171,12 @@ const EMPTY_ARRAY: Image[] = []
 export const ComicReader = memo(function ComicReader({
   comicId,
 }: ComicReaderProps) {
-  const [isTocCollapsed, setTocCollapsed] = useState(true)
-  const [viewMode, setViewMode] = useState<ViewMode>('double')
-
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
   const containerRef = useRef<HTMLDivElement>(null)
+
+  const [isTocCollapsed, setTocCollapsed] = useState(true)
+  const [viewMode, setViewMode] = useState<ViewMode>('double')
+  const preloadCache = useRef<Map<string, HTMLImageElement>>(new Map())
 
   const throttleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestProgressRef = useRef<{
@@ -183,8 +184,6 @@ export const ComicReader = memo(function ComicReader({
     total: number
     percent: number
   } | null>(null)
-
-  const preloadCache = useRef<Map<string, HTMLImageElement>>(new Map())
 
   const comic = useLibraryStore((s) => s.comics[comicId])
   const images = useLibraryStore(
@@ -211,7 +210,6 @@ export const ComicReader = memo(function ComicReader({
     images,
     visibleIndices,
   })
-
   stateRef.current = { activeTab, comic, images, visibleIndices }
 
   useLayoutEffect(() => {
@@ -257,39 +255,42 @@ export const ComicReader = memo(function ComicReader({
   }, [comicId, updateComicProgress])
 
   useEffect(() => {
-    if (!images.length) return
-    if (activeTab !== comic?.path) return
+    const { comic, images } = stateRef.current
+    if (!images.length || activeTab !== comic?.path) return
 
-    const progress = useProgressStore.getState().comics[comicId]
+    const progress = useProgressStore.getState().comics[comic.id]
     if (progress?.current !== undefined) {
       const targetIndex = Math.min(progress.current, images.length - 1)
       jumpTo(targetIndex)
     }
-  }, [images.length, comic?.path, comicId, jumpTo, activeTab])
+  }, [jumpTo, activeTab, images.length, comicId])
 
   useEffect(() => {
+    const { images, comic } = stateRef.current
     if (!images.length) return
 
     const newProgress = {
       current: currentIndex,
       total: images.length,
-      percent: (currentIndex / (images.length - 1)) * 100,
+      percent:
+        images.length > 1 ? (currentIndex / (images.length - 1)) * 100 : 100,
     }
 
     latestProgressRef.current = newProgress
 
     throttleTimeoutRef.current ??= setTimeout(() => {
       if (latestProgressRef.current) {
-        updateComicProgress(comicId, {
+        updateComicProgress(comic.id, {
           ...latestProgressRef.current,
           lastRead: Date.now(),
         })
       }
       throttleTimeoutRef.current = null
     }, 300)
-  }, [currentIndex, images.length, comicId, updateComicProgress])
+  }, [currentIndex, updateComicProgress, images.length])
 
   useEffect(() => {
+    const { images, visibleIndices } = stateRef.current
     if (!images.length) return
 
     const nextIndexStart = currentIndex + visibleIndices.length
@@ -326,7 +327,7 @@ export const ComicReader = memo(function ComicReader({
         }
       }
     }
-  }, [currentIndex, visibleIndices.length, images])
+  }, [currentIndex, visibleIndices.length, images.length])
 
   const toggleToc = useCallback(() => {
     setTocCollapsed((prev) => !prev)
@@ -365,6 +366,11 @@ export const ComicReader = memo(function ComicReader({
   useEffect(() => {
     throttledNextRef.current = throttle(goNext, 80)
     throttledPrevRef.current = throttle(goPrev, 80)
+
+    return () => {
+      throttledNextRef.current?.cancel?.()
+      throttledPrevRef.current?.cancel?.()
+    }
   }, [goNext, goPrev])
 
   useEffect(() => {
