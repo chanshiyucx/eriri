@@ -348,7 +348,9 @@ export const useLibraryStore = create<LibraryState>()(
         const comic = get().comics[comicId]
         if (!comic) return []
 
+        set({ isScanning: true })
         const images = await scanComicImages(comic.path)
+        set({ isScanning: false })
         get().addComicImages(comicId, images)
 
         return images
