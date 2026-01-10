@@ -7,11 +7,11 @@ import {
   StepForward,
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Virtuoso } from 'react-virtuoso'
+import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
+import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -336,6 +336,29 @@ export const ComicLibrary = memo(function ComicLibrary({
     [updateComicProgress, addTab],
   )
 
+  const renderComicItem = useCallback(
+    (_index: number, comic: Comic) => (
+      <ComicItem
+        comic={comic}
+        isSelected={comicId === comic.id}
+        onClick={handleSelectComic}
+        onTags={handleSetComicTags}
+      />
+    ),
+    [comicId, handleSelectComic, handleSetComicTags],
+  )
+
+  const renderGridImageItem = useCallback(
+    (_index: number, img: Image) => (
+      <ImageItem
+        image={img}
+        onClick={handleImageClick}
+        onTags={handleSetImageTags}
+      />
+    ),
+    [handleImageClick, handleSetImageTags],
+  )
+
   const renderScrollImageItem = useCallback(
     (_index: number, img: Image) => (
       <ScrollImageItem
@@ -387,21 +410,15 @@ export const ComicLibrary = memo(function ComicLibrary({
             </Button>
           </div>
         </div>
-        <ScrollArea className="h-0 flex-1">
-          <div className="p-4">
-            <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-              {showComics.map((comic) => (
-                <ComicItem
-                  key={comic.id}
-                  comic={comic}
-                  isSelected={comicId === comic.id}
-                  onClick={handleSelectComic}
-                  onTags={handleSetComicTags}
-                />
-              ))}
-            </div>
-          </div>
-        </ScrollArea>
+        <VirtuosoGrid
+          className="flex-1"
+          data={showComics}
+          totalCount={showComics.length}
+          itemContent={renderComicItem}
+          components={LibraryPadding}
+          listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
+          increaseViewportBy={{ top: 0, bottom: 1000 }}
+        />
       </div>
 
       {/* Right Column: Comic Detail */}
@@ -452,24 +469,19 @@ export const ComicLibrary = memo(function ComicLibrary({
           </div>
         </div>
         {viewMode === 'grid' ? (
-          <ScrollArea className="h-0 flex-1">
-            <div className="p-4">
-              <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-                {showImages.map((img) => (
-                  <ImageItem
-                    key={img.path}
-                    image={img}
-                    onClick={handleImageClick}
-                    onTags={handleSetImageTags}
-                  />
-                ))}
-              </div>
-            </div>
-          </ScrollArea>
+          <VirtuosoGrid
+            key={comicId}
+            className="flex-1"
+            data={showImages}
+            totalCount={showImages.length}
+            itemContent={renderGridImageItem}
+            components={LibraryPadding}
+            listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
+            increaseViewportBy={{ top: 0, bottom: 1000 }}
+          />
         ) : (
           <Virtuoso
             key={comicId}
-            className="h-full w-full flex-1"
             data={showImages}
             totalCount={showImages.length}
             itemContent={renderScrollImageItem}

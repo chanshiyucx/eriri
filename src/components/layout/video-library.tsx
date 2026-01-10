@@ -1,10 +1,11 @@
 import { Funnel, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
+import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -117,6 +118,18 @@ export const VideoLibrary = memo(function VideoLibrary({
     setFilterVideo((prev) => !prev)
   }, [])
 
+  const renderVideoItem = useCallback(
+    (_index: number, video: Video) => (
+      <VideoItem
+        video={video}
+        isSelected={videoId === video.id}
+        onClick={handleSelectVideo}
+        onTags={handleSetVideoTags}
+      />
+    ),
+    [videoId, handleSelectVideo, handleSetVideoTags],
+  )
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       e.stopPropagation()
@@ -174,21 +187,15 @@ export const VideoLibrary = memo(function VideoLibrary({
             </Button>
           </div>
         </div>
-        <ScrollArea className="h-0 flex-1">
-          <div className="p-4">
-            <div className="align-content-start grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3">
-              {showVideos.map((video) => (
-                <VideoItem
-                  key={video.id}
-                  video={video}
-                  isSelected={videoId === video.id}
-                  onClick={handleSelectVideo}
-                  onTags={handleSetVideoTags}
-                />
-              ))}
-            </div>
-          </div>
-        </ScrollArea>
+        <VirtuosoGrid
+          className="flex-1"
+          data={showVideos}
+          totalCount={showVideos.length}
+          itemContent={renderVideoItem}
+          components={LibraryPadding}
+          listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
+          increaseViewportBy={{ top: 0, bottom: 1000 }}
+        />
       </div>
 
       {/* Right Column: Video Player */}
