@@ -201,7 +201,7 @@ export const BookReader = memo(function BookReader({
       const currentLine = range.startIndex
       const safeLineIndex = Math.min(Math.max(0, currentLine), totalLines - 1)
       const percent =
-        totalLines > 1 ? (safeLineIndex / (totalLines - 1)) * 100 : 0
+        totalLines > 1 ? (safeLineIndex / (totalLines - 1)) * 100 : 100
 
       const startCharIndex = content.lineStartOffsets[safeLineIndex] ?? 0
 
@@ -246,7 +246,8 @@ export const BookReader = memo(function BookReader({
       e.stopPropagation()
 
       const { activeTab, book } = stateRef.current
-      if (activeTab || !book) return
+      if (!book) return
+      if (activeTab && activeTab !== book.path) return
 
       const key = e.key.toUpperCase()
       if (key === 'T') {
