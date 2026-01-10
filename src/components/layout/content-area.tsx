@@ -27,7 +27,7 @@ export function ContentArea() {
       ))}
 
       {selectedLibrary && (
-        <div className="flex-1">
+        <div className="flex-1" key={selectedLibrary.createdAt}>
           {selectedLibrary.type === LibraryType.book ? (
             <BookLibrary selectedLibrary={selectedLibrary} />
           ) : selectedLibrary.type === LibraryType.video ? (

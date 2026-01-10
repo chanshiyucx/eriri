@@ -1,6 +1,6 @@
 import { ask, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { FolderOpen, Trash2 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { startTransition, useCallback, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   cleanAllThumbnailCache,
@@ -10,6 +10,7 @@ import {
   openPathNative,
   setCacheDir,
 } from '@/lib/scanner'
+import { useLibraryStore } from '@/store/library'
 import type { ImageCache } from '@/types/library'
 
 function formatBytes(bytes: number): string {
@@ -23,18 +24,22 @@ function formatBytes(bytes: number): string {
 export function CacheInfo() {
   const [cache, setCache] = useState<ImageCache>({ count: 0, size: 0 })
   const [cacheDir, setCacheDirState] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const isScanning = useLibraryStore((s) => s.isScanning)
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     const stats = await getThumbnailStats()
-    setCache(stats)
     const dir = await getCacheDir()
-    setCacheDirState(dir)
-  }
+    startTransition(() => {
+      setCache(stats)
+      setCacheDirState(dir)
+    })
+  }, [])
 
   useEffect(() => {
-    void loadData()
-  }, [])
+    if (!isScanning) {
+      void loadData()
+    }
+  }, [isScanning, loadData])
 
   const handleCleanCache = async () => {
     const cleanAll = await ask('选择清理过期或清理全部缓存。', {
@@ -44,7 +49,6 @@ export function CacheInfo() {
       cancelLabel: '清理过期',
     })
 
-    setIsLoading(true)
     try {
       if (cleanAll) {
         await cleanAllThumbnailCache()
@@ -54,8 +58,6 @@ export function CacheInfo() {
       await loadData()
     } catch (error) {
       console.error('Failed to clean cache:', error)
-    } finally {
-      setIsLoading(false)
     }
   }
 
@@ -109,7 +111,6 @@ export function CacheInfo() {
         onClick={() => {
           void handleCacheDir()
         }}
-        disabled={isLoading}
         className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
         title={cacheDir ? '打开/更换缓存目录' : '设置缓存目录'}
       >
@@ -119,7 +120,7 @@ export function CacheInfo() {
         onClick={() => {
           void handleCleanCache()
         }}
-        disabled={isLoading || cache.count === 0}
+        disabled={cache.count === 0}
         className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
         title="清理缓存"
       >

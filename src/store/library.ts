@@ -248,7 +248,7 @@ export const useLibraryStore = create<LibraryState>()(
             }
           })
         }
-        get().updateLibrary(id, {}, scannedLibrary)
+        get().updateLibrary(id, { createdAt: Date.now() }, scannedLibrary)
         set({ isScanning: false })
       },
 
