@@ -218,15 +218,12 @@ export function Sidebar() {
         })
         if (!yes) return
         await refreshLibrary(library.id)
-        if (library.id === selectedLibraryId) {
-          window.location.reload()
-        }
       } catch (error) {
         console.error('Failed to refresh library:', error)
         alert('Failed to refresh library: ' + String(error))
       }
     },
-    [refreshLibrary, selectedLibraryId],
+    [refreshLibrary],
   )
 
   const handleRemove = useCallback(
