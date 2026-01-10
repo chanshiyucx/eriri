@@ -12,16 +12,16 @@ import { BookReader } from './book-reader'
 interface BookItemProps {
   book: Book
   isSelected: boolean
-  progress?: { percent: number }
   onClick: (id: string) => void
 }
 
 const BookItem = memo(function BookItem({
   book,
   isSelected,
-  progress,
   onClick,
 }: BookItemProps) {
+  const progress = useProgressStore((s) => s.books[book.id])
+
   return (
     <Button
       onClick={() => onClick(book.id)}
@@ -108,8 +108,6 @@ export const BookLibrary = memo(function BookLibrary({
     }),
   )
 
-  const bookProgress = useProgressStore(useShallow((s) => s.books))
-
   const handleSelectAuthor = useCallback(
     (id: string) => {
       if (id === authorId) return
@@ -158,7 +156,6 @@ export const BookLibrary = memo(function BookLibrary({
               key={book.id}
               book={book}
               isSelected={bookId === book.id}
-              progress={bookProgress[book.id]}
               onClick={handleSelectBook}
             />
           ))}
