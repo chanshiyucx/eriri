@@ -29,6 +29,8 @@ export interface Video {
   libraryId: string
   createdAt: number
   size: number
+  width: number
+  height: number
   duration: number
   starred: boolean
   deleted: boolean

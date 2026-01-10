@@ -7,7 +7,10 @@ use tracing::info;
 
 use crate::models::Video;
 use crate::tags::get_file_tags;
-use crate::thumbnail::{convert_file_src, generate_video_thumbnail, get_thumbnail_dir, get_thumbnail_hash};
+use crate::thumbnail::{
+    convert_file_src, generate_video_thumbnail, get_image_dimensions_fast, get_thumbnail_dir,
+    get_thumbnail_hash, THUMB_HEIGHT, THUMB_WIDTH,
+};
 
 use super::utils::{
     current_time_millis, generate_uuid, get_created_time, is_hidden, is_video_file,
@@ -71,10 +74,12 @@ pub fn scan_video_library(
                 let _ = generate_video_thumbnail(video_path, &thumb_path, &sidecar_executable);
             }
 
-            let cover = if thumb_path.exists() {
-                convert_file_src(&thumb_path.to_string_lossy())
+            let (cover, width, height) = if thumb_path.exists() {
+                let cover = convert_file_src(&thumb_path.to_string_lossy());
+                let (w, h) = get_image_dimensions_fast(&thumb_path).unwrap_or((THUMB_WIDTH, THUMB_HEIGHT));
+                (cover, w, h)
             } else {
-                String::new()
+                (String::new(), THUMB_WIDTH, THUMB_HEIGHT)
             };
 
             let url = convert_file_src(&path_str);
@@ -88,6 +93,8 @@ pub fn scan_video_library(
                 library_id: library_id.to_string(),
                 created_at,
                 size,
+                width,
+                height,
                 duration: 0,
                 starred,
                 deleted,
