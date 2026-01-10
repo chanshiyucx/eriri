@@ -53,6 +53,8 @@ pub struct Video {
     #[serde(rename = "createdAt")]
     pub created_at: u64,
     pub size: u64,
+    pub width: u32,
+    pub height: u32,
     pub duration: u64,
     pub starred: bool,
     pub deleted: bool,
