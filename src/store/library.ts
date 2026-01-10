@@ -55,6 +55,7 @@ interface LibraryState {
   removeLibrary: (id: string) => void
   importLibrary: (path: string) => Promise<void>
   refreshLibrary: (libraryId: string) => Promise<void>
+  reorderLibrary: (orderedIds: string[]) => void
 
   selectedLibraryId: string | null
   setSelectedLibraryId: (id: string | null) => void
@@ -196,12 +197,17 @@ export const useLibraryStore = create<LibraryState>()(
 
         const type = await getLibraryType(path)
         const libraryName = path.split('/').pop() ?? 'Untitled Library'
+        const maxSortOrder = Math.max(
+          0,
+          ...Object.values(get().libraries).map((l) => l.sortOrder ?? 0),
+        )
         const library: Library = {
           id: libraryId,
           name: libraryName,
           path,
           type,
           createdAt: Date.now(),
+          sortOrder: maxSortOrder + 1,
           status: {
             comicId: '',
             authorId: '',
@@ -247,6 +253,14 @@ export const useLibraryStore = create<LibraryState>()(
       },
 
       setSelectedLibraryId: (id) => set({ selectedLibraryId: id }),
+
+      reorderLibrary: (orderedIds) =>
+        set((state) => {
+          orderedIds.forEach((id, index) => {
+            const lib = state.libraries[id]
+            if (lib) lib.sortOrder = index
+          })
+        }),
 
       updateBookTags: async (bookId, tags) => {
         const book = get().books[bookId]
