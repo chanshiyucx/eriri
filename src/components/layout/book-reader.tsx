@@ -3,6 +3,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { ReaderPadding } from '@/components/ui/virtuoso-config'
 import {
   findLineIndexByOffset,
   parseBook,
@@ -22,19 +23,6 @@ const BookLine = memo(function BookLine({ line }: { line: string }) {
     </p>
   )
 })
-
-const BookHeader = memo(function BookHeader() {
-  return <div className="h-16" />
-})
-
-const BookFooter = memo(function BookFooter() {
-  return <div className="h-32" />
-})
-
-const VIRTUOSO_COMPONENTS = {
-  Header: BookHeader,
-  Footer: BookFooter,
-}
 
 interface TableOfContentsProps {
   chapters: Chapter[]
@@ -329,7 +317,7 @@ export const BookReader = memo(function BookReader({
         initialTopMostItemIndex={initialTopIndex}
         rangeChanged={handleRangeChanged}
         itemContent={renderItem}
-        components={VIRTUOSO_COMPONENTS}
+        components={ReaderPadding}
         increaseViewportBy={{ top: 0, bottom: 200 }}
       />
     </div>
