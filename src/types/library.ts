@@ -12,6 +12,7 @@ export interface Library {
   path: string
   type: LibraryType
   createdAt: number
+  sortOrder: number
   status: {
     comicId?: string
     authorId?: string
