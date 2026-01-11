@@ -83,10 +83,21 @@ const ScrollImageItem = memo(function ScrollImageItem({
 }: ImageItemProps) {
   return (
     <div
-      className={cn('relative cursor-pointer', image.deleted && 'opacity-40')}
+      className={cn(
+        'relative cursor-pointer bg-cover bg-center',
+        image.deleted && 'opacity-40',
+      )}
       onClick={() => onClick(image.index)}
+      style={{
+        aspectRatio: `${image.width} / ${image.height}`,
+        backgroundImage: `url(${image.thumbnail})`,
+      }}
     >
-      <img src={image.url} alt={image.filename} className="w-full" />
+      <img
+        src={image.url}
+        alt={image.filename}
+        className="h-full w-full object-cover"
+      />
       <TagButtons
         starred={image.starred}
         deleted={image.deleted}
@@ -485,7 +496,7 @@ export const ComicLibrary = memo(function ComicLibrary({
             data={showImages}
             totalCount={showImages.length}
             itemContent={renderScrollImageItem}
-            increaseViewportBy={{ top: 0, bottom: 3000 }}
+            increaseViewportBy={{ top: 0, bottom: 6000 }}
           />
         )}
       </div>
