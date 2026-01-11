@@ -13,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             config::init(app)?;
+            thumbnail::init(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

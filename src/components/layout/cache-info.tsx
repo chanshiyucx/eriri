@@ -26,8 +26,8 @@ export function CacheInfo() {
   const [cacheDir, setCacheDirState] = useState<string | null>(null)
   const isScanning = useLibraryStore((s) => s.isScanning)
 
-  const loadData = useCallback(async () => {
-    const stats = await getThumbnailStats()
+  const loadData = useCallback(async (rescan = false) => {
+    const stats = await getThumbnailStats(rescan)
     const dir = await getCacheDir()
     startTransition(() => {
       setCache(stats)
@@ -74,6 +74,7 @@ export function CacheInfo() {
 
       if (selected !== cacheDir) {
         await setCacheDir(selected)
+        void loadData(true)
         window.location.reload()
       }
     } catch (error) {
