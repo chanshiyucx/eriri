@@ -110,11 +110,11 @@ export async function cleanAllThumbnailCache(): Promise<void> {
   }
 }
 
-export async function getThumbnailStats(): Promise<ImageCache> {
+export async function getThumbnailStats(rescan = false): Promise<ImageCache> {
   try {
     const [count, size] = await invoke<[number, number]>(
       'get_thumbnail_stats',
-      {},
+      { rescan },
     )
     return { count, size }
   } catch (error) {

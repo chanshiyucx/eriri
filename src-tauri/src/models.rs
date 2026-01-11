@@ -78,3 +78,9 @@ pub struct FileTags {
     pub starred: Option<bool>,
     pub deleted: Option<bool>,
 }
+
+#[derive(Default, Serialize, Deserialize, Clone)]
+pub struct ThumbnailStats {
+    pub count: usize,
+    pub size: u64,
+}

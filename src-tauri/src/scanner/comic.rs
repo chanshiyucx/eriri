@@ -4,6 +4,7 @@ use rayon::prelude::*;
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use tauri::AppHandle;
 use tracing::{info, warn};
 use turbojpeg::Decompressor;
@@ -11,8 +12,8 @@ use turbojpeg::Decompressor;
 use crate::models::{Comic, ComicImage};
 use crate::tags::get_file_tags;
 use crate::thumbnail::{
-    convert_file_src, find_cover_image, get_thumbnail_dir, get_thumbnail_hash, is_image_file,
-    process_and_get_dimensions, THUMB_HEIGHT, THUMB_WIDTH,
+    add_stat, convert_file_src, find_cover_image, get_thumbnail_dir, get_thumbnail_hash,
+    is_image_file, process_and_get_dimensions, THUMB_HEIGHT, THUMB_WIDTH,
 };
 
 use super::utils::{current_time_millis, generate_uuid, get_created_time, is_hidden};
@@ -27,6 +28,8 @@ pub fn scan_comic_library(
     let path = Path::new(library_path);
 
     let thumb_dir = get_thumbnail_dir(&app);
+    let new_count = AtomicUsize::new(0);
+    let new_bytes = AtomicU64::new(0);
 
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
     let entries_vec: Vec<_> = entries
@@ -65,12 +68,17 @@ pub fn scan_comic_library(
 
                         if !thumb_path.exists() {
                             if let Some(ref mut decompressor) = decompressor_opt.as_mut() {
-                                let _ = process_and_get_dimensions(
+                                if let Ok((_, _, file_size)) = process_and_get_dimensions(
                                     &cover_path,
                                     &thumb_path,
                                     decompressor,
                                     resizer,
-                                );
+                                ) {
+                                    if file_size > 0 {
+                                        new_count.fetch_add(1, Ordering::Relaxed);
+                                        new_bytes.fetch_add(file_size, Ordering::Relaxed);
+                                    }
+                                }
                             }
                         }
 
@@ -99,6 +107,12 @@ pub fn scan_comic_library(
         .flatten()
         .collect();
 
+    let total_new_count = new_count.load(Ordering::Relaxed);
+    let total_new_bytes = new_bytes.load(Ordering::Relaxed);
+    if total_new_count > 0 {
+        add_stat(&app, total_new_count, total_new_bytes);
+    }
+
     let mut comics = processed_comics;
     comics.sort_by(|a, b| natord::compare(&a.title, &b.title));
 
@@ -120,6 +134,8 @@ pub fn scan_comic_images(
     let path = Path::new(comic_path);
 
     let thumb_dir = get_thumbnail_dir(&app);
+    let new_count = AtomicUsize::new(0);
+    let new_bytes = AtomicU64::new(0);
 
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
     let image_paths: Vec<PathBuf> = entries
@@ -164,11 +180,19 @@ pub fn scan_comic_images(
 
                 let (width, height) = if let Some(ref mut decompressor) = decompressor_opt.as_mut()
                 {
-                    process_and_get_dimensions(file_path, &thumb_path, decompressor, resizer)
-                        .unwrap_or_else(|e| {
+                    match process_and_get_dimensions(file_path, &thumb_path, decompressor, resizer) {
+                        Ok((w, h, file_size)) => {
+                            if file_size > 0 {
+                                new_count.fetch_add(1, Ordering::Relaxed);
+                                new_bytes.fetch_add(file_size, Ordering::Relaxed);
+                            }
+                            (w, h)
+                        }
+                        Err(e) => {
                             warn!(error = %e, path = %file_path.display(), "Failed to process image");
-                        (THUMB_WIDTH, THUMB_HEIGHT)
-                        })
+                            (THUMB_WIDTH, THUMB_HEIGHT)
+                        }
+                    }
                 } else {
                     (THUMB_WIDTH, THUMB_HEIGHT)
                 };
@@ -196,6 +220,12 @@ pub fn scan_comic_images(
             },
         )
         .collect();
+
+    let total_new_count = new_count.load(Ordering::Relaxed);
+    let total_new_bytes = new_bytes.load(Ordering::Relaxed);
+    if total_new_count > 0 {
+        add_stat(&app, total_new_count, total_new_bytes);
+    }
 
     images.sort_by(|a, b| natord::compare(&a.filename, &b.filename));
     images.iter_mut().enumerate().for_each(|(i, img)| {
