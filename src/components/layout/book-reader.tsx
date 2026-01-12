@@ -231,7 +231,7 @@ export const BookReader = memo(function BookReader({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      e.stopPropagation()
+      if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const { activeTab, book } = stateRef.current
       if (!book) return

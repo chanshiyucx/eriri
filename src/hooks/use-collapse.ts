@@ -5,7 +5,7 @@ export function useCollapse() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      e.stopPropagation()
+      if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const key = e.key.toUpperCase()
       if (key === 'S') {

@@ -375,7 +375,7 @@ export const ComicReader = memo(function ComicReader({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      e.stopPropagation()
+      if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const { activeTab, comic, images, visibleIndices } = stateRef.current
       if (activeTab !== comic?.path) return

@@ -132,7 +132,7 @@ export const VideoLibrary = memo(function VideoLibrary({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      e.stopPropagation()
+      if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const { activeTab, video } = stateRef.current
       if (activeTab || !video) return
