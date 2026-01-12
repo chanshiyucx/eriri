@@ -275,7 +275,7 @@ export const ComicLibrary = memo(function ComicLibrary({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      e.stopPropagation()
+      if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const { activeTab, comic } = stateRef.current
       if (activeTab || !comic) return

@@ -117,7 +117,7 @@ export function TopNav() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      e.preventDefault()
+      if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const { tabs, activeTab } = stateRef.current
 
