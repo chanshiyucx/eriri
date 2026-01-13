@@ -197,8 +197,7 @@ export function Sidebar() {
 
       await importLibrary(selected)
     } catch (error) {
-      console.error('Failed to import library:', error)
-      alert('Failed to import library: ' + String(error))
+      alert('导入库失败: ' + String(error))
     }
   }
 
@@ -219,8 +218,7 @@ export function Sidebar() {
         if (!yes) return
         await refreshLibrary(library.id)
       } catch (error) {
-        console.error('Failed to refresh library:', error)
-        alert('Failed to refresh library: ' + String(error))
+        alert('刷新库失败: ' + String(error))
       }
     },
     [refreshLibrary],
@@ -228,12 +226,16 @@ export function Sidebar() {
 
   const handleRemove = useCallback(
     async (library: Library) => {
-      const yes = await ask(`确认删除库 "${library.name}"?`, {
-        title: '删除库',
-        kind: 'warning',
-      })
-      if (!yes) return
-      removeLibrary(library.id)
+      try {
+        const yes = await ask(`确认删除库 "${library.name}"?`, {
+          title: '删除库',
+          kind: 'warning',
+        })
+        if (!yes) return
+        removeLibrary(library.id)
+      } catch (error) {
+        alert('删除库失败: ' + String(error))
+      }
     },
     [removeLibrary],
   )

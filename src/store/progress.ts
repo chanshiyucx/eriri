@@ -2,21 +2,9 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import { createDebouncedTauriFileStorage } from '@/lib/storage'
+import type { BookProgress, ComicProgress } from '@/types/library'
 
-export interface ComicProgress {
-  current: number
-  total: number
-  percent: number
-  lastRead: number
-}
-
-export interface BookProgress {
-  startCharIndex: number
-  totalChars: number
-  percent: number
-  lastRead: number
-  currentChapterTitle?: string
-}
+const progressStore = createDebouncedTauriFileStorage('progress', 2000)
 
 interface ProgressState {
   comics: Record<string, ComicProgress>
@@ -56,9 +44,7 @@ export const useProgressStore = create<ProgressState>()(
     })),
     {
       name: 'progress',
-      storage: createJSONStorage(() =>
-        createDebouncedTauriFileStorage('progress', 2000),
-      ),
+      storage: createJSONStorage(() => progressStore),
     },
   ),
 )

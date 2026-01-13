@@ -1,3 +1,4 @@
+mod bookmark;
 mod config;
 mod models;
 mod scanner;
@@ -32,7 +33,11 @@ pub fn run() {
             config::read_store_data,
             config::write_store_data,
             config::remove_store_data,
+            bookmark::create_bookmark,
+            bookmark::resolve_bookmark,
+            bookmark::restore_bookmarks,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
+

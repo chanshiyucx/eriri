@@ -4,7 +4,6 @@ import { immer } from 'zustand/middleware/immer'
 import { createTauriFileStorage } from '@/lib/storage'
 import { LibraryType } from '@/types/library'
 
-// Stable storage instance for async persistence
 const tabsStorage = createTauriFileStorage('tabs')
 
 export interface Tab {

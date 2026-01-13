@@ -18,7 +18,7 @@ import {
 } from 'react'
 import { Button } from '@/components/ui/button'
 import { TagButtons } from '@/components/ui/tag-buttons'
-import { useComicNavigation } from '@/hooks/use-comic-navigation'
+import { useComicNavigation, type ViewMode } from '@/hooks/use-comic-navigation'
 import { throttle } from '@/lib/helper'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -27,7 +27,6 @@ import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 import type { FileTags, Image } from '@/types/library'
 
-type ViewMode = 'single' | 'double'
 type ImagePosition = 'center' | 'left' | 'right'
 
 interface TableOfContentsProps {

@@ -7,7 +7,6 @@ import {
 import { immer } from 'zustand/middleware/immer'
 import { createTauriFileStorage } from '@/lib/storage'
 
-// Stable storage instance for async persistence
 const uiStorage = createTauriFileStorage('ui')
 
 export type ThemeMode = 'light' | 'dark' | 'system'
@@ -22,8 +21,6 @@ interface UIState {
 }
 
 const applyTheme = (theme: ThemeMode) => {
-  if (typeof window === 'undefined') return
-
   const resolvedTheme =
     theme === 'system'
       ? window.matchMedia('(prefers-color-scheme: dark)').matches
