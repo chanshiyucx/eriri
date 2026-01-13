@@ -13,6 +13,7 @@ export interface Library {
   type: LibraryType
   createdAt: number
   sortOrder: number
+  bookmark?: string
   status: {
     comicId?: string
     authorId?: string
@@ -102,4 +103,19 @@ export interface ScannedLibrary {
 export interface FileTags {
   starred?: boolean
   deleted?: boolean
+}
+
+export interface ComicProgress {
+  current: number
+  total: number
+  percent: number
+  lastRead: number
+}
+
+export interface BookProgress {
+  startCharIndex: number
+  totalChars: number
+  percent: number
+  lastRead: number
+  currentChapterTitle?: string
 }

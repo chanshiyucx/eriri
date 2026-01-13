@@ -1,6 +1,6 @@
 import { cn } from '@/lib/style'
 
-export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement>
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement>
 
 export function Button({ className, children, ...props }: ButtonProps) {
   return (

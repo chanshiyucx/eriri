@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import type { Image } from '@/types/library'
 
-type ViewMode = 'single' | 'double'
+export type ViewMode = 'single' | 'double'
 
 const shouldPair = (
   img1: Image,
@@ -79,7 +79,7 @@ export function useComicNavigation({
         viewMode,
         containerSize,
       )
-      const step = currentVisible.length || 1
+      const step = currentVisible.length ?? 1
       const nextIndex = Math.min(prev + step, images.length - 1)
       if (nextIndex !== prev) {
         onIndexChange?.(nextIndex)

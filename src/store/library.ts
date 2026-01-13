@@ -2,8 +2,10 @@ import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
 import {
+  createBookmark,
   generateUuid,
   getLibraryType,
+  restoreBookmarks,
   scanBookLibrary,
   scanComicImages,
   scanComicLibrary,
@@ -26,7 +28,6 @@ import {
   type Video,
 } from '@/types/library'
 
-// Stable storage instance for async persistence
 const libraryStorage = createTauriFileStorage('library')
 
 const MAX_CACHE_SIZE = 30
@@ -195,6 +196,7 @@ export const useLibraryStore = create<LibraryState>()(
         const existingLibrary = get().libraries[libraryId]
         if (existingLibrary) return
 
+        const bookmark = await createBookmark(path)
         const type = await getLibraryType(path)
         const libraryName = path.split('/').pop() ?? 'Untitled Library'
         const maxSortOrder = Math.max(
@@ -208,6 +210,7 @@ export const useLibraryStore = create<LibraryState>()(
           type,
           createdAt: Date.now(),
           sortOrder: maxSortOrder + 1,
+          bookmark: bookmark ?? undefined,
           status: {
             comicId: '',
             authorId: '',
@@ -386,6 +389,15 @@ export const useLibraryStore = create<LibraryState>()(
       storage: createJSONStorage(() => libraryStorage),
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       partialize: ({ isScanning, comicImages, ...rest }) => rest,
+      onRehydrateStorage: () => (state) => {
+        if (!state) return
+        const bookmarks = Object.values(state.libraries)
+          .map((lib) => lib.bookmark)
+          .filter((b): b is string => !!b)
+        if (bookmarks.length > 0) {
+          restoreBookmarks(bookmarks).catch(console.error)
+        }
+      },
     },
   ),
 )

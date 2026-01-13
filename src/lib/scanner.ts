@@ -8,6 +8,40 @@ import {
   type Video,
 } from '@/types/library'
 
+export async function createBookmark(path: string): Promise<string | null> {
+  try {
+    return await invoke<string>('create_bookmark', { path })
+  } catch (error) {
+    console.error('Failed to create bookmark:', error)
+    return null
+  }
+}
+
+export async function resolveBookmark(
+  bookmarkData: string,
+): Promise<string | null> {
+  try {
+    return await invoke<string>('resolve_bookmark', { bookmarkData })
+  } catch (error) {
+    console.error('Failed to resolve bookmark:', error)
+    return null
+  }
+}
+
+export async function restoreBookmarks(
+  bookmarks: string[],
+): Promise<(string | null)[]> {
+  try {
+    const results = await invoke<(string | null)[]>('restore_bookmarks', {
+      bookmarks,
+    })
+    return results
+  } catch (error) {
+    console.error('Failed to restore bookmarks:', error)
+    return bookmarks.map(() => null)
+  }
+}
+
 export async function generateUuid(input: string): Promise<string> {
   try {
     return await invoke<string>('generate_uuid_command', {
