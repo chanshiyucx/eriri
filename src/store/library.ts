@@ -34,19 +34,16 @@ const MAX_CACHE_SIZE = 30
 
 interface LibraryState {
   isScanning: boolean
-
   libraries: Record<string, Library>
   comics: Record<string, Comic>
   authors: Record<string, Author>
   books: Record<string, Book>
   videos: Record<string, Video>
-
   libraryComics: Record<string, string[]>
   libraryAuthors: Record<string, string[]>
   libraryVideos: Record<string, string[]>
   authorBooks: Record<string, string[]>
   comicImages: Record<string, ComicImage>
-
   addLibrary: (library: Library, scannedLibrary: ScannedLibrary) => void
   updateLibrary: (
     id: string,
@@ -57,14 +54,11 @@ interface LibraryState {
   importLibrary: (path: string) => Promise<void>
   refreshLibrary: (libraryId: string) => Promise<void>
   reorderLibrary: (orderedIds: string[]) => void
-
   selectedLibraryId: string | null
   setSelectedLibraryId: (id: string | null) => void
-
   getComicImages: (comicId: string) => Promise<Image[]>
   addComicImages: (comicId: string, images: Image[]) => void
   removeComicImages: (comicId: string) => void
-
   updateBookTags: (bookId: string, tags: FileTags) => Promise<void>
   updateComicTags: (comicId: string, tags: FileTags) => Promise<void>
   updateVideoTags: (videoId: string, tags: FileTags) => Promise<void>

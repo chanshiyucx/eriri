@@ -17,8 +17,8 @@ import {
   useState,
 } from 'react'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
-import { useComicNavigation, type ViewMode } from '@/hooks/use-comic-navigation'
 import { throttle } from '@/lib/helper'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -27,31 +27,36 @@ import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 import type { FileTags, Image } from '@/types/library'
 
-type ImagePosition = 'center' | 'left' | 'right'
+type ViewMode = 'single' | 'scroll'
+
+const calcImageWidth = (img: Image, height: number) =>
+  (img.width / img.height) * height
+
+const calcScrollLeft = (images: Image[], targetIndex: number, height: number) =>
+  images
+    .slice(0, targetIndex)
+    .reduce((acc, img) => acc + calcImageWidth(img, height), 0)
 
 interface TableOfContentsProps {
   images: Image[]
-  visibleIndicesSet: Set<number>
+  currentIndex: number
   isCollapsed: boolean
   onSelect: (index: number) => void
 }
 
 const TableOfContents = memo(function TableOfContents({
   images,
-  visibleIndicesSet,
+  currentIndex,
   isCollapsed,
   onSelect,
 }: TableOfContentsProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll to keep visible items in view
   useEffect(() => {
     if (isCollapsed || !scrollRef.current) return
-    const firstVisible = Array.from(visibleIndicesSet)[0]
-    if (firstVisible === undefined) return
 
     const container = scrollRef.current
-    const item = container.querySelector(`[data-index="${firstVisible}"]`)
+    const item = container.querySelector(`[data-index="${currentIndex}"]`)
     if (item) {
       item.scrollIntoView({
         behavior: 'smooth',
@@ -59,7 +64,7 @@ const TableOfContents = memo(function TableOfContents({
         inline: 'center',
       })
     }
-  }, [visibleIndicesSet, isCollapsed])
+  }, [currentIndex, isCollapsed])
 
   return (
     <div
@@ -81,7 +86,7 @@ const TableOfContents = memo(function TableOfContents({
             data-index={i}
             className={cn(
               'flex w-[100px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
-              visibleIndicesSet.has(i) && 'bg-overlay ring-rose ring-2',
+              currentIndex === i && 'bg-overlay ring-rose ring-2',
               image.deleted && 'opacity-40',
               image.starred ? 'bg-love/50' : 'hover:bg-overlay',
             )}
@@ -95,7 +100,6 @@ const TableOfContents = memo(function TableOfContents({
                 loading="lazy"
                 decoding="async"
               />
-
               <TagButtons
                 starred={image.starred}
                 deleted={image.deleted}
@@ -109,32 +113,23 @@ const TableOfContents = memo(function TableOfContents({
   )
 })
 
-interface ComicImageProps {
+interface SingleImageProps {
   image: Image
-  position?: ImagePosition
   onTags: (image: Image, tags: FileTags) => void
 }
 
-const ComicImage = memo(function ComicImage({
+const SingleImage = memo(function SingleImage({
   image,
-  position,
   onTags,
-}: ComicImageProps) {
+}: SingleImageProps) {
   return (
     <div
       className={cn(
-        'relative flex h-full w-full justify-center',
+        'relative flex h-full w-full items-center justify-center',
         image.deleted && 'opacity-40',
       )}
     >
-      <figure
-        className={cn(
-          'h-full w-auto',
-          position === 'left' && 'absolute top-0 right-0 object-right',
-          position === 'right' && 'absolute top-0 left-0 object-left',
-          position === 'center' && 'relative object-center',
-        )}
-      >
+      <figure className="relative h-full w-auto">
         <img
           key={image.url}
           src={image.url}
@@ -161,6 +156,55 @@ const ComicImage = memo(function ComicImage({
   )
 })
 
+interface ScrollImageProps {
+  image: Image
+  containerHeight: number
+  onTags: (image: Image, tags: FileTags) => void
+}
+
+const ScrollImage = memo(function ScrollImage({
+  image,
+  containerHeight,
+  onTags,
+}: ScrollImageProps) {
+  const width = calcImageWidth(image, containerHeight)
+
+  return (
+    <div
+      className={cn(
+        'relative shrink-0 cursor-pointer bg-cover bg-center',
+        image.deleted && 'opacity-40',
+      )}
+      style={{
+        width,
+        height: containerHeight,
+        backgroundImage: `url(${image.thumbnail})`,
+      }}
+    >
+      <img
+        src={image.url}
+        alt={image.filename}
+        className="h-full w-full object-contain"
+        loading="lazy"
+        decoding="async"
+      />
+      <TagButtons
+        starred={image.starred}
+        deleted={image.deleted}
+        onStar={(e) => {
+          e.stopPropagation()
+          void onTags(image, { starred: !image.starred })
+        }}
+        onDelete={(e) => {
+          e.stopPropagation()
+          void onTags(image, { deleted: !image.deleted })
+        }}
+        size="md"
+      />
+    </div>
+  )
+})
+
 interface ComicReaderProps {
   comicId: string
 }
@@ -170,12 +214,13 @@ const EMPTY_ARRAY: Image[] = []
 export const ComicReader = memo(function ComicReader({
   comicId,
 }: ComicReaderProps) {
-  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 })
+  const [containerHeight, setContainerHeight] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const [isTocCollapsed, setTocCollapsed] = useState(true)
-  const [viewMode, setViewMode] = useState<ViewMode>('double')
-  const preloadCache = useRef<Map<string, HTMLImageElement>>(new Map())
+  const [viewMode, setViewMode] = useState<ViewMode>('scroll')
+  const [currentIndex, setCurrentIndex] = useState(0)
 
   const throttleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestProgressRef = useRef<{
@@ -195,39 +240,20 @@ export const ComicReader = memo(function ComicReader({
   const isImmersive = useUIStore((s) => s.isImmersive)
   const activeTab = useTabsStore((s) => s.activeTab)
 
-  const { currentIndex, visibleIndices, jumpTo, goNext, goPrev } =
-    useComicNavigation({
-      images,
-      viewMode,
-      containerSize,
-      initialIndex: 0,
-    })
-
-  const stateRef = useRef({
-    activeTab,
-    comic,
-    images,
-    visibleIndices,
-  })
-  stateRef.current = { activeTab, comic, images, visibleIndices }
+  const stateRef = useRef({ activeTab, comic, images, currentIndex })
+  stateRef.current = { activeTab, comic, images, currentIndex }
 
   useLayoutEffect(() => {
     const el = containerRef.current
     if (!el) return
 
     const measure = () => {
-      const newWidth = el.clientWidth
       const newHeight = el.clientHeight
-
-      setContainerSize((prev) => {
-        if (prev.width === newWidth && prev.height === newHeight) return prev
-        return { width: newWidth, height: newHeight }
-      })
+      setContainerHeight((prev) => (prev === newHeight ? prev : newHeight))
     }
 
     const observer = new ResizeObserver(measure)
     observer.observe(el)
-
     return () => observer.disconnect()
   }, [])
 
@@ -254,25 +280,32 @@ export const ComicReader = memo(function ComicReader({
   }, [comicId, updateComicProgress])
 
   useEffect(() => {
-    const { comic, images } = stateRef.current
-    if (!images.length || activeTab !== comic?.path) return
+    const { comic, images: imgs } = stateRef.current
+    if (!imgs.length || activeTab !== comic?.path) return
 
     const progress = useProgressStore.getState().comics[comic.id]
     if (progress?.current !== undefined) {
-      const targetIndex = Math.min(progress.current, images.length - 1)
-      jumpTo(targetIndex)
+      const targetIndex = Math.min(progress.current, imgs.length - 1)
+      setCurrentIndex(targetIndex)
+
+      if (viewMode === 'scroll' && scrollRef.current) {
+        scrollRef.current.scrollLeft = calcScrollLeft(
+          imgs,
+          targetIndex,
+          containerHeight,
+        )
+      }
     }
-  }, [jumpTo, activeTab, images.length, comicId])
+  }, [activeTab, images.length, comicId, viewMode, containerHeight])
 
   useEffect(() => {
-    const { images, comic } = stateRef.current
-    if (!images.length) return
+    const { images: imgs, comic } = stateRef.current
+    if (!imgs.length) return
 
     const newProgress = {
       current: currentIndex,
-      total: images.length,
-      percent:
-        images.length > 1 ? (currentIndex / (images.length - 1)) * 100 : 100,
+      total: imgs.length,
+      percent: imgs.length > 1 ? (currentIndex / (imgs.length - 1)) * 100 : 100,
     }
 
     latestProgressRef.current = newProgress
@@ -288,62 +321,13 @@ export const ComicReader = memo(function ComicReader({
     }, 300)
   }, [currentIndex, updateComicProgress, images.length])
 
-  useEffect(() => {
-    const { images, visibleIndices } = stateRef.current
-    if (!images.length) return
-
-    const nextIndexStart = currentIndex + visibleIndices.length
-    const prevIndexStart = currentIndex - 1
-
-    const indicesToPreload = [
-      ...Array.from({ length: 2 }, (_, i) => nextIndexStart + i),
-      prevIndexStart,
-    ].filter((i) => i >= 0 && i < images.length)
-
-    indicesToPreload.forEach((idx) => {
-      const url = images[idx].url
-      if (preloadCache.current.has(url)) return
-      const img = new Image()
-      img.src = url
-      preloadCache.current.set(url, img)
-    })
-
-    // Smart cache eviction: keep images near current position
-    if (preloadCache.current.size > 50) {
-      const nearbyUrls = new Set(
-        Array.from({ length: 10 }, (_, i) => [
-          images[currentIndex + i]?.url,
-          images[currentIndex - i]?.url,
-        ])
-          .flat()
-          .filter(Boolean),
-      )
-
-      for (const url of preloadCache.current.keys()) {
-        if (!nearbyUrls.has(url)) {
-          preloadCache.current.delete(url)
-          if (preloadCache.current.size <= 30) break
-        }
-      }
-    }
-  }, [currentIndex, visibleIndices.length, images.length])
-
   const toggleToc = useCallback(() => {
     setTocCollapsed((prev) => !prev)
   }, [])
 
   const toggleViewMode = useCallback(() => {
-    setViewMode((prev) => (prev === 'single' ? 'double' : 'single'))
+    setViewMode((prev) => (prev === 'single' ? 'scroll' : 'single'))
   }, [])
-
-  const currentImageNames = useMemo(
-    () =>
-      visibleIndices.flatMap((i) => {
-        const name = images[i]?.filename
-        return name ? [name] : []
-      }),
-    [visibleIndices, images],
-  )
 
   const handleSetImageTags = useCallback(
     (image: Image, tags: FileTags) => {
@@ -357,6 +341,27 @@ export const ComicReader = memo(function ComicReader({
       void updateComicTags(comicId, tags)
     },
     [comicId, updateComicTags],
+  )
+
+  const goNext = useCallback(() => {
+    setCurrentIndex((prev) => Math.min(prev + 1, images.length - 1))
+  }, [images.length])
+
+  const goPrev = useCallback(() => {
+    setCurrentIndex((prev) => Math.max(prev - 1, 0))
+  }, [])
+
+  const jumpTo = useCallback(
+    (index: number) => {
+      const newIndex = Math.max(0, Math.min(index, images.length - 1))
+      setCurrentIndex(newIndex)
+
+      if (viewMode === 'scroll' && scrollRef.current) {
+        const scrollLeft = calcScrollLeft(images, newIndex, containerHeight)
+        scrollRef.current.scrollTo({ left: scrollLeft, behavior: 'smooth' })
+      }
+    },
+    [images, viewMode, containerHeight],
   )
 
   const throttledNextRef = useRef<ReturnType<typeof throttle> | null>(null)
@@ -376,7 +381,12 @@ export const ComicReader = memo(function ComicReader({
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
-      const { activeTab, comic, images, visibleIndices } = stateRef.current
+      const {
+        activeTab,
+        comic,
+        images: imgs,
+        currentIndex: idx,
+      } = stateRef.current
       if (activeTab !== comic?.path) return
 
       const key = e.key.toUpperCase()
@@ -387,27 +397,17 @@ export const ComicReader = memo(function ComicReader({
       } else if (key === 'D') {
         toggleViewMode()
       } else if (key === 'N') {
-        const firstImage = images[visibleIndices[0]]
-        if (firstImage) {
-          void handleSetImageTags(firstImage, { starred: !firstImage.starred })
-        }
-      } else if (key === 'M') {
-        if (visibleIndices[1] !== undefined) {
-          const secondImage = images[visibleIndices[1]]
-          void handleSetImageTags(secondImage, {
-            starred: !secondImage.starred,
+        const currentImage = imgs[idx]
+        if (currentImage) {
+          void handleSetImageTags(currentImage, {
+            starred: !currentImage.starred,
           })
         }
       } else if (key === 'J') {
-        const firstImage = images[visibleIndices[0]]
-        if (firstImage) {
-          void handleSetImageTags(firstImage, { deleted: !firstImage.deleted })
-        }
-      } else if (key === 'K') {
-        if (visibleIndices[1] !== undefined) {
-          const secondImage = images[visibleIndices[1]]
-          void handleSetImageTags(secondImage, {
-            deleted: !secondImage.deleted,
+        const currentImage = imgs[idx]
+        if (currentImage) {
+          void handleSetImageTags(currentImage, {
+            deleted: !currentImage.deleted,
           })
         }
       } else if (key === 'T') {
@@ -423,19 +423,41 @@ export const ComicReader = memo(function ComicReader({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleViewMode, handleSetImageTags, toggleToc, handleSetComicTags])
 
-  const visibleIndicesSet = useMemo(
-    () => new Set(visibleIndices),
-    [visibleIndices],
+  // Track scroll position to update currentIndex in scroll mode
+  const handleScroll = useCallback(() => {
+    if (viewMode !== 'scroll' || !scrollRef.current) return
+
+    const scrollLeft = scrollRef.current.scrollLeft
+    let accumulatedWidth = 0
+
+    for (let i = 0; i < images.length; i++) {
+      const imgWidth = calcImageWidth(images[i], containerHeight)
+      if (scrollLeft < accumulatedWidth + imgWidth / 2) {
+        setCurrentIndex(i)
+        return
+      }
+      accumulatedWidth += imgWidth
+    }
+    setCurrentIndex(images.length - 1)
+  }, [viewMode, images, containerHeight])
+
+  const throttledScrollHandler = useMemo(
+    () => throttle(handleScroll, 100),
+    [handleScroll],
   )
 
-  const isReady = images.length > 0 && containerSize.width > 0
+  useEffect(() => {
+    return () => throttledScrollHandler.cancel?.()
+  }, [throttledScrollHandler])
+
+  const currentImage = images[currentIndex]
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
       {images.length > 0 && (
         <TableOfContents
           images={images}
-          visibleIndicesSet={visibleIndicesSet}
+          currentIndex={currentIndex}
           isCollapsed={isTocCollapsed}
           onSelect={jumpTo}
         />
@@ -452,7 +474,7 @@ export const ComicReader = memo(function ComicReader({
           <Button
             className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
             onClick={toggleViewMode}
-            title={`切换到 ${viewMode === 'single' ? '双栏' : '单栏'}`}
+            title={`切换到 ${viewMode === 'single' ? '滚动' : '单页'}`}
           >
             {viewMode === 'single' ? (
               <Square className="h-4 w-4" />
@@ -487,10 +509,8 @@ export const ComicReader = memo(function ComicReader({
             />
           </Button>
 
-          <h3 className="flex flex-1 justify-evenly truncate text-center">
-            {currentImageNames.map((name) => (
-              <span key={name}>{name}</span>
-            ))}
+          <h3 className="flex flex-1 justify-center truncate text-center">
+            {currentImage?.filename}
           </h3>
         </div>
       )}
@@ -498,46 +518,48 @@ export const ComicReader = memo(function ComicReader({
         ref={containerRef}
         className="bg-surface flex h-0 flex-1 items-center justify-center overflow-hidden"
       >
-        {isReady && (
+        {viewMode === 'single' && currentImage && (
           <>
-            {visibleIndices.map((index, mapIndex) => {
-              const img = images[index]
-              const isSpread =
-                viewMode === 'double' && visibleIndices.length > 1
-              let pos: ImagePosition = 'center'
-              if (isSpread) {
-                pos = mapIndex === 0 ? 'left' : 'right'
-              }
+            <SingleImage image={currentImage} onTags={handleSetImageTags} />
 
-              return (
-                <ComicImage
-                  key={img.url}
-                  image={img}
-                  position={pos}
-                  onTags={handleSetImageTags}
-                />
-              )
-            })}
+            {currentIndex > 0 && (
+              <Button
+                className="hover:text-love transition-color text-subtle/60 absolute top-1/2 left-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
+                onClick={goPrev}
+              >
+                <CircleChevronLeft className="h-10 w-10" />
+              </Button>
+            )}
+
+            {currentIndex < images.length - 1 && (
+              <Button
+                className="hover:text-love transition-color text-subtle/60 absolute top-1/2 right-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
+                onClick={goNext}
+              >
+                <CircleChevronRight className="h-10 w-10" />
+              </Button>
+            )}
           </>
         )}
 
-        {/* Navigation Buttons */}
-        {currentIndex > 0 && (
-          <Button
-            className="hover:text-love transition-color text-subtle/60 absolute top-1/2 left-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
-            onClick={goPrev}
+        {viewMode === 'scroll' && (
+          <ScrollArea
+            ref={scrollRef}
+            className="h-full w-full"
+            orientation="horizontal"
+            onScroll={throttledScrollHandler}
           >
-            <CircleChevronLeft className="h-10 w-10" />
-          </Button>
-        )}
-
-        {currentIndex < images.length - 1 && (
-          <Button
-            className="hover:text-love transition-color text-subtle/60 absolute top-1/2 right-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
-            onClick={goNext}
-          >
-            <CircleChevronRight className="h-10 w-10" />
-          </Button>
+            <div className="flex h-full">
+              {images.map((img) => (
+                <ScrollImage
+                  key={img.url}
+                  image={img}
+                  containerHeight={containerHeight}
+                  onTags={handleSetImageTags}
+                />
+              ))}
+            </div>
+          </ScrollArea>
         )}
       </div>
     </div>

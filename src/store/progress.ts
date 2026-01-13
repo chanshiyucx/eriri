@@ -9,7 +9,6 @@ const progressStore = createDebouncedTauriFileStorage('progress', 2000)
 interface ProgressState {
   comics: Record<string, ComicProgress>
   books: Record<string, BookProgress>
-
   updateComicProgress: (comicId: string, progress: ComicProgress) => void
   updateBookProgress: (bookId: string, progress: BookProgress) => void
   removeComicProgress: (comicId: string) => void
