@@ -9,18 +9,16 @@ export function LibraryArea() {
     s.selectedLibraryId ? s.libraries[s.selectedLibraryId] : null,
   )
 
+  if (!selectedLibrary) return null
+
   return (
-    <main className="bg-surface flex h-full flex-1 flex-col">
-      {selectedLibrary && (
-        <div className="flex-1" key={selectedLibrary.createdAt}>
-          {selectedLibrary.type === LibraryType.book ? (
-            <BookLibrary selectedLibrary={selectedLibrary} />
-          ) : selectedLibrary.type === LibraryType.video ? (
-            <VideoLibrary selectedLibrary={selectedLibrary} />
-          ) : (
-            <ComicLibrary selectedLibrary={selectedLibrary} />
-          )}
-        </div>
+    <main className="bg-surface flex-1" key={selectedLibrary.createdAt}>
+      {selectedLibrary.type === LibraryType.book ? (
+        <BookLibrary selectedLibrary={selectedLibrary} />
+      ) : selectedLibrary.type === LibraryType.video ? (
+        <VideoLibrary selectedLibrary={selectedLibrary} />
+      ) : (
+        <ComicLibrary selectedLibrary={selectedLibrary} />
       )}
     </main>
   )
