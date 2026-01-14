@@ -23,7 +23,7 @@ const TabContent = memo(function TabContent({
   return (
     <div
       className={cn(
-        'bg-surface fixed inset-0 z-100 w-full',
+        'bg-surface fixed inset-0 z-100',
         isActive ? 'visible' : 'hidden',
         isImmersive ? 'top-0' : 'top-8',
       )}
