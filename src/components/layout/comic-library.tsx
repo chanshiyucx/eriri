@@ -27,17 +27,17 @@ import {
 
 type ViewMode = 'grid' | 'scroll'
 
-interface ImageItemProps {
+interface ImageProps {
   image: Image
   onClick: (index: number) => void
   onTags: (image: Image, tags: FileTags) => void
 }
 
-const ImageItem = memo(function ImageItem({
+const GridImage = memo(function GridImage({
   image,
   onClick,
   onTags,
-}: ImageItemProps) {
+}: ImageProps) {
   return (
     <div
       className={cn(
@@ -76,11 +76,11 @@ const ImageItem = memo(function ImageItem({
   )
 })
 
-const ScrollImageItem = memo(function ScrollImageItem({
+const ScrollImage = memo(function ScrollImage({
   image,
   onClick,
   onTags,
-}: ImageItemProps) {
+}: ImageProps) {
   return (
     <div
       className={cn(
@@ -359,9 +359,9 @@ export const ComicLibrary = memo(function ComicLibrary({
     [comicId, handleSelectComic, handleSetComicTags],
   )
 
-  const renderGridImageItem = useCallback(
+  const renderGridImage = useCallback(
     (_index: number, img: Image) => (
-      <ImageItem
+      <GridImage
         image={img}
         onClick={handleImageClick}
         onTags={handleSetImageTags}
@@ -370,9 +370,9 @@ export const ComicLibrary = memo(function ComicLibrary({
     [handleImageClick, handleSetImageTags],
   )
 
-  const renderScrollImageItem = useCallback(
+  const renderScrollImage = useCallback(
     (_index: number, img: Image) => (
-      <ScrollImageItem
+      <ScrollImage
         image={img}
         onClick={handleImageClick}
         onTags={handleSetImageTags}
@@ -485,7 +485,7 @@ export const ComicLibrary = memo(function ComicLibrary({
             className="flex-1"
             data={showImages}
             totalCount={showImages.length}
-            itemContent={renderGridImageItem}
+            itemContent={renderGridImage}
             components={LibraryPadding}
             listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
             increaseViewportBy={{ top: 0, bottom: 1000 }}
@@ -495,7 +495,7 @@ export const ComicLibrary = memo(function ComicLibrary({
             key={comicId}
             data={showImages}
             totalCount={showImages.length}
-            itemContent={renderScrollImageItem}
+            itemContent={renderScrollImage}
             increaseViewportBy={{ top: 0, bottom: 6000 }}
           />
         )}

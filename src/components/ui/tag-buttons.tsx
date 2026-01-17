@@ -29,18 +29,6 @@ export const TagButtons = memo(function TagButtons({
     >
       <Button
         className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
-        onClick={onStar}
-      >
-        <Star
-          className={cn(
-            'text-love',
-            iconSize,
-            starred ? 'fill-gold/80' : 'opacity-0 group-hover:opacity-100',
-          )}
-        />
-      </Button>
-      <Button
-        className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
         onClick={onDelete}
       >
         <Trash2
@@ -48,6 +36,18 @@ export const TagButtons = memo(function TagButtons({
             'text-love',
             iconSize,
             deleted ? 'fill-gold/80' : 'opacity-0 group-hover:opacity-100',
+          )}
+        />
+      </Button>
+      <Button
+        className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
+        onClick={onStar}
+      >
+        <Star
+          className={cn(
+            'text-love',
+            iconSize,
+            starred ? 'fill-gold/80' : 'opacity-0 group-hover:opacity-100',
           )}
         />
       </Button>
