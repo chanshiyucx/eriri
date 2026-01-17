@@ -12,7 +12,10 @@ export function LibraryArea() {
   if (!selectedLibrary) return null
 
   return (
-    <main className="bg-surface flex-1" key={selectedLibrary.createdAt}>
+    <main
+      className="bg-surface flex-1 overflow-hidden"
+      key={selectedLibrary.createdAt}
+    >
       {selectedLibrary.type === LibraryType.book ? (
         <BookLibrary selectedLibrary={selectedLibrary} />
       ) : selectedLibrary.type === LibraryType.video ? (
