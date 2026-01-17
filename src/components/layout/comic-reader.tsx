@@ -7,18 +7,11 @@ import {
   Star,
   Trash2,
 } from 'lucide-react'
-import {
-  memo,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
+import { ComicHorizontalList } from '@/components/ui/virtuoso-config'
 import { throttle } from '@/lib/helper'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -28,14 +21,6 @@ import { useUIStore } from '@/store/ui'
 import type { FileTags, Image } from '@/types/library'
 
 type ViewMode = 'single' | 'scroll'
-
-const calcImageWidth = (img: Image, height: number) =>
-  (img.width / img.height) * height
-
-const calcScrollLeft = (images: Image[], targetIndex: number, height: number) =>
-  images
-    .slice(0, targetIndex)
-    .reduce((acc, img) => acc + calcImageWidth(img, height), 0)
 
 interface TableOfContentsProps {
   images: Image[]
@@ -135,8 +120,6 @@ const SingleImage = memo(function SingleImage({
           src={image.url}
           alt={image.filename}
           className="block h-full w-auto object-contain select-none"
-          decoding="async"
-          loading="eager"
         />
         <TagButtons
           starred={image.starred}
@@ -158,26 +141,21 @@ const SingleImage = memo(function SingleImage({
 
 interface ScrollImageProps {
   image: Image
-  containerHeight: number
   onTags: (image: Image, tags: FileTags) => void
 }
 
 const ScrollImage = memo(function ScrollImage({
   image,
-  containerHeight,
   onTags,
 }: ScrollImageProps) {
-  const width = calcImageWidth(image, containerHeight)
-
   return (
     <div
       className={cn(
-        'relative shrink-0 cursor-pointer bg-cover bg-center',
+        'relative h-full shrink-0 cursor-pointer bg-cover bg-center',
         image.deleted && 'opacity-40',
       )}
       style={{
-        width,
-        height: containerHeight,
+        aspectRatio: `${image.width} / ${image.height}`,
         backgroundImage: `url(${image.thumbnail})`,
       }}
     >
@@ -185,19 +163,17 @@ const ScrollImage = memo(function ScrollImage({
         src={image.url}
         alt={image.filename}
         className="h-full w-full object-contain"
-        loading="lazy"
-        decoding="async"
       />
       <TagButtons
         starred={image.starred}
         deleted={image.deleted}
         onStar={(e) => {
           e.stopPropagation()
-          void onTags(image, { starred: !image.starred })
+          onTags(image, { starred: !image.starred })
         }}
         onDelete={(e) => {
           e.stopPropagation()
-          void onTags(image, { deleted: !image.deleted })
+          onTags(image, { deleted: !image.deleted })
         }}
         size="md"
       />
@@ -214,9 +190,7 @@ const EMPTY_ARRAY: Image[] = []
 export const ComicReader = memo(function ComicReader({
   comicId,
 }: ComicReaderProps) {
-  const [containerHeight, setContainerHeight] = useState(0)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const virtuosoRef = useRef<VirtuosoHandle>(null)
 
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
@@ -242,20 +216,6 @@ export const ComicReader = memo(function ComicReader({
 
   const stateRef = useRef({ activeTab, comic, images, currentIndex })
   stateRef.current = { activeTab, comic, images, currentIndex }
-
-  useLayoutEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-
-    const measure = () => {
-      const newHeight = el.clientHeight
-      setContainerHeight((prev) => (prev === newHeight ? prev : newHeight))
-    }
-
-    const observer = new ResizeObserver(measure)
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
 
   useEffect(() => {
     if (images.length === 0) {
@@ -288,15 +248,14 @@ export const ComicReader = memo(function ComicReader({
       const targetIndex = Math.min(progress.current, imgs.length - 1)
       setCurrentIndex(targetIndex)
 
-      if (viewMode === 'scroll' && scrollRef.current) {
-        scrollRef.current.scrollLeft = calcScrollLeft(
-          imgs,
-          targetIndex,
-          containerHeight,
-        )
+      if (viewMode === 'scroll') {
+        virtuosoRef.current?.scrollToIndex({
+          index: targetIndex,
+          align: 'start',
+        })
       }
     }
-  }, [activeTab, images.length, comicId, viewMode, containerHeight])
+  }, [activeTab, images.length, comicId, viewMode])
 
   useEffect(() => {
     const { images: imgs, comic } = stateRef.current
@@ -356,12 +315,15 @@ export const ComicReader = memo(function ComicReader({
       const newIndex = Math.max(0, Math.min(index, images.length - 1))
       setCurrentIndex(newIndex)
 
-      if (viewMode === 'scroll' && scrollRef.current) {
-        const scrollLeft = calcScrollLeft(images, newIndex, containerHeight)
-        scrollRef.current.scrollTo({ left: scrollLeft, behavior: 'smooth' })
+      if (viewMode === 'scroll') {
+        virtuosoRef.current?.scrollToIndex({
+          index: newIndex,
+          align: 'start',
+          behavior: 'smooth',
+        })
       }
     },
-    [images, viewMode, containerHeight],
+    [images.length, viewMode],
   )
 
   const throttledNextRef = useRef<ReturnType<typeof throttle> | null>(null)
@@ -394,28 +356,24 @@ export const ComicReader = memo(function ComicReader({
         throttledPrevRef.current?.()
       } else if (key === 'ARROWDOWN') {
         throttledNextRef.current?.()
-      } else if (key === 'D') {
+      } else if (key === 'B') {
         toggleViewMode()
+      } else if (key === 'T') {
+        toggleToc()
+      } else if (key === 'C') {
+        handleSetComicTags({ deleted: !comic.deleted })
+      } else if (key === 'V') {
+        handleSetComicTags({ starred: !comic.starred })
       } else if (key === 'N') {
         const currentImage = imgs[idx]
-        if (currentImage) {
-          void handleSetImageTags(currentImage, {
-            starred: !currentImage.starred,
-          })
-        }
-      } else if (key === 'J') {
+        handleSetImageTags(currentImage, {
+          deleted: !currentImage.deleted,
+        })
+      } else if (key === 'M') {
         const currentImage = imgs[idx]
-        if (currentImage) {
-          void handleSetImageTags(currentImage, {
-            deleted: !currentImage.deleted,
-          })
-        }
-      } else if (key === 'T') {
-        void toggleToc()
-      } else if (key === 'C') {
-        void handleSetComicTags({ deleted: !comic.deleted })
-      } else if (key === 'V') {
-        void handleSetComicTags({ starred: !comic.starred })
+        handleSetImageTags(currentImage, {
+          starred: !currentImage.starred,
+        })
       }
     }
 
@@ -423,32 +381,19 @@ export const ComicReader = memo(function ComicReader({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleViewMode, handleSetImageTags, toggleToc, handleSetComicTags])
 
-  // Track scroll position to update currentIndex in scroll mode
-  const handleScroll = useCallback(() => {
-    if (viewMode !== 'scroll' || !scrollRef.current) return
-
-    const scrollLeft = scrollRef.current.scrollLeft
-    let accumulatedWidth = 0
-
-    for (let i = 0; i < images.length; i++) {
-      const imgWidth = calcImageWidth(images[i], containerHeight)
-      if (scrollLeft < accumulatedWidth + imgWidth / 2) {
-        setCurrentIndex(i)
-        return
-      }
-      accumulatedWidth += imgWidth
-    }
-    setCurrentIndex(images.length - 1)
-  }, [viewMode, images, containerHeight])
-
-  const throttledScrollHandler = useMemo(
-    () => throttle(handleScroll, 100),
-    [handleScroll],
+  const handleRangeChanged = useCallback(
+    (range: { startIndex: number; endIndex: number }) => {
+      setCurrentIndex(range.startIndex)
+    },
+    [],
   )
 
-  useEffect(() => {
-    return () => throttledScrollHandler.cancel?.()
-  }, [throttledScrollHandler])
+  const renderScrollImage = useCallback(
+    (_index: number, image: Image) => (
+      <ScrollImage image={image} onTags={handleSetImageTags} />
+    ),
+    [handleSetImageTags],
+  )
 
   const currentImage = images[currentIndex]
 
@@ -514,10 +459,7 @@ export const ComicReader = memo(function ComicReader({
           </h3>
         </div>
       )}
-      <div
-        ref={containerRef}
-        className="bg-surface flex h-0 flex-1 items-center justify-center overflow-hidden"
-      >
+      <div className="bg-surface flex h-0 flex-1 items-center justify-center overflow-hidden">
         {viewMode === 'single' && currentImage && (
           <>
             <SingleImage image={currentImage} onTags={handleSetImageTags} />
@@ -543,23 +485,16 @@ export const ComicReader = memo(function ComicReader({
         )}
 
         {viewMode === 'scroll' && (
-          <ScrollArea
-            ref={scrollRef}
+          <Virtuoso
+            ref={virtuosoRef}
             className="h-full w-full"
-            orientation="horizontal"
-            onScroll={throttledScrollHandler}
-          >
-            <div className="flex h-full">
-              {images.map((img) => (
-                <ScrollImage
-                  key={img.url}
-                  image={img}
-                  containerHeight={containerHeight}
-                  onTags={handleSetImageTags}
-                />
-              ))}
-            </div>
-          </ScrollArea>
+            horizontalDirection
+            data={images}
+            rangeChanged={handleRangeChanged}
+            itemContent={renderScrollImage}
+            increaseViewportBy={{ top: 0, bottom: 6000 }}
+            components={ComicHorizontalList}
+          />
         )}
       </div>
     </div>
