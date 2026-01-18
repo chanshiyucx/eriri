@@ -247,7 +247,7 @@ export function Sidebar() {
         isSidebarCollapsed ? 'w-0' : 'w-56 border-r',
       )}
     >
-      <ScrollArea className="flex-1">
+      <ScrollArea viewportClassName="h-0 flex-1">
         <Button
           className="h-10 w-full justify-start gap-2 rounded-none px-4"
           disabled={isScanning}

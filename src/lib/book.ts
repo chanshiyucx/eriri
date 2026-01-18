@@ -14,7 +14,7 @@ export interface BookContent {
 }
 
 const CHAPTER_REGEX =
-  /(?:^|\n)(第[0-9０-９一二三四五六七八九十百千]+[章回节卷集幕].*)/
+  /(?:^|\n)((第[0-9０-９一二三四五六七八九十百千]+[章回节卷集幕]|序章|终章|番外|后记|尾声).*)/
 
 export async function parseBook(path: string): Promise<BookContent> {
   try {
