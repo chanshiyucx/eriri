@@ -29,7 +29,7 @@ type ViewMode = 'grid' | 'scroll'
 
 interface ImageProps {
   image: Image
-  onClick: (index: number) => void
+  onClick?: (index: number) => void
   onTags: (image: Image, tags: FileTags) => void
 }
 
@@ -45,7 +45,7 @@ const GridImage = memo(function GridImage({
         image.deleted && 'opacity-40',
         image.starred ? 'bg-love/50' : 'hover:bg-overlay',
       )}
-      onClick={() => onClick(image.index)}
+      onClick={() => onClick?.(image.index)}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
         <img
@@ -76,18 +76,13 @@ const GridImage = memo(function GridImage({
   )
 })
 
-const ScrollImage = memo(function ScrollImage({
-  image,
-  onClick,
-  onTags,
-}: ImageProps) {
+const ScrollImage = memo(function ScrollImage({ image, onTags }: ImageProps) {
   return (
     <div
       className={cn(
-        'relative cursor-pointer bg-cover bg-center',
+        'relative bg-cover bg-center',
         image.deleted && 'opacity-40',
       )}
-      onClick={() => onClick(image.index)}
       style={{
         aspectRatio: `${image.width} / ${image.height}`,
         backgroundImage: `url(${image.thumbnail})`,
@@ -372,13 +367,9 @@ export const ComicLibrary = memo(function ComicLibrary({
 
   const renderScrollImage = useCallback(
     (_index: number, img: Image) => (
-      <ScrollImage
-        image={img}
-        onClick={handleImageClick}
-        onTags={handleSetImageTags}
-      />
+      <ScrollImage image={img} onTags={handleSetImageTags} />
     ),
-    [handleImageClick, handleSetImageTags],
+    [handleSetImageTags],
   )
 
   const showComics = useMemo(() => {
@@ -496,7 +487,7 @@ export const ComicLibrary = memo(function ComicLibrary({
             data={showImages}
             totalCount={showImages.length}
             itemContent={renderScrollImage}
-            increaseViewportBy={{ top: 0, bottom: 6000 }}
+            increaseViewportBy={6000}
           />
         )}
       </div>

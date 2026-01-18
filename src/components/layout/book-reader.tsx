@@ -4,6 +4,7 @@ import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ReaderPadding } from '@/components/ui/virtuoso-config'
+import { useClickOutside } from '@/hooks/use-click-outside'
 import {
   findLineIndexByOffset,
   parseBook,
@@ -29,6 +30,7 @@ interface TableOfContentsProps {
   currentChapterTitle: string
   isCollapsed: boolean
   onSelect: (lineIndex: number) => void
+  onClose: () => void
 }
 
 const TableOfContents = memo(function TableOfContents({
@@ -36,15 +38,21 @@ const TableOfContents = memo(function TableOfContents({
   currentChapterTitle,
   isCollapsed,
   onSelect,
+  onClose,
 }: TableOfContentsProps) {
+  const tocRef = useRef<HTMLDivElement>(null)
+
+  useClickOutside(tocRef, onClose, !isCollapsed)
+
   return (
     <div
+      ref={tocRef}
       className={cn(
         'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-all duration-300 ease-in-out',
         isCollapsed ? '-translate-x-full' : 'translate-x-0',
       )}
     >
-      <ScrollArea className="h-full">
+      <ScrollArea viewportClassName="h-full">
         <div className="pb-12">
           {chapters.map((chapter, i) => (
             <div
@@ -153,8 +161,9 @@ export const BookReader = memo(function BookReader({
   }, [content, bookId])
 
   const toggleToc = useCallback(() => {
+    if (!content?.chapters.length) return
     setTocCollapsed((prev) => !prev)
-  }, [])
+  }, [content])
 
   const handleChapterClick = useCallback((lineIndex: number) => {
     virtuosoRef.current?.scrollToIndex({
@@ -251,16 +260,17 @@ export const BookReader = memo(function BookReader({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleSetBookTags, toggleToc])
 
-  if (!book) return null
+  if (!book || !content) return null
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
-      {content?.chapters && (
+      {content.chapters && (
         <TableOfContents
           chapters={content.chapters}
           currentChapterTitle={currentChapterTitle}
           isCollapsed={isTocCollapsed}
           onSelect={handleChapterClick}
+          onClose={() => setTocCollapsed(true)}
         />
       )}
 
@@ -268,7 +278,9 @@ export const BookReader = memo(function BookReader({
         <Button
           className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
           onClick={toggleToc}
+          onMouseDown={(e) => e.stopPropagation()}
           title="展开目录"
+          disabled={!content.chapters.length}
         >
           <SquareMenu className="h-4 w-4" />
         </Button>
