@@ -506,7 +506,7 @@ export const ComicReader = memo(function ComicReader({
             data={images}
             initialTopMostItemIndex={currentIndex}
             itemContent={renderScrollImage}
-            increaseViewportBy={6000}
+            increaseViewportBy={3000}
             components={ComicHorizontalList}
           />
         )}

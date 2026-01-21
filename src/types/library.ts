@@ -71,6 +71,19 @@ export interface Book {
   createdAt: number
 }
 
+export interface Chapter {
+  title: string
+  lineIndex: number
+  charIndex: number
+}
+
+export interface BookContent {
+  lines: string[]
+  lineStartOffsets: number[]
+  chapters: Chapter[]
+  totalChars: number
+}
+
 export interface Image {
   path: string
   url: string

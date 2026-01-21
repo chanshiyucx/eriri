@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/style'
 import { useTabsStore, type Tab } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
@@ -96,23 +97,20 @@ export function TopNav() {
     const observer = new ResizeObserver(updateArrowVisibility)
     observer.observe(container)
 
-    const handleScroll = () => updateArrowVisibility()
-    container.addEventListener('scroll', handleScroll, { passive: true })
+    container.addEventListener('scroll', updateArrowVisibility, {
+      passive: true,
+    })
 
     updateArrowVisibility()
 
     return () => {
       observer.disconnect()
-      container.removeEventListener('scroll', handleScroll)
+      container.removeEventListener('scroll', updateArrowVisibility)
       if (rafIdRef.current !== null) {
         cancelAnimationFrame(rafIdRef.current)
         rafIdRef.current = null
       }
     }
-  }, [updateArrowVisibility])
-
-  useEffect(() => {
-    updateArrowVisibility()
   }, [updateArrowVisibility])
 
   useEffect(() => {
@@ -171,9 +169,6 @@ export function TopNav() {
     })
   }, [])
 
-  const handleScrollLeft = useCallback(() => scroll('left'), [scroll])
-  const handleScrollRight = useCallback(() => scroll('right'), [scroll])
-
   return (
     <div className="bg-base flex h-8 shrink-0 items-center border-b px-2">
       <Button className="mx-1 h-6 w-6" onClick={toggleSidebar}>
@@ -195,15 +190,17 @@ export function TopNav() {
         {showLeftArrow && (
           <Button
             className="absolute left-0 z-10 h-6 w-6"
-            onClick={handleScrollLeft}
+            onClick={() => scroll('left')}
           >
             <ChevronLeft className="h-4 w-4" />
           </Button>
         )}
 
-        <div
+        <ScrollArea
           ref={scrollContainerRef}
-          className="scrollbar-hide flex flex-1 items-center gap-1 overflow-x-auto"
+          orientation="horizontal"
+          viewportClassName="flex-1"
+          className="flex items-center gap-1"
         >
           {tabs.map((tab) => (
             <TabItem
@@ -214,12 +211,12 @@ export function TopNav() {
               onRemove={removeTab}
             />
           ))}
-        </div>
+        </ScrollArea>
 
         {showRightArrow && (
           <Button
             className="absolute right-0 z-10 h-6 w-6"
-            onClick={handleScrollRight}
+            onClick={() => scroll('right')}
           >
             <ChevronRight className="h-4 w-4" />
           </Button>

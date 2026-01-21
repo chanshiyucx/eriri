@@ -28,6 +28,25 @@ pub struct Author {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct Chapter {
+    pub title: String,
+    #[serde(rename = "lineIndex")]
+    pub line_index: usize,
+    #[serde(rename = "charIndex")]
+    pub char_index: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct BookContent {
+    pub lines: Vec<String>,
+    #[serde(rename = "lineStartOffsets")]
+    pub line_start_offsets: Vec<usize>,
+    pub chapters: Vec<Chapter>,
+    #[serde(rename = "totalChars")]
+    pub total_chars: usize,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Comic {
     pub id: String,
     pub title: String,
@@ -77,6 +96,11 @@ pub struct ComicImage {
 pub struct FileTags {
     pub starred: Option<bool>,
     pub deleted: Option<bool>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Clone)]
+pub struct Config {
+    pub cache_dir: Option<String>,
 }
 
 #[derive(Default, Serialize, Deserialize, Clone)]
