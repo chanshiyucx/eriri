@@ -487,7 +487,7 @@ export const ComicLibrary = memo(function ComicLibrary({
             data={showImages}
             totalCount={showImages.length}
             itemContent={renderScrollImage}
-            increaseViewportBy={6000}
+            increaseViewportBy={3000}
           />
         )}
       </div>

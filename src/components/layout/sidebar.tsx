@@ -84,7 +84,7 @@ const SortableLibraryItem = memo(function SortableLibraryItem({
       <Button
         className={cn(
           'h-10 w-full justify-start gap-2 rounded-none px-4 transition-all duration-300',
-          isSelected && 'bg-overlay',
+          isSelected && 'bg-overlay text-love',
         )}
         onClick={() => onSelect(library)}
       >

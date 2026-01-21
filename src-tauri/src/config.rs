@@ -1,13 +1,9 @@
-use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
-#[derive(Debug, Serialize, Deserialize, Default, Clone)]
-pub struct Config {
-    pub cache_dir: Option<String>,
-}
+use crate::models::Config;
 
 pub struct ConfigState(pub Mutex<Config>);
 
@@ -16,6 +12,11 @@ fn get_config_path(app: &AppHandle) -> Option<PathBuf> {
         .app_config_dir()
         .ok()
         .map(|dir| dir.join("config.json"))
+}
+
+fn get_store_dir(app: &AppHandle) -> Option<PathBuf> {
+    let config = get(app);
+    config.cache_dir.map(|dir| PathBuf::from(dir).join("store"))
 }
 
 fn load_from_disk(app: &AppHandle) -> Config {
@@ -57,11 +58,6 @@ pub fn save_config(app: &AppHandle, config: &Config) -> Result<(), String> {
     } else {
         Err("Failed to resolve config path".to_string())
     }
-}
-
-fn get_store_dir(app: &AppHandle) -> Option<PathBuf> {
-    let config = get(app);
-    config.cache_dir.map(|dir| PathBuf::from(dir).join("store"))
 }
 
 #[tauri::command]

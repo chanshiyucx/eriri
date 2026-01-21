@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import {
   LibraryType,
   type Author,
+  type BookContent,
   type Comic,
   type Image,
   type ImageCache,
@@ -130,6 +131,15 @@ export async function cleanExpiredThumbnailCache(): Promise<void> {
     })
   } catch (error) {
     console.error('Failed to clean expired thumbnail cache:', error)
+  }
+}
+
+export async function parseBook(path: string): Promise<BookContent> {
+  try {
+    return await invoke<BookContent>('parse_book', { path })
+  } catch (error) {
+    console.error('Failed to clean expired thumbnail cache:', error)
+    return { lines: [], lineStartOffsets: [], chapters: [], totalChars: 0 }
   }
 }
 

@@ -5,17 +5,35 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ReaderPadding } from '@/components/ui/virtuoso-config'
 import { useClickOutside } from '@/hooks/use-click-outside'
-import {
-  findLineIndexByOffset,
-  parseBook,
-  type BookContent,
-  type Chapter,
-} from '@/lib/book'
+import { parseBook } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
-import { LibraryType, type FileTags } from '@/types/library'
+import {
+  LibraryType,
+  type BookContent,
+  type Chapter,
+  type FileTags,
+} from '@/types/library'
+
+const findLineIndexByOffset = (offsets: number[], targetOffset: number) => {
+  let low = 0
+  let high = offsets.length - 1
+
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2)
+    const midOffset = offsets[mid]
+
+    if (midOffset === targetOffset) return mid
+    if (midOffset < targetOffset) {
+      low = mid + 1
+    } else {
+      high = mid - 1
+    }
+  }
+  return Math.max(0, high)
+}
 
 const BookLine = memo(function BookLine({ line }: { line: string }) {
   return (
