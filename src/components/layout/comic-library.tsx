@@ -277,17 +277,17 @@ export const ComicLibrary = memo(function ComicLibrary({
 
       const key = e.key.toUpperCase()
       if (key === 'C') {
-        void handleSetComicTags(comic, { deleted: !comic.deleted })
+        handleSetComicTags(comic, { deleted: !comic.deleted })
       } else if (key === 'V') {
-        void handleSetComicTags(comic, { starred: !comic.starred })
+        handleSetComicTags(comic, { starred: !comic.starred })
+      } else if (key === 'P') {
+        handleContinueReading()
       } else if (key === 'B') {
         toggleViewMode()
       } else if (key === 'F') {
         toggleFilterComic()
       } else if (key === 'G') {
         toggleFilterImage()
-      } else if (key === 'P') {
-        handleContinueReading()
       }
     }
 
