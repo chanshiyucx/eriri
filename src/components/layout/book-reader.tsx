@@ -268,15 +268,17 @@ export const BookReader = memo(function BookReader({
       if (key === 'T') {
         toggleToc()
       } else if (key === 'C') {
-        void handleSetBookTags({ deleted: !book.deleted })
+        handleSetBookTags({ deleted: !book.deleted })
       } else if (key === 'V') {
-        void handleSetBookTags({ starred: !book.starred })
+        handleSetBookTags({ starred: !book.starred })
+      } else if (key === 'P') {
+        handleContinueReading()
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSetBookTags, toggleToc])
+  }, [handleSetBookTags, toggleToc, handleContinueReading])
 
   if (!book || !content) return null
 

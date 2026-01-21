@@ -1,12 +1,5 @@
-import {
-  ChevronLeft,
-  ChevronRight,
-  Home,
-  PanelLeftClose,
-  PanelLeftOpen,
-  X,
-} from 'lucide-react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { Home, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import { memo, useEffect, useRef } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/style'
@@ -49,12 +42,6 @@ const TabItem = memo(function TabItem({
 })
 
 export function TopNav() {
-  const scrollContainerRef = useRef<HTMLDivElement>(null)
-  const [showLeftArrow, setShowLeftArrow] = useState(false)
-  const [showRightArrow, setShowRightArrow] = useState(false)
-  const rafIdRef = useRef<number | null>(null)
-  const lastArrowStateRef = useRef({ left: false, right: false })
-
   const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const toggleImmersive = useUIStore((s) => s.toggleImmersive)
@@ -66,52 +53,6 @@ export function TopNav() {
   const stateRef = useRef({ tabs, activeTab })
   // eslint-disable-next-line react-hooks/refs
   stateRef.current = { tabs, activeTab }
-
-  const updateArrowVisibility = useCallback(() => {
-    if (rafIdRef.current !== null) return
-
-    rafIdRef.current = requestAnimationFrame(() => {
-      const container = scrollContainerRef.current
-      if (container) {
-        const { scrollLeft, scrollWidth, clientWidth } = container
-        const newShowLeft = scrollLeft > 0
-        const newShowRight = scrollLeft < scrollWidth - clientWidth - 1
-
-        if (lastArrowStateRef.current.left !== newShowLeft) {
-          setShowLeftArrow(newShowLeft)
-          lastArrowStateRef.current.left = newShowLeft
-        }
-        if (lastArrowStateRef.current.right !== newShowRight) {
-          setShowRightArrow(newShowRight)
-          lastArrowStateRef.current.right = newShowRight
-        }
-      }
-      rafIdRef.current = null
-    })
-  }, [])
-
-  useEffect(() => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const observer = new ResizeObserver(updateArrowVisibility)
-    observer.observe(container)
-
-    container.addEventListener('scroll', updateArrowVisibility, {
-      passive: true,
-    })
-
-    updateArrowVisibility()
-
-    return () => {
-      observer.disconnect()
-      container.removeEventListener('scroll', updateArrowVisibility)
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current)
-        rafIdRef.current = null
-      }
-    }
-  }, [updateArrowVisibility])
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -153,25 +94,9 @@ export function TopNav() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [toggleImmersive, removeTab, toggleSidebar, setActiveTab])
 
-  const scroll = useCallback((direction: 'left' | 'right') => {
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const scrollAmount = 200
-    const newScrollLeft =
-      direction === 'left'
-        ? container.scrollLeft - scrollAmount
-        : container.scrollLeft + scrollAmount
-
-    container.scrollTo({
-      left: newScrollLeft,
-      behavior: 'smooth',
-    })
-  }, [])
-
   return (
-    <div className="bg-base flex h-8 shrink-0 items-center border-b px-2">
-      <Button className="mx-1 h-6 w-6" onClick={toggleSidebar}>
+    <div className="bg-base flex h-8 items-center gap-2 border-b px-2">
+      <Button className="h-6 w-6" onClick={toggleSidebar}>
         {isSidebarCollapsed ? (
           <PanelLeftOpen className="h-4 w-4" />
         ) : (
@@ -180,48 +105,27 @@ export function TopNav() {
       </Button>
 
       <Button
-        className={cn('mx-1 h-6 w-6', !activeTab && 'text-love')}
+        className={cn('h-6 w-6', !activeTab && 'text-love')}
         onClick={() => setActiveTab('')}
       >
         <Home className="h-4 w-4" />
       </Button>
 
-      <div className="ml-2 flex flex-1 items-center overflow-hidden">
-        {showLeftArrow && (
-          <Button
-            className="absolute left-0 z-10 h-6 w-6"
-            onClick={() => scroll('left')}
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-        )}
-
-        <ScrollArea
-          ref={scrollContainerRef}
-          orientation="horizontal"
-          viewportClassName="flex-1"
-          className="flex items-center gap-1"
-        >
-          {tabs.map((tab) => (
-            <TabItem
-              key={tab.path}
-              tab={tab}
-              isActive={activeTab === tab.path}
-              onSelect={setActiveTab}
-              onRemove={removeTab}
-            />
-          ))}
-        </ScrollArea>
-
-        {showRightArrow && (
-          <Button
-            className="absolute right-0 z-10 h-6 w-6"
-            onClick={() => scroll('right')}
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-        )}
-      </div>
+      <ScrollArea
+        orientation="horizontal"
+        viewportClassName="flex-1"
+        className="flex items-center gap-1"
+      >
+        {tabs.map((tab) => (
+          <TabItem
+            key={tab.path}
+            tab={tab}
+            isActive={activeTab === tab.path}
+            onSelect={setActiveTab}
+            onRemove={removeTab}
+          />
+        ))}
+      </ScrollArea>
     </div>
   )
 }
