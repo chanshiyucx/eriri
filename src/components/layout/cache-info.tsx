@@ -13,7 +13,7 @@ import {
 import { useLibraryStore } from '@/store/library'
 import type { ImageCache } from '@/types/library'
 
-function formatBytes(bytes: number): string {
+const formatBytes = (bytes: number): string => {
   if (bytes === 0) return '0 B'
   const units = ['B', 'KB', 'MB', 'GB']
   const k = 1024
@@ -42,14 +42,14 @@ export function CacheInfo() {
   }, [isScanning, loadData])
 
   const handleCleanCache = async () => {
-    const cleanAll = await ask('选择清理过期或清理全部缓存。', {
-      title: '清理缓存',
-      kind: 'info',
-      okLabel: '清理全部',
-      cancelLabel: '清理过期',
-    })
-
     try {
+      const cleanAll = await ask('选择清理过期或清理全部缓存。', {
+        title: '清理缓存',
+        kind: 'info',
+        okLabel: '清理全部',
+        cancelLabel: '清理过期',
+      })
+
       if (cleanAll) {
         await cleanAllThumbnailCache()
       } else {
@@ -57,48 +57,34 @@ export function CacheInfo() {
       }
       await loadData()
     } catch (error) {
-      console.error('Failed to clean cache:', error)
+      alert('清理缓存失败: ' + String(error))
     }
   }
 
-  const selectAndSetCacheDir = async (title: string) => {
+  const handleChangeDir = async () => {
     try {
       const selected = await openDialog({
         directory: true,
         multiple: false,
         recursive: true,
-        defaultPath: cacheDir!,
-        title,
+        defaultPath: cacheDir ?? '',
+        title: cacheDir ? '更换缓存目录' : '选择缓存目录',
       })
-      if (!selected || typeof selected !== 'string') return
+      if (!selected || selected === cacheDir) return
 
-      if (selected !== cacheDir) {
-        await setCacheDir(selected)
-        void loadData(true)
-        window.location.reload()
-      }
+      await setCacheDir(selected)
+      void loadData(true)
+      window.location.reload()
     } catch (error) {
-      console.error('Failed to set cache dir:', error)
+      alert('设置缓存目录失败: ' + String(error))
     }
   }
 
-  const handleCacheDir = async () => {
-    if (!cacheDir) {
-      await selectAndSetCacheDir('选择缓存目录')
-      return
-    }
-
-    const wantChange = await ask('选择打开或更换缓存目录。', {
-      title: '缓存目录',
-      kind: 'info',
-      okLabel: '更换',
-      cancelLabel: '打开',
-    })
-
-    if (wantChange) {
-      await selectAndSetCacheDir('更换缓存目录')
-    } else {
+  const handleOpenDir = async () => {
+    if (cacheDir) {
       await openPathNative(cacheDir)
+    } else {
+      await handleChangeDir()
     }
   }
 
@@ -109,18 +95,18 @@ export function CacheInfo() {
         <div>{formatBytes(cache.size)}</div>
       </div>
       <Button
-        onClick={() => {
-          void handleCacheDir()
+        onClick={() => void handleOpenDir()}
+        onContextMenu={(e) => {
+          e.preventDefault()
+          void handleChangeDir()
         }}
         className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
-        title={cacheDir ? '打开/更换缓存目录' : '设置缓存目录'}
+        title={cacheDir ? '左键打开，右键更换' : '设置缓存目录'}
       >
         <FolderOpen className="h-4 w-4" />
       </Button>
       <Button
-        onClick={() => {
-          void handleCleanCache()
-        }}
+        onClick={() => void handleCleanCache()}
         disabled={cache.count === 0}
         className="hover:text-love h-6 w-6 bg-transparent p-0 transition-colors"
         title="清理缓存"

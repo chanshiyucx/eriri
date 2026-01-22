@@ -22,6 +22,6 @@
   }
 
   body {
-    @apply bg-base text-text;
+    @apply bg-base text-text tabular-nums antialiased;
   }
 }

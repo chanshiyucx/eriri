@@ -146,21 +146,15 @@ export const BookReader = memo(function BookReader({
 
   useEffect(() => {
     if (!book.path) return
-    let mounted = true
     const load = async () => {
       try {
         const data = await parseBook(book.path)
-        if (mounted) {
-          setContent(data)
-        }
+        setContent(data)
       } catch (e) {
         console.error('Failed to load book', e)
       }
     }
     void load()
-    return () => {
-      mounted = false
-    }
   }, [book.path])
 
   const initialTopIndex = useMemo(() => {
@@ -191,14 +185,13 @@ export const BookReader = memo(function BookReader({
   }, [])
 
   const handleContinueReading = useCallback(() => {
-    if (!book || activeTab === book.path) return
+    if (!book || activeTab === book.id) return
     addTab({
       type: LibraryType.book,
       id: book.id,
       title: book.title,
-      path: book.path,
     })
-    setActiveTab(book.path)
+    setActiveTab(book.id)
   }, [addTab, activeTab, setActiveTab, book])
 
   const handleSetBookTags = useCallback(
@@ -262,17 +255,21 @@ export const BookReader = memo(function BookReader({
 
       const { activeTab, book } = stateRef.current
       if (!book) return
-      if (activeTab && activeTab !== book.path) return
+      if (activeTab && activeTab !== book.id) return
 
-      const key = e.key.toUpperCase()
-      if (key === 'T') {
-        toggleToc()
-      } else if (key === 'C') {
-        handleSetBookTags({ deleted: !book.deleted })
-      } else if (key === 'V') {
-        handleSetBookTags({ starred: !book.starred })
-      } else if (key === 'P') {
-        handleContinueReading()
+      switch (e.code) {
+        case 'KeyT':
+          toggleToc()
+          break
+        case 'KeyC':
+          handleSetBookTags({ deleted: !book.deleted })
+          break
+        case 'KeyV':
+          handleSetBookTags({ starred: !book.starred })
+          break
+        case 'KeyP':
+          handleContinueReading()
+          break
       }
     }
 

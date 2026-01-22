@@ -58,14 +58,8 @@ const GridImage = memo(function GridImage({
         <TagButtons
           starred={image.starred}
           deleted={image.deleted}
-          onStar={(e) => {
-            e.stopPropagation()
-            void onTags(image, { starred: !image.starred })
-          }}
-          onDelete={(e) => {
-            e.stopPropagation()
-            void onTags(image, { deleted: !image.deleted })
-          }}
+          onStar={() => void onTags(image, { starred: !image.starred })}
+          onDelete={() => void onTags(image, { deleted: !image.deleted })}
           size="sm"
         />
       </div>
@@ -96,14 +90,8 @@ const ScrollImage = memo(function ScrollImage({ image, onTags }: ImageProps) {
       <TagButtons
         starred={image.starred}
         deleted={image.deleted}
-        onStar={(e) => {
-          e.stopPropagation()
-          void onTags(image, { starred: !image.starred })
-        }}
-        onDelete={(e) => {
-          e.stopPropagation()
-          void onTags(image, { deleted: !image.deleted })
-        }}
+        onStar={() => void onTags(image, { starred: !image.starred })}
+        onDelete={() => void onTags(image, { deleted: !image.deleted })}
         size="md"
       />
     </div>
@@ -146,14 +134,8 @@ const ComicItem = memo(function ComicItem({
         <TagButtons
           starred={comic.starred}
           deleted={comic.deleted}
-          onStar={(e) => {
-            e.stopPropagation()
-            void onTags(comic, { starred: !comic.starred })
-          }}
-          onDelete={(e) => {
-            e.stopPropagation()
-            void onTags(comic, { deleted: !comic.deleted })
-          }}
+          onStar={() => void onTags(comic, { starred: !comic.starred })}
+          onDelete={() => void onTags(comic, { deleted: !comic.deleted })}
           size="sm"
         />
         {comic.pageCount && (
@@ -251,9 +233,8 @@ export const ComicLibrary = memo(function ComicLibrary({
       type: LibraryType.comic,
       id: comic.id,
       title: comic.title,
-      path: comic.path,
     })
-    setActiveTab(comic.path)
+    setActiveTab(comic.id)
   }, [addTab, setActiveTab])
 
   useEffect(() => {
@@ -275,19 +256,25 @@ export const ComicLibrary = memo(function ComicLibrary({
       const { activeTab, comic } = stateRef.current
       if (activeTab || !comic) return
 
-      const key = e.key.toUpperCase()
-      if (key === 'C') {
-        handleSetComicTags(comic, { deleted: !comic.deleted })
-      } else if (key === 'V') {
-        handleSetComicTags(comic, { starred: !comic.starred })
-      } else if (key === 'P') {
-        handleContinueReading()
-      } else if (key === 'B') {
-        toggleViewMode()
-      } else if (key === 'F') {
-        toggleFilterComic()
-      } else if (key === 'G') {
-        toggleFilterImage()
+      switch (e.code) {
+        case 'KeyC':
+          handleSetComicTags(comic, { deleted: !comic.deleted })
+          break
+        case 'KeyV':
+          handleSetComicTags(comic, { starred: !comic.starred })
+          break
+        case 'KeyP':
+          handleContinueReading()
+          break
+        case 'KeyB':
+          toggleViewMode()
+          break
+        case 'KeyF':
+          toggleFilterComic()
+          break
+        case 'KeyG':
+          toggleFilterImage()
+          break
       }
     }
 
@@ -336,7 +323,6 @@ export const ComicLibrary = memo(function ComicLibrary({
         type: LibraryType.comic,
         id: comic.id,
         title: comic.title,
-        path: comic.path,
       })
     },
     [updateComicProgress, addTab],

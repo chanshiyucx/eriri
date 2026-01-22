@@ -6,16 +6,16 @@ import { cn } from '@/lib/style'
 interface TagButtonsProps {
   starred: boolean
   deleted: boolean
-  onStar?: (e: React.MouseEvent) => void
-  onDelete?: (e: React.MouseEvent) => void
+  onStar?: () => void
+  onDelete?: () => void
   size?: 'sm' | 'md'
 }
 
 export const TagButtons = memo(function TagButtons({
   starred,
   deleted,
-  onStar = () => void 0,
-  onDelete = () => void 0,
+  onStar,
+  onDelete,
   size = 'sm',
 }: TagButtonsProps) {
   const btnSize = size === 'sm' ? 'h-6 w-6' : 'h-8 w-8'
@@ -29,7 +29,10 @@ export const TagButtons = memo(function TagButtons({
     >
       <Button
         className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
-        onClick={onDelete}
+        onClick={(e) => {
+          e.stopPropagation()
+          onDelete?.()
+        }}
       >
         <Trash2
           className={cn(
@@ -41,7 +44,10 @@ export const TagButtons = memo(function TagButtons({
       </Button>
       <Button
         className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
-        onClick={onStar}
+        onClick={(e) => {
+          e.stopPropagation()
+          onStar?.()
+        }}
       >
         <Star
           className={cn(

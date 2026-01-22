@@ -10,7 +10,6 @@ export interface Tab {
   type: LibraryType
   id: string
   title: string
-  path: string
 }
 
 interface TabsState {
@@ -30,30 +29,30 @@ export const useTabsStore = create<TabsState>()(
 
       addTab: (newTab) =>
         set((state) => {
-          const existingTab = state.tabs.find((t) => t.path === newTab.path)
+          const existingTab = state.tabs.find((t) => t.id === newTab.id)
           if (existingTab) {
-            state.activeTab = newTab.path
+            state.activeTab = newTab.id
           } else {
             state.tabs.push(newTab)
-            state.activeTab = newTab.path
+            state.activeTab = newTab.id
           }
         }),
 
-      removeTab: (tabPath) =>
+      removeTab: (tabId) =>
         set((state) => {
-          const targetIndex = state.tabs.findIndex((t) => t.path === tabPath)
+          const targetIndex = state.tabs.findIndex((t) => t.id === tabId)
           if (targetIndex === -1) return
 
-          if (state.activeTab === tabPath) {
+          if (state.activeTab === tabId) {
             const newActiveTab =
               state.tabs[targetIndex + 1] || state.tabs[targetIndex - 1]
-            state.activeTab = newActiveTab ? newActiveTab.path : ''
+            state.activeTab = newActiveTab ? newActiveTab.id : ''
           }
 
           state.tabs.splice(targetIndex, 1)
         }),
 
-      setActiveTab: (tabPath) => set({ activeTab: tabPath }),
+      setActiveTab: (tabId) => set({ activeTab: tabId }),
 
       clearAllTabs: () => set({ tabs: [], activeTab: '' }),
     })),

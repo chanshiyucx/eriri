@@ -178,7 +178,7 @@ export const useLibraryStore = create<LibraryState>()(
           delete state.libraryVideos[id]
           delete state.libraries[id]
 
-          tabsToRemove.forEach((t) => tabsStore.removeTab(t.path))
+          tabsToRemove.forEach((t) => tabsStore.removeTab(t.id))
 
           if (state.selectedLibraryId === id) {
             state.selectedLibraryId = null
@@ -195,7 +195,7 @@ export const useLibraryStore = create<LibraryState>()(
         const libraryName = path.split('/').pop() ?? 'Untitled Library'
         const maxSortOrder = Math.max(
           0,
-          ...Object.values(get().libraries).map((l) => l.sortOrder ?? 0),
+          ...Object.values(get().libraries).map((l) => l.sortOrder),
         )
         const library: Library = {
           id: libraryId,

@@ -1,3 +1,4 @@
+import { debounce } from 'lodash-es'
 import {
   CircleChevronLeft,
   CircleChevronRight,
@@ -21,7 +22,6 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { ComicHorizontalList } from '@/components/ui/virtuoso-config'
 import { useClickOutside } from '@/hooks/use-click-outside'
-import { debounce } from '@/lib/helper'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -105,14 +105,8 @@ const TableOfContents = memo(function TableOfContents({
               <TagButtons
                 starred={image.starred}
                 deleted={image.deleted}
-                onStar={(e) => {
-                  e.stopPropagation()
-                  onTags(image, { starred: !image.starred })
-                }}
-                onDelete={(e) => {
-                  e.stopPropagation()
-                  onTags(image, { deleted: !image.deleted })
-                }}
+                onStar={() => onTags(image, { starred: !image.starred })}
+                onDelete={() => onTags(image, { deleted: !image.deleted })}
                 size="sm"
               />
             </div>
@@ -149,14 +143,8 @@ const SingleImage = memo(function SingleImage({
         <TagButtons
           starred={image.starred}
           deleted={image.deleted}
-          onStar={(e) => {
-            e.stopPropagation()
-            onTags(image, { starred: !image.starred })
-          }}
-          onDelete={(e) => {
-            e.stopPropagation()
-            onTags(image, { deleted: !image.deleted })
-          }}
+          onStar={() => onTags(image, { starred: !image.starred })}
+          onDelete={() => onTags(image, { deleted: !image.deleted })}
           size="md"
         />
       </figure>
@@ -210,14 +198,8 @@ const ScrollImage = memo(function ScrollImage({
       <TagButtons
         starred={image.starred}
         deleted={image.deleted}
-        onStar={(e) => {
-          e.stopPropagation()
-          onTags(image, { starred: !image.starred })
-        }}
-        onDelete={(e) => {
-          e.stopPropagation()
-          onTags(image, { deleted: !image.deleted })
-        }}
+        onStar={() => onTags(image, { starred: !image.starred })}
+        onDelete={() => onTags(image, { deleted: !image.deleted })}
         size="md"
       />
     </div>
@@ -353,29 +335,35 @@ export const ComicReader = memo(function ComicReader({
       const { activeTab, comic, images, currentIndex } = stateRef.current
       if (activeTab !== comic?.path) return
 
-      const key = e.key.toUpperCase()
-      if (key === 'ARROWUP') {
-        jumpTo(stateRef.current.currentIndex - 1)
-      } else if (key === 'ARROWDOWN') {
-        jumpTo(stateRef.current.currentIndex + 1)
-      } else if (key === 'B') {
-        toggleViewMode()
-      } else if (key === 'T') {
-        toggleToc()
-      } else if (key === 'C') {
-        handleSetComicTags({ deleted: !comic.deleted })
-      } else if (key === 'V') {
-        handleSetComicTags({ starred: !comic.starred })
-      } else if (key === 'N') {
-        const currentImage = images[currentIndex]
-        handleSetImageTags(currentImage, {
-          deleted: !currentImage.deleted,
-        })
-      } else if (key === 'M') {
-        const currentImage = images[currentIndex]
-        handleSetImageTags(currentImage, {
-          starred: !currentImage.starred,
-        })
+      switch (e.code) {
+        case 'ArrowUp':
+          jumpTo(currentIndex - 1)
+          break
+        case 'ArrowDown':
+          jumpTo(currentIndex + 1)
+          break
+        case 'KeyB':
+          toggleViewMode()
+          break
+        case 'KeyT':
+          toggleToc()
+          break
+        case 'KeyC':
+          handleSetComicTags({ deleted: !comic.deleted })
+          break
+        case 'KeyV':
+          handleSetComicTags({ starred: !comic.starred })
+          break
+        case 'KeyN': {
+          const currentImage = images[currentIndex]
+          handleSetImageTags(currentImage, { deleted: !currentImage.deleted })
+          break
+        }
+        case 'KeyM': {
+          const currentImage = images[currentIndex]
+          handleSetImageTags(currentImage, { starred: !currentImage.starred })
+          break
+        }
       }
     }
 

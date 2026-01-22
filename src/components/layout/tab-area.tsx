@@ -30,10 +30,10 @@ const TabContent = memo(function TabContent({
     >
       {type === LibraryType.book ? (
         <BookReader bookId={id} />
-      ) : type === LibraryType.video ? (
-        <VideoPlayer videoId={id} />
-      ) : (
+      ) : type === LibraryType.comic ? (
         <ComicReader comicId={id} />
+      ) : (
+        <VideoPlayer videoId={id} />
       )}
     </div>
   )
@@ -48,9 +48,9 @@ export function TabArea() {
     <>
       {tabs.map((tab) => (
         <TabContent
-          key={tab.path}
+          key={tab.id}
           tab={tab}
-          isActive={tab.path === activeTab}
+          isActive={tab.id === activeTab}
           isImmersive={isImmersive}
         />
       ))}
