@@ -1,30 +1,23 @@
-import { Monitor, Moon, Sun } from 'lucide-react'
-import { useEffect } from 'react'
+import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/style'
 import { useUIStore, type ThemeMode } from '@/store/ui'
 
+interface Theme {
+  mode: ThemeMode
+  icon: LucideIcon
+  label: string
+}
+
+const themes: Theme[] = [
+  { mode: 'light', icon: Sun, label: '浅色' },
+  { mode: 'system', icon: Monitor, label: '跟随系统' },
+  { mode: 'dark', icon: Moon, label: '深色' },
+]
+
 export function ThemeSwitcher() {
-  const { theme, setTheme } = useUIStore()
-
-  // Listen for system theme changes when in system mode
-  useEffect(() => {
-    if (theme !== 'system') return
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = () => {
-      // Re-trigger store to apply system theme
-      useUIStore.getState().setTheme('system')
-    }
-    mediaQuery.addEventListener('change', handleChange)
-    return () => mediaQuery.removeEventListener('change', handleChange)
-  }, [theme])
-
-  const themes: { mode: ThemeMode; icon: typeof Sun; label: string }[] = [
-    { mode: 'light', icon: Sun, label: '浅色' },
-    { mode: 'system', icon: Monitor, label: '跟随系统' },
-    { mode: 'dark', icon: Moon, label: '深色' },
-  ]
+  const theme = useUIStore((s) => s.theme)
+  const setTheme = useUIStore((s) => s.setTheme)
 
   return (
     <div className="bg-overlay flex h-10 items-center justify-evenly gap-1 rounded-full">

@@ -47,14 +47,8 @@ const VideoItem = memo(function VideoItem({
         <TagButtons
           starred={video.starred}
           deleted={video.deleted}
-          onStar={(e) => {
-            e.stopPropagation()
-            void onTags(video, { starred: !video.starred })
-          }}
-          onDelete={(e) => {
-            e.stopPropagation()
-            void onTags(video, { deleted: !video.deleted })
-          }}
+          onStar={() => void onTags(video, { starred: !video.starred })}
+          onDelete={() => void onTags(video, { deleted: !video.deleted })}
           size="sm"
         />
       </div>
@@ -137,13 +131,16 @@ export const VideoLibrary = memo(function VideoLibrary({
       const { activeTab, video } = stateRef.current
       if (activeTab || !video) return
 
-      const key = e.key.toUpperCase()
-      if (key === 'C') {
-        void handleSetVideoTags(video, { deleted: !video.deleted })
-      } else if (key === 'V') {
-        void handleSetVideoTags(video, { starred: !video.starred })
-      } else if (key === 'F') {
-        toggleFilterVideo()
+      switch (e.code) {
+        case 'KeyC':
+          handleSetVideoTags(video, { deleted: !video.deleted })
+          break
+        case 'KeyV':
+          handleSetVideoTags(video, { starred: !video.starred })
+          break
+        case 'KeyF':
+          toggleFilterVideo()
+          break
       }
     }
 

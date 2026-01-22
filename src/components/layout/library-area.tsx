@@ -18,10 +18,10 @@ export function LibraryArea() {
     >
       {selectedLibrary.type === LibraryType.book ? (
         <BookLibrary selectedLibrary={selectedLibrary} />
-      ) : selectedLibrary.type === LibraryType.video ? (
-        <VideoLibrary selectedLibrary={selectedLibrary} />
-      ) : (
+      ) : selectedLibrary.type === LibraryType.comic ? (
         <ComicLibrary selectedLibrary={selectedLibrary} />
+      ) : (
+        <VideoLibrary selectedLibrary={selectedLibrary} />
       )}
     </main>
   )

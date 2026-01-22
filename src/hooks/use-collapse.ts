@@ -7,11 +7,13 @@ export function useCollapse() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
-      const key = e.key.toUpperCase()
-      if (key === 'S') {
-        setCollapsed((prev) => Math.max(0, prev - 1))
-      } else if (key === 'D') {
-        setCollapsed((prev) => Math.min(2, prev + 1))
+      switch (e.code) {
+        case 'KeyS':
+          setCollapsed((prev) => Math.max(0, prev - 1))
+          break
+        case 'KeyD':
+          setCollapsed((prev) => Math.min(2, prev + 1))
+          break
       }
     }
 

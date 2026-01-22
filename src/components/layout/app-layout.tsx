@@ -1,12 +1,12 @@
 import { LibraryArea } from './library-area'
 import { Sidebar } from './sidebar'
 import { TabArea } from './tab-area'
-import { TopNav } from './top-nav'
+import { TabNav } from './tab-nav'
 
 export function AppLayout() {
   return (
     <div className="flex h-screen w-screen flex-col overflow-hidden">
-      <TopNav />
+      <TabNav />
 
       <TabArea />
 

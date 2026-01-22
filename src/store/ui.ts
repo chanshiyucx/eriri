@@ -55,7 +55,7 @@ export const useUIStore = create<UIState>()(
         name: 'ui',
         storage: createJSONStorage(() => uiStorage),
         onRehydrateStorage: () => (state) => {
-          if (state?.theme) {
+          if (state) {
             applyTheme(state.theme)
           }
         },
@@ -68,3 +68,11 @@ useUIStore.subscribe(
   (state) => state.theme,
   (theme) => applyTheme(theme),
 )
+
+window
+  .matchMedia('(prefers-color-scheme: dark)')
+  .addEventListener('change', () => {
+    if (useUIStore.getState().theme === 'system') {
+      applyTheme('system')
+    }
+  })

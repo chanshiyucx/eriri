@@ -26,7 +26,7 @@ import { CacheInfo } from '@/components/layout/cache-info'
 import { ThemeSwitcher } from '@/components/layout/theme-switcher'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { getCacheDir, setCacheDir } from '@/lib/scanner'
+import { getCacheDir } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useUIStore } from '@/store/ui'
@@ -132,9 +132,7 @@ export function Sidebar() {
   const isScanning = useLibraryStore((s) => s.isScanning)
 
   const librariesList = useMemo(() => {
-    return Object.values(libraries).sort(
-      (a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0),
-    )
+    return Object.values(libraries).sort((a, b) => a.sortOrder - b.sortOrder)
   }, [libraries])
 
   const libraryIds = useMemo(
@@ -161,37 +159,26 @@ export function Sidebar() {
     [libraryIds, reorderLibrary],
   )
 
+  const handleSelect = useCallback(
+    (library: Library) => {
+      setSelectedLibraryId(library.id)
+    },
+    [setSelectedLibraryId],
+  )
+
   const handleImport = async () => {
     try {
       const cacheDir = await getCacheDir()
       if (!cacheDir) {
-        const yes = await ask(
-          '未设置缩略图缓存目录，请先选择一个目录用于存储缩略图。',
-          {
-            title: '需要设置缓存目录',
-            kind: 'info',
-            okLabel: '去设置',
-            cancelLabel: '取消',
-          },
-        )
-        if (!yes) return
-
-        const selectedCache = await open({
-          directory: true,
-          multiple: false,
-          recursive: true,
-          title: '选择缓存目录',
-        })
-        if (!selectedCache || typeof selectedCache !== 'string') return
-
-        await setCacheDir(selectedCache)
+        alert('请先设置缓存目录')
+        return
       }
 
       const selected = await open({
         directory: true,
         multiple: false,
         recursive: true,
-        title: 'Select Library Folder',
+        title: '请选择导入库',
       })
       if (!selected || typeof selected !== 'string') return
 
@@ -200,13 +187,6 @@ export function Sidebar() {
       alert('导入库失败: ' + String(error))
     }
   }
-
-  const handleSelect = useCallback(
-    (library: Library) => {
-      setSelectedLibraryId(library.id)
-    },
-    [setSelectedLibraryId],
-  )
 
   const handleRefresh = useCallback(
     async (library: Library) => {
@@ -243,7 +223,7 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'bg-base flex h-full flex-col transition-all duration-300 ease-in-out',
+        'bg-base flex h-full flex-col transition-all duration-300',
         isSidebarCollapsed ? 'w-0' : 'w-56 border-r',
       )}
     >
