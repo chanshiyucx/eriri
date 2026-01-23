@@ -123,6 +123,12 @@ export const BookReader = memo(function BookReader({
     }
   }, [])
 
+  const initialTopIndex = useMemo(() => {
+    if (!content) return 0
+    const progress = useProgressStore.getState().books[bookId]
+    return Math.min(progress?.currentLineIndex ?? 0, content.lines.length - 1)
+  }, [content, bookId])
+
   useEffect(() => {
     if (!book.path) return
     const load = async () => {
@@ -135,12 +141,6 @@ export const BookReader = memo(function BookReader({
     }
     void load()
   }, [bookId, book.path])
-
-  const initialTopIndex = useMemo(() => {
-    if (!content) return 0
-    const progress = useProgressStore.getState().books[bookId]
-    return Math.min(progress?.currentLineIndex ?? 0, content.lines.length - 1)
-  }, [content, bookId])
 
   const toggleToc = useCallback(() => {
     const { content } = stateRef.current
@@ -308,7 +308,6 @@ export const BookReader = memo(function BookReader({
         ref={virtuosoRef}
         className="flex-1"
         data={lines}
-        totalCount={lines.length}
         initialTopMostItemIndex={initialTopIndex}
         rangeChanged={handleRangeChanged}
         itemContent={renderItem}

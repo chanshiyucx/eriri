@@ -143,7 +143,6 @@ export const ComicReader = memo(function ComicReader({
   const activeTab = useTabsStore((s) => s.activeTab)
 
   const stateRef = useRef({ activeTab, comic, images, currentIndex })
-
   stateRef.current = { activeTab, comic, images, currentIndex }
 
   const throttledUpdateProgress = useRef(
@@ -154,6 +153,14 @@ export const ComicReader = memo(function ComicReader({
       { leading: true, trailing: true },
     ),
   )
+
+  useEffect(() => {
+    const throttled = throttledUpdateProgress.current
+    return () => {
+      throttled.flush()
+      throttled.cancel()
+    }
+  }, [])
 
   const initialTopIndex = useMemo(() => {
     if (!images.length) return 0
@@ -172,9 +179,18 @@ export const ComicReader = memo(function ComicReader({
           index: newIndex,
           align: 'start',
         })
+      } else {
+        const newProgress = {
+          current: newIndex,
+          total: images.length,
+          percent:
+            images.length > 1 ? (newIndex / (images.length - 1)) * 100 : 100,
+          lastRead: Date.now(),
+        }
+        updateComicProgress(comicId, newProgress)
       }
     },
-    [images.length, viewMode, setCurrentIndex],
+    [updateComicProgress, images.length, viewMode, setCurrentIndex, comicId],
   )
 
   useEffect(() => {
@@ -191,21 +207,7 @@ export const ComicReader = memo(function ComicReader({
     if (progress?.current !== undefined) {
       jumpTo(progress.current)
     }
-  }, [activeTab, images.length, comicId, jumpTo])
-
-  useEffect(() => {
-    const { images, comic } = stateRef.current
-    if (!images.length) return
-
-    const newProgress = {
-      current: currentIndex,
-      total: images.length,
-      percent:
-        images.length > 1 ? (currentIndex / (images.length - 1)) * 100 : 100,
-      lastRead: Date.now(),
-    }
-    updateComicProgress(comic.id, newProgress)
-  }, [currentIndex, updateComicProgress, images.length])
+  }, [activeTab, jumpTo])
 
   const toggleToc = useCallback(() => {
     setTocCollapsed((prev) => !prev)
@@ -229,6 +231,10 @@ export const ComicReader = memo(function ComicReader({
     [comicId, updateComicTags],
   )
 
+  const handleCloseToc = useCallback(() => {
+    setTocCollapsed(true)
+  }, [])
+
   const handleRangeChanged = useCallback(
     (range: { startIndex: number; endIndex: number }) => {
       const { comic, images, currentIndex } = stateRef.current
@@ -239,7 +245,7 @@ export const ComicReader = memo(function ComicReader({
       const newIndex = range.startIndex
       const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
 
-      setCurrentIndex(range.startIndex)
+      setCurrentIndex(newIndex)
 
       const newProgress: ComicProgress = {
         current: newIndex,
@@ -258,7 +264,7 @@ export const ComicReader = memo(function ComicReader({
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const { activeTab, comic, images, currentIndex } = stateRef.current
-      if (activeTab !== comic?.path) return
+      if (activeTab !== comic?.id) return
 
       switch (e.code) {
         case 'ArrowUp':
@@ -315,16 +321,15 @@ export const ComicReader = memo(function ComicReader({
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
-      {images.length > 0 && (
-        <TableOfContents
-          images={images}
-          currentIndex={currentIndex}
-          isCollapsed={isTocCollapsed}
-          onSelect={jumpTo}
-          onTags={handleSetImageTags}
-          onClose={() => setTocCollapsed(true)}
-        />
-      )}
+      <TableOfContents
+        images={images}
+        currentIndex={currentIndex}
+        isCollapsed={isTocCollapsed}
+        onSelect={jumpTo}
+        onTags={handleSetImageTags}
+        onClose={handleCloseToc}
+      />
+
       {!isImmersive && (
         <div className="bg-base text-subtle flex h-8 w-full items-center border-b px-2 text-xs">
           <Button
@@ -378,7 +383,7 @@ export const ComicReader = memo(function ComicReader({
           </h3>
 
           <span>
-            {currentIndex} / {images.length}
+            {currentIndex + 1} / {images.length}
           </span>
         </div>
       )}

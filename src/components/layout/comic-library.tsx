@@ -68,8 +68,8 @@ const ComicItem = memo(function ComicItem({
         <TagButtons
           starred={comic.starred}
           deleted={comic.deleted}
-          onStar={() => void onTags(comic, { starred: !comic.starred })}
-          onDelete={() => void onTags(comic, { deleted: !comic.deleted })}
+          onStar={() => onTags(comic, { starred: !comic.starred })}
+          onDelete={() => onTags(comic, { deleted: !comic.deleted })}
           size="sm"
         />
         {comic.pageCount && (
@@ -153,6 +153,14 @@ export const ComicLibrary = memo(function ComicLibrary({
     ),
   )
 
+  useEffect(() => {
+    const throttled = throttledUpdateProgress.current
+    return () => {
+      throttled.flush()
+      throttled.cancel()
+    }
+  }, [])
+
   const initialTopIndex = useMemo(() => {
     if (!images.length) return 0
     const progress = useProgressStore.getState().comics[comicId]
@@ -205,7 +213,7 @@ export const ComicLibrary = memo(function ComicLibrary({
       const newIndex = range.startIndex
       const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
 
-      setCurrentIndex(range.startIndex)
+      setCurrentIndex(newIndex)
 
       const newProgress: ComicProgress = {
         current: newIndex,
@@ -282,10 +290,13 @@ export const ComicLibrary = memo(function ComicLibrary({
       const { comic, images } = stateRef.current
       if (!comic) return
 
+      const total = images.length
+      const percent = total > 1 ? (index / (total - 1)) * 100 : 100
+
       updateComicProgress(comic.id, {
         current: index,
-        total: images.length,
-        percent: (index / (images.length - 1)) * 100,
+        total,
+        percent,
         lastRead: Date.now(),
       })
 
@@ -331,6 +342,7 @@ export const ComicLibrary = memo(function ComicLibrary({
     ),
     [handleSetImageTags, handleImageClick],
   )
+
   const showComics = useMemo(() => {
     return filterComic ? comics.filter((c) => c.starred) : comics
   }, [comics, filterComic])
@@ -374,7 +386,6 @@ export const ComicLibrary = memo(function ComicLibrary({
         <VirtuosoGrid
           className="flex-1"
           data={showComics}
-          totalCount={showComics.length}
           itemContent={renderComicItem}
           components={LibraryPadding}
           listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
@@ -434,7 +445,6 @@ export const ComicLibrary = memo(function ComicLibrary({
             key={comicId}
             className="flex-1"
             data={showImages}
-            totalCount={showImages.length}
             itemContent={renderGridImage}
             components={LibraryPadding}
             listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
@@ -445,7 +455,6 @@ export const ComicLibrary = memo(function ComicLibrary({
             key={comicId}
             className="flex-1"
             data={showImages}
-            totalCount={showImages.length}
             initialTopMostItemIndex={initialTopIndex}
             rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
