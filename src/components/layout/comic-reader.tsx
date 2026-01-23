@@ -177,7 +177,7 @@ export const ComicReader = memo(function ComicReader({
       if (viewMode === 'scroll') {
         virtuosoRef.current?.scrollToIndex({
           index: newIndex,
-          align: 'start',
+          align: 'center',
         })
       } else {
         const newProgress = {
@@ -239,10 +239,11 @@ export const ComicReader = memo(function ComicReader({
     (range: { startIndex: number; endIndex: number }) => {
       const { comic, images, currentIndex } = stateRef.current
       if (!comic || !images.length) return
-      if (currentIndex === range.startIndex) return
+
+      const newIndex = Math.floor((range.startIndex + range.endIndex) / 2)
+      if (currentIndex === newIndex) return
 
       const total = images.length
-      const newIndex = range.startIndex
       const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
 
       setCurrentIndex(newIndex)
@@ -412,7 +413,6 @@ export const ComicReader = memo(function ComicReader({
           </>
         ) : (
           <Virtuoso
-            key={comicId}
             ref={virtuosoRef}
             className="h-full w-full overflow-y-hidden"
             horizontalDirection
@@ -420,7 +420,7 @@ export const ComicReader = memo(function ComicReader({
             initialTopMostItemIndex={initialTopIndex}
             rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
-            increaseViewportBy={1000}
+            increaseViewportBy={2000}
           />
         )}
       </div>
