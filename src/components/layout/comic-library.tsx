@@ -8,7 +8,7 @@ import {
   StepForward,
 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'
+import { Virtuoso, VirtuosoGrid, type VirtuosoHandle } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { GridImage, ScrollImage } from '@/components/ui/image-view'
@@ -112,6 +112,7 @@ interface ComicLibraryProps {
 export const ComicLibrary = memo(function ComicLibrary({
   selectedLibrary,
 }: ComicLibraryProps) {
+  const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [filterComic, setFilterComic] = useState<boolean>(false)
@@ -142,6 +143,7 @@ export const ComicLibrary = memo(function ComicLibrary({
   )
 
   const stateRef = useRef({ activeTab, comic, images, currentIndex })
+  // eslint-disable-next-line react-hooks/refs
   stateRef.current = { activeTab, comic, images, currentIndex }
 
   const throttledUpdateProgress = useRef(
@@ -161,10 +163,12 @@ export const ComicLibrary = memo(function ComicLibrary({
     }
   }, [])
 
-  const initialTopIndex = useMemo(() => {
-    if (!images.length) return 0
+  useEffect(() => {
+    if (!images.length) return
     const progress = useProgressStore.getState().comics[comicId]
-    return Math.min(progress?.current ?? 0, images.length - 1)
+    const targetIndex = Math.min(progress?.current ?? 0, images.length - 1)
+    setCurrentIndex(targetIndex)
+    virtuosoRef.current?.scrollToIndex({ index: targetIndex, align: 'center' })
   }, [comicId, images.length])
 
   const toggleViewMode = useCallback(() => {
@@ -207,10 +211,11 @@ export const ComicLibrary = memo(function ComicLibrary({
     (range: { startIndex: number; endIndex: number }) => {
       const { comic, images, currentIndex } = stateRef.current
       if (!comic || !images.length) return
-      if (currentIndex === range.startIndex) return
+
+      const newIndex = Math.floor((range.startIndex + range.endIndex) / 2)
+      if (currentIndex === newIndex) return
 
       const total = images.length
-      const newIndex = range.startIndex
       const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
 
       setCurrentIndex(newIndex)
@@ -452,13 +457,12 @@ export const ComicLibrary = memo(function ComicLibrary({
           />
         ) : (
           <Virtuoso
-            key={comicId}
+            ref={virtuosoRef}
             className="flex-1"
             data={showImages}
-            initialTopMostItemIndex={initialTopIndex}
             rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
-            increaseViewportBy={1000}
+            increaseViewportBy={2000}
           />
         )}
       </div>
