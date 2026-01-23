@@ -9,6 +9,11 @@
     @apply border-overlay;
   }
 
+  html,
+  body {
+    @apply h-full overflow-hidden overscroll-none;
+  }
+
   html {
     color-scheme: light dark;
   }
