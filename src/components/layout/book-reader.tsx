@@ -1,3 +1,4 @@
+import { throttle } from 'lodash-es'
 import { SquareMenu, Star, StepForward, Trash2 } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
@@ -13,27 +14,12 @@ import { useTabsStore } from '@/store/tabs'
 import {
   LibraryType,
   type BookContent,
+  type BookProgress,
   type Chapter,
   type FileTags,
 } from '@/types/library'
 
-const findLineIndexByOffset = (offsets: number[], targetOffset: number) => {
-  let low = 0
-  let high = offsets.length - 1
-
-  while (low <= high) {
-    const mid = Math.floor((low + high) / 2)
-    const midOffset = offsets[mid]
-
-    if (midOffset === targetOffset) return mid
-    if (midOffset < targetOffset) {
-      low = mid + 1
-    } else {
-      high = mid - 1
-    }
-  }
-  return Math.max(0, high)
-}
+const EMPTY_LINES: string[] = []
 
 const BookLine = memo(function BookLine({ line }: { line: string }) {
   return (
@@ -70,25 +56,28 @@ const TableOfContents = memo(function TableOfContents({
         isCollapsed ? '-translate-x-full' : 'translate-x-0',
       )}
     >
-      <ScrollArea viewportClassName="h-full">
-        <div className="pb-12">
-          {chapters.map((chapter, i) => (
-            <div
-              key={i}
-              className={cn(
-                'hover:bg-overlay w-full cursor-pointer truncate px-4 py-2 text-left text-sm',
-                currentChapterTitle === chapter.title && 'bg-overlay text-love',
-              )}
-              onClick={() => onSelect(chapter.lineIndex)}
-            >
-              {chapter.title}
-            </div>
-          ))}
-        </div>
+      <ScrollArea viewportClassName="h-full" className="pb-12">
+        {chapters.map((chapter) => (
+          <div
+            key={chapter.lineIndex}
+            className={cn(
+              'hover:bg-overlay w-full cursor-pointer truncate px-4 py-2 text-left text-sm',
+              currentChapterTitle === chapter.title && 'bg-overlay text-love',
+            )}
+            onClick={() => onSelect(chapter.lineIndex)}
+          >
+            {chapter.title}
+          </div>
+        ))}
       </ScrollArea>
     </div>
   )
 })
+
+interface BookData {
+  bookId: string
+  content: BookContent
+}
 
 interface BookReaderProps {
   bookId: string
@@ -99,11 +88,10 @@ export const BookReader = memo(function BookReader({
   bookId,
   showReading = false,
 }: BookReaderProps) {
-  const [content, setContent] = useState<BookContent | null>(null)
+  const [bookData, setBookData] = useState<BookData | null>(null)
   const [currentChapterTitle, setCurrentChapterTitle] = useState<string>('')
-  const virtuosoRef = useRef<VirtuosoHandle>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
-  const currentChapterRef = useRef(currentChapterTitle)
+  const virtuosoRef = useRef<VirtuosoHandle>(null)
 
   const book = useLibraryStore((s) => s.books[bookId])
   const updateBookTags = useLibraryStore((s) => s.updateBookTags)
@@ -112,79 +100,68 @@ export const BookReader = memo(function BookReader({
   const addTab = useTabsStore((s) => s.addTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  const memoizedLines = useMemo(() => content?.lines ?? [], [content])
-  const totalChars = useMemo(() => content?.totalChars ?? 0, [content])
+  const content = bookData?.bookId === bookId ? bookData.content : null
+  const lines = content?.lines ?? EMPTY_LINES
 
-  const throttleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const latestProgressRef = useRef<{
-    startCharIndex: number
-    totalChars: number
-    percent: number
-    currentChapterTitle?: string
-  } | null>(null)
+  const stateRef = useRef({ activeTab, book, content, currentChapterTitle })
+  stateRef.current = { activeTab, book, content, currentChapterTitle }
 
-  currentChapterRef.current = currentChapterTitle
-
-  const stateRef = useRef({ activeTab, book })
-  stateRef.current = { activeTab, book }
+  const throttledUpdateProgress = useRef(
+    throttle(
+      (bookId: string, progress: BookProgress) =>
+        updateBookProgress(bookId, progress),
+      300,
+      { leading: true, trailing: true },
+    ),
+  )
 
   useEffect(() => {
+    const throttled = throttledUpdateProgress.current
     return () => {
-      if (throttleTimeoutRef.current) {
-        clearTimeout(throttleTimeoutRef.current)
-        throttleTimeoutRef.current = null
-      }
-      if (latestProgressRef.current) {
-        updateBookProgress(bookId, {
-          ...latestProgressRef.current,
-          lastRead: Date.now(),
-        })
-        latestProgressRef.current = null
-      }
+      throttled.flush()
+      throttled.cancel()
     }
-  }, [bookId, updateBookProgress])
+  }, [])
 
   useEffect(() => {
     if (!book.path) return
     const load = async () => {
       try {
         const data = await parseBook(book.path)
-        setContent(data)
+        setBookData({ bookId, content: data })
       } catch (e) {
         console.error('Failed to load book', e)
       }
     }
     void load()
-  }, [book.path])
+  }, [bookId, book.path])
 
   const initialTopIndex = useMemo(() => {
     if (!content) return 0
     const progress = useProgressStore.getState().books[bookId]
-
-    if (progress?.startCharIndex) {
-      return findLineIndexByOffset(
-        content.lineStartOffsets,
-        progress.startCharIndex,
-      )
-    } else if (progress?.percent) {
-      return Math.floor((progress.percent / 100) * content.lines.length)
-    }
-    return 0
+    return Math.min(progress?.currentLineIndex ?? 0, content.lines.length - 1)
   }, [content, bookId])
 
   const toggleToc = useCallback(() => {
+    const { content } = stateRef.current
     if (!content?.chapters.length) return
     setTocCollapsed((prev) => !prev)
-  }, [content])
+  }, [])
 
   const handleChapterClick = useCallback((lineIndex: number) => {
     virtuosoRef.current?.scrollToIndex({
       index: lineIndex,
       align: 'start',
+      behavior: 'smooth',
     })
   }, [])
 
+  const handleCloseToc = useCallback(() => {
+    setTocCollapsed(true)
+  }, [])
+
   const handleContinueReading = useCallback(() => {
+    const { activeTab, book } = stateRef.current
     if (!book || activeTab === book.id) return
     addTab({
       type: LibraryType.book,
@@ -192,7 +169,7 @@ export const BookReader = memo(function BookReader({
       title: book.title,
     })
     setActiveTab(book.id)
-  }, [addTab, activeTab, setActiveTab, book])
+  }, [addTab, setActiveTab])
 
   const handleSetBookTags = useCallback(
     (tags: FileTags) => {
@@ -203,6 +180,7 @@ export const BookReader = memo(function BookReader({
 
   const handleRangeChanged = useCallback(
     (range: { startIndex: number; endIndex: number }) => {
+      const { book, content } = stateRef.current
       if (!content) return
 
       const totalLines = content.lines.length
@@ -211,41 +189,24 @@ export const BookReader = memo(function BookReader({
       const percent =
         totalLines > 1 ? (safeLineIndex / (totalLines - 1)) * 100 : 100
 
-      const startCharIndex = content.lineStartOffsets[safeLineIndex] ?? 0
-
       const match = content.chapters.findLast(
         (c) => c.lineIndex <= safeLineIndex,
       )
       const chapterTitle = match?.title ?? ''
 
-      if (chapterTitle !== currentChapterRef.current) {
+      if (chapterTitle !== stateRef.current.currentChapterTitle) {
         setCurrentChapterTitle(chapterTitle)
       }
 
-      const newProgress = {
-        startCharIndex,
-        totalChars,
+      const newProgress: BookProgress = {
+        currentLineIndex: safeLineIndex,
+        totalLines,
         percent,
         currentChapterTitle: chapterTitle,
+        lastRead: Date.now(),
       }
-
-      latestProgressRef.current = newProgress
-
-      throttleTimeoutRef.current ??= setTimeout(() => {
-        if (latestProgressRef.current) {
-          updateBookProgress(bookId, {
-            ...latestProgressRef.current,
-            lastRead: Date.now(),
-          })
-        }
-        throttleTimeoutRef.current = null
-      }, 300)
+      throttledUpdateProgress.current(book.id, newProgress)
     },
-    [content, bookId, updateBookProgress, totalChars],
-  )
-
-  const renderItem = useCallback(
-    (_index: number, line: string) => <BookLine line={line} />,
     [],
   )
 
@@ -277,6 +238,11 @@ export const BookReader = memo(function BookReader({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleSetBookTags, toggleToc, handleContinueReading])
 
+  const renderItem = useCallback(
+    (_index: number, line: string) => <BookLine line={line} />,
+    [],
+  )
+
   if (!book || !content) return null
 
   return (
@@ -287,7 +253,7 @@ export const BookReader = memo(function BookReader({
           currentChapterTitle={currentChapterTitle}
           isCollapsed={isTocCollapsed}
           onSelect={handleChapterClick}
-          onClose={() => setTocCollapsed(true)}
+          onClose={handleCloseToc}
         />
       )}
 
@@ -314,7 +280,7 @@ export const BookReader = memo(function BookReader({
 
         <Button
           className="h-6 w-6"
-          onClick={() => void handleSetBookTags({ deleted: !book.deleted })}
+          onClick={() => handleSetBookTags({ deleted: !book.deleted })}
           title="标记删除"
         >
           <Trash2
@@ -324,7 +290,7 @@ export const BookReader = memo(function BookReader({
 
         <Button
           className="h-6 w-6"
-          onClick={() => void handleSetBookTags({ starred: !book.starred })}
+          onClick={() => handleSetBookTags({ starred: !book.starred })}
           title="标记收藏"
         >
           <Star
@@ -340,9 +306,9 @@ export const BookReader = memo(function BookReader({
       <Virtuoso
         key={bookId}
         ref={virtuosoRef}
-        className="h-full w-full flex-1"
-        data={memoizedLines}
-        totalCount={memoizedLines.length}
+        className="flex-1"
+        data={lines}
+        totalCount={lines.length}
         initialTopMostItemIndex={initialTopIndex}
         rangeChanged={handleRangeChanged}
         itemContent={renderItem}

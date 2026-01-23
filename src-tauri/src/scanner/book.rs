@@ -131,27 +131,15 @@ pub fn parse_book(path: &str) -> Result<BookContent, String> {
         .collect();
 
     let mut chapters = Vec::new();
-    let mut line_start_offsets = Vec::with_capacity(lines.len());
-    let mut char_count = 0usize;
 
     for (index, line) in lines.iter().enumerate() {
-        line_start_offsets.push(char_count);
-
         if let Some(title) = extract_chapter_title(line) {
             chapters.push(Chapter {
                 title,
                 line_index: index,
-                char_index: char_count,
             });
         }
-
-        char_count += line.len() + 1;
     }
 
-    Ok(BookContent {
-        lines,
-        line_start_offsets,
-        chapters,
-        total_chars: char_count,
-    })
+    Ok(BookContent { lines, chapters })
 }

@@ -1,3 +1,4 @@
+import { throttle } from 'lodash-es'
 import {
   Funnel,
   Grid2x2,
@@ -10,6 +11,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Virtuoso, VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
+import { GridImage, ScrollImage } from '@/components/ui/image-view'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
@@ -20,6 +22,7 @@ import { useTabsStore } from '@/store/tabs'
 import {
   LibraryType,
   type Comic,
+  type ComicProgress,
   type FileTags,
   type Image,
   type Library,
@@ -27,76 +30,7 @@ import {
 
 type ViewMode = 'grid' | 'scroll'
 
-interface ImageProps {
-  image: Image
-  onClick?: (index: number) => void
-  onTags: (image: Image, tags: FileTags) => void
-}
-
-const GridImage = memo(function GridImage({
-  image,
-  onClick,
-  onTags,
-}: ImageProps) {
-  return (
-    <div
-      className={cn(
-        'flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
-        image.deleted && 'opacity-40',
-        image.starred ? 'bg-love/50' : 'hover:bg-overlay',
-      )}
-      onClick={() => onClick?.(image.index)}
-    >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
-        <img
-          src={image.thumbnail}
-          alt={image.filename}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-        <TagButtons
-          starred={image.starred}
-          deleted={image.deleted}
-          onStar={() => void onTags(image, { starred: !image.starred })}
-          onDelete={() => void onTags(image, { deleted: !image.deleted })}
-          size="sm"
-        />
-      </div>
-      <div className="truncate text-center text-sm transition-colors">
-        {image.filename}
-      </div>
-    </div>
-  )
-})
-
-const ScrollImage = memo(function ScrollImage({ image, onTags }: ImageProps) {
-  return (
-    <div
-      className={cn(
-        'relative bg-cover bg-center',
-        image.deleted && 'opacity-40',
-      )}
-      style={{
-        aspectRatio: `${image.width} / ${image.height}`,
-        backgroundImage: `url(${image.thumbnail})`,
-      }}
-    >
-      <img
-        src={image.url}
-        alt={image.filename}
-        className="h-full w-full object-cover"
-      />
-      <TagButtons
-        starred={image.starred}
-        deleted={image.deleted}
-        onStar={() => void onTags(image, { starred: !image.starred })}
-        onDelete={() => void onTags(image, { deleted: !image.deleted })}
-        size="md"
-      />
-    </div>
-  )
-})
+const EMPTY_ARRAY: Image[] = []
 
 interface ComicItemProps {
   comic: Comic
@@ -175,8 +109,6 @@ interface ComicLibraryProps {
   selectedLibrary: Library
 }
 
-const EMPTY_ARRAY: Image[] = []
-
 export const ComicLibrary = memo(function ComicLibrary({
   selectedLibrary,
 }: ComicLibraryProps) {
@@ -184,13 +116,14 @@ export const ComicLibrary = memo(function ComicLibrary({
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [filterComic, setFilterComic] = useState<boolean>(false)
   const [filterImage, setFilterImage] = useState<boolean>(false)
+  const [currentIndex, setCurrentIndex] = useState(0)
 
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
+  const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
   const getComicImages = useLibraryStore((s) => s.getComicImages)
 
-  const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
   const activeTab = useTabsStore((s) => s.activeTab)
   const addTab = useTabsStore((s) => s.addTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
@@ -202,16 +135,29 @@ export const ComicLibrary = memo(function ComicLibrary({
     }),
   )
 
-  const { comicId } = selectedLibrary.status
-  const comic = useLibraryStore((s) => (comicId ? s.comics[comicId] : null))
+  const { comicId = '' } = selectedLibrary.status
+  const comic = useLibraryStore((s) => s.comics[comicId])
   const images = useLibraryStore(
-    (s) => s.comicImages[comicId ?? '']?.images ?? EMPTY_ARRAY,
+    (s) => s.comicImages[comicId]?.images ?? EMPTY_ARRAY,
   )
 
-  const stateRef = useRef({ activeTab, comic, images })
+  const stateRef = useRef({ activeTab, comic, images, currentIndex })
+  stateRef.current = { activeTab, comic, images, currentIndex }
 
-  // eslint-disable-next-line react-hooks/refs
-  stateRef.current = { activeTab, comic, images }
+  const throttledUpdateProgress = useRef(
+    throttle(
+      (comicId: string, progress: ComicProgress) =>
+        updateComicProgress(comicId, progress),
+      300,
+      { leading: true, trailing: true },
+    ),
+  )
+
+  const initialTopIndex = useMemo(() => {
+    if (!images.length) return 0
+    const progress = useProgressStore.getState().comics[comicId]
+    return Math.min(progress?.current ?? 0, images.length - 1)
+  }, [comicId, images.length])
 
   const toggleViewMode = useCallback(() => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
@@ -247,6 +193,30 @@ export const ComicLibrary = memo(function ComicLibrary({
       void updateComicTags(comic.id, tags)
     },
     [updateComicTags],
+  )
+
+  const handleRangeChanged = useCallback(
+    (range: { startIndex: number; endIndex: number }) => {
+      const { comic, images, currentIndex } = stateRef.current
+      if (!comic || !images.length) return
+      if (currentIndex === range.startIndex) return
+
+      const total = images.length
+      const newIndex = range.startIndex
+      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
+
+      setCurrentIndex(range.startIndex)
+
+      const newProgress: ComicProgress = {
+        current: newIndex,
+        total,
+        percent,
+        lastRead: Date.now(),
+      }
+
+      throttledUpdateProgress.current(comic.id, newProgress)
+    },
+    [],
   )
 
   useEffect(() => {
@@ -352,12 +322,15 @@ export const ComicLibrary = memo(function ComicLibrary({
   )
 
   const renderScrollImage = useCallback(
-    (_index: number, img: Image) => (
-      <ScrollImage image={img} onTags={handleSetImageTags} />
+    (_index: number, image: Image) => (
+      <ScrollImage
+        image={image}
+        onTags={handleSetImageTags}
+        onContextMenu={handleImageClick}
+      />
     ),
-    [handleSetImageTags],
+    [handleSetImageTags, handleImageClick],
   )
-
   const showComics = useMemo(() => {
     return filterComic ? comics.filter((c) => c.starred) : comics
   }, [comics, filterComic])
@@ -470,10 +443,13 @@ export const ComicLibrary = memo(function ComicLibrary({
         ) : (
           <Virtuoso
             key={comicId}
+            className="flex-1"
             data={showImages}
             totalCount={showImages.length}
+            initialTopMostItemIndex={initialTopIndex}
+            rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
-            increaseViewportBy={3000}
+            increaseViewportBy={{ top: 0, bottom: 1000 }}
           />
         )}
       </div>

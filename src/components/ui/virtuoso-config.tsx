@@ -1,5 +1,3 @@
-import { forwardRef } from 'react'
-
 function LibraryHeader() {
   return <div className="h-4" />
 }
@@ -16,12 +14,6 @@ function ReaderFooter() {
   return <div className="h-32" />
 }
 
-const HorizontalList = forwardRef<HTMLDivElement>(
-  function HorizontalList(props, ref) {
-    return <div ref={ref} {...props} className="flex!" />
-  },
-)
-
 export const LibraryPadding = {
   Header: LibraryHeader,
   Footer: LibraryFooter,
@@ -30,8 +22,4 @@ export const LibraryPadding = {
 export const ReaderPadding = {
   Header: ReaderHeader,
   Footer: ReaderFooter,
-}
-
-export const ComicHorizontalList = {
-  List: HorizontalList,
 }

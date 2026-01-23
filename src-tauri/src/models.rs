@@ -32,18 +32,12 @@ pub struct Chapter {
     pub title: String,
     #[serde(rename = "lineIndex")]
     pub line_index: usize,
-    #[serde(rename = "charIndex")]
-    pub char_index: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BookContent {
     pub lines: Vec<String>,
-    #[serde(rename = "lineStartOffsets")]
-    pub line_start_offsets: Vec<usize>,
     pub chapters: Vec<Chapter>,
-    #[serde(rename = "totalChars")]
-    pub total_chars: usize,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
