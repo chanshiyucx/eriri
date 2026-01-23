@@ -139,7 +139,7 @@ export async function parseBook(path: string): Promise<BookContent> {
     return await invoke<BookContent>('parse_book', { path })
   } catch (error) {
     console.error('Failed to clean expired thumbnail cache:', error)
-    return { lines: [], lineStartOffsets: [], chapters: [], totalChars: 0 }
+    return { lines: [], chapters: [] }
   }
 }
 

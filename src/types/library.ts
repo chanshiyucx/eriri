@@ -74,14 +74,11 @@ export interface Book {
 export interface Chapter {
   title: string
   lineIndex: number
-  charIndex: number
 }
 
 export interface BookContent {
   lines: string[]
-  lineStartOffsets: number[]
   chapters: Chapter[]
-  totalChars: number
 }
 
 export interface Image {
@@ -126,8 +123,8 @@ export interface ComicProgress {
 }
 
 export interface BookProgress {
-  startCharIndex: number
-  totalChars: number
+  currentLineIndex: number
+  totalLines: number
   percent: number
   lastRead: number
   currentChapterTitle?: string

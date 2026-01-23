@@ -1,4 +1,4 @@
-import { debounce } from 'lodash-es'
+import { throttle } from 'lodash-es'
 import {
   CircleChevronLeft,
   CircleChevronRight,
@@ -13,21 +13,22 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
+import { ScrollImage, SingleImage } from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
-import { ComicHorizontalList } from '@/components/ui/virtuoso-config'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
-import type { FileTags, Image } from '@/types/library'
+import type { ComicProgress, FileTags, Image } from '@/types/library'
 
 type ViewMode = 'single' | 'scroll'
 
@@ -117,95 +118,6 @@ const TableOfContents = memo(function TableOfContents({
   )
 })
 
-interface SingleImageProps {
-  image: Image
-  onTags: (image: Image, tags: FileTags) => void
-}
-
-const SingleImage = memo(function SingleImage({
-  image,
-  onTags,
-}: SingleImageProps) {
-  return (
-    <div
-      className={cn(
-        'relative flex h-full w-full items-center justify-center',
-        image.deleted && 'opacity-40',
-      )}
-    >
-      <figure className="relative h-full w-auto">
-        <img
-          key={image.url}
-          src={image.url}
-          alt={image.filename}
-          className="block h-full w-auto object-contain select-none"
-        />
-        <TagButtons
-          starred={image.starred}
-          deleted={image.deleted}
-          onStar={() => onTags(image, { starred: !image.starred })}
-          onDelete={() => onTags(image, { deleted: !image.deleted })}
-          size="md"
-        />
-      </figure>
-    </div>
-  )
-})
-
-interface ScrollImageProps {
-  image: Image
-  onTags: (image: Image, tags: FileTags) => void
-  onVisible?: (index: number, isVisible: boolean) => void
-}
-
-const ScrollImage = memo(function ScrollImage({
-  image,
-  onTags,
-  onVisible,
-}: ScrollImageProps) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el || !onVisible) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => onVisible(image.index, entry.isIntersecting),
-      { threshold: 0.5 },
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [image.index, onVisible])
-
-  return (
-    <div
-      ref={ref}
-      data-index={image.index}
-      className={cn(
-        'relative h-full shrink-0 bg-cover bg-center',
-        image.deleted && 'opacity-40',
-      )}
-      style={{
-        aspectRatio: `${image.width} / ${image.height}`,
-        backgroundImage: `url(${image.thumbnail})`,
-      }}
-    >
-      <img
-        src={image.url}
-        alt={image.filename}
-        className="h-full w-full object-contain"
-      />
-      <TagButtons
-        starred={image.starred}
-        deleted={image.deleted}
-        onStar={() => onTags(image, { starred: !image.starred })}
-        onDelete={() => onTags(image, { deleted: !image.deleted })}
-        size="md"
-      />
-    </div>
-  )
-})
-
 interface ComicReaderProps {
   comicId: string
 }
@@ -214,51 +126,40 @@ export const ComicReader = memo(function ComicReader({
   comicId,
 }: ComicReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
+  const [currentIndex, setCurrentIndex] = useState(0)
 
   const comic = useLibraryStore((s) => s.comics[comicId])
   const images = useLibraryStore(
     (s) => s.comicImages[comicId]?.images ?? EMPTY_ARRAY,
   )
 
-  const getComicImages = useLibraryStore((s) => s.getComicImages)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
   const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
+  const getComicImages = useLibraryStore((s) => s.getComicImages)
   const isImmersive = useUIStore((s) => s.isImmersive)
   const activeTab = useTabsStore((s) => s.activeTab)
 
-  const progress = useProgressStore((s) => s.comics[comicId])
-  const [currentIndex, setCurrentIndex] = useState(progress?.current ?? 0)
-
   const stateRef = useRef({ activeTab, comic, images, currentIndex })
-  // eslint-disable-next-line react-hooks/refs
+
   stateRef.current = { activeTab, comic, images, currentIndex }
 
-  const visibleIndices = useRef(new Set<number>())
-  const syncCurrentIndex = useRef(
-    // eslint-disable-next-line react-hooks/refs
-    debounce(() => {
-      if (!visibleIndices.current.size) return
-      const minIndex = Math.min(...visibleIndices.current)
-      if (minIndex === stateRef.current.currentIndex) return
-      setCurrentIndex(minIndex)
-    }, 60),
+  const throttledUpdateProgress = useRef(
+    throttle(
+      (comicId: string, progress: ComicProgress) =>
+        updateComicProgress(comicId, progress),
+      300,
+      { leading: true, trailing: true },
+    ),
   )
 
-  const handleImageVisible = useCallback(
-    (index: number, isVisible: boolean) => {
-      if (isVisible) {
-        visibleIndices.current.add(index)
-      } else {
-        visibleIndices.current.delete(index)
-      }
-      syncCurrentIndex.current()
-    },
-    [],
-  )
+  const initialTopIndex = useMemo(() => {
+    if (!images.length) return 0
+    const progress = useProgressStore.getState().comics[comicId]
+    return Math.min(progress?.current ?? 0, images.length - 1)
+  }, [comicId, images.length])
 
   const jumpTo = useCallback(
     (index: number) => {
@@ -273,7 +174,7 @@ export const ComicReader = memo(function ComicReader({
         })
       }
     },
-    [images.length, viewMode],
+    [images.length, viewMode, setCurrentIndex],
   )
 
   useEffect(() => {
@@ -284,7 +185,7 @@ export const ComicReader = memo(function ComicReader({
 
   useLayoutEffect(() => {
     const { comic, images } = stateRef.current
-    if (!images || activeTab !== comic?.path) return
+    if (!images || activeTab !== comic?.id) return
 
     const progress = useProgressStore.getState().comics[comic.id]
     if (progress?.current !== undefined) {
@@ -326,6 +227,30 @@ export const ComicReader = memo(function ComicReader({
       void updateComicTags(comicId, tags)
     },
     [comicId, updateComicTags],
+  )
+
+  const handleRangeChanged = useCallback(
+    (range: { startIndex: number; endIndex: number }) => {
+      const { comic, images, currentIndex } = stateRef.current
+      if (!comic || !images.length) return
+      if (currentIndex === range.startIndex) return
+
+      const total = images.length
+      const newIndex = range.startIndex
+      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
+
+      setCurrentIndex(range.startIndex)
+
+      const newProgress: ComicProgress = {
+        current: newIndex,
+        total,
+        percent,
+        lastRead: Date.now(),
+      }
+
+      throttledUpdateProgress.current(comic.id, newProgress)
+    },
+    [],
   )
 
   useEffect(() => {
@@ -379,18 +304,14 @@ export const ComicReader = memo(function ComicReader({
 
   const renderScrollImage = useCallback(
     (_index: number, image: Image) => (
-      <ScrollImage
-        image={image}
-        onTags={handleSetImageTags}
-        onVisible={handleImageVisible}
-      />
+      <ScrollImage image={image} onTags={handleSetImageTags} />
     ),
-    [handleSetImageTags, handleImageVisible],
+    [handleSetImageTags],
   )
 
   const currentImage = images[currentIndex]
 
-  if (!comic) return null
+  if (!comic || !images.length) return null
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
@@ -462,7 +383,7 @@ export const ComicReader = memo(function ComicReader({
         </div>
       )}
       <div className="bg-surface flex h-0 flex-1 items-center justify-center overflow-hidden">
-        {viewMode === 'single' && currentImage && (
+        {viewMode === 'single' ? (
           <>
             <SingleImage image={currentImage} onTags={handleSetImageTags} />
 
@@ -484,18 +405,17 @@ export const ComicReader = memo(function ComicReader({
               </Button>
             )}
           </>
-        )}
-
-        {viewMode === 'scroll' && (
+        ) : (
           <Virtuoso
+            key={comicId}
             ref={virtuosoRef}
             className="h-full w-full"
             horizontalDirection
             data={images}
-            initialTopMostItemIndex={currentIndex}
+            initialTopMostItemIndex={initialTopIndex}
+            rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
-            increaseViewportBy={3000}
-            components={ComicHorizontalList}
+            increaseViewportBy={{ top: 0, bottom: 1000 }}
           />
         )}
       </div>
