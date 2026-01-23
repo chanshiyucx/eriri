@@ -458,7 +458,7 @@ export const ComicLibrary = memo(function ComicLibrary({
             initialTopMostItemIndex={initialTopIndex}
             rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
-            increaseViewportBy={{ top: 0, bottom: 1000 }}
+            increaseViewportBy={1000}
           />
         )}
       </div>

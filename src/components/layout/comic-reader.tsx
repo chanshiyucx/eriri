@@ -414,13 +414,13 @@ export const ComicReader = memo(function ComicReader({
           <Virtuoso
             key={comicId}
             ref={virtuosoRef}
-            className="h-full w-full"
+            className="h-full w-full overflow-y-hidden"
             horizontalDirection
             data={images}
             initialTopMostItemIndex={initialTopIndex}
             rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
-            increaseViewportBy={{ top: 0, bottom: 1000 }}
+            increaseViewportBy={1000}
           />
         )}
       </div>

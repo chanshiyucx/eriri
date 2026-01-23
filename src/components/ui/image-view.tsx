@@ -97,7 +97,7 @@ export const ScrollImage = memo(function ScrollImage({
       <img
         src={image.url}
         alt={image.filename}
-        className="h-full w-full object-cover"
+        className="h-full w-full object-contain"
         onContextMenu={(e) => {
           e.preventDefault()
           onContextMenu?.(image.index)
