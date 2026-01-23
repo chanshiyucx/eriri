@@ -177,7 +177,7 @@ export const ComicReader = memo(function ComicReader({
       if (viewMode === 'scroll') {
         virtuosoRef.current?.scrollToIndex({
           index: newIndex,
-          align: 'center',
+          align: 'start',
         })
       } else {
         const newProgress = {

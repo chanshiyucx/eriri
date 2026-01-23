@@ -7,7 +7,15 @@ import {
   Rows2,
   StepForward,
 } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react'
 import { Virtuoso, VirtuosoGrid, type VirtuosoHandle } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
@@ -151,7 +159,7 @@ export const ComicLibrary = memo(function ComicLibrary({
       (comicId: string, progress: ComicProgress) =>
         updateComicProgress(comicId, progress),
       300,
-      { leading: true, trailing: true },
+      { leading: false, trailing: true },
     ),
   )
 
@@ -163,7 +171,7 @@ export const ComicLibrary = memo(function ComicLibrary({
     }
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!images.length) return
     const progress = useProgressStore.getState().comics[comicId]
     const targetIndex = Math.min(progress?.current ?? 0, images.length - 1)
