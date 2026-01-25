@@ -13,7 +13,6 @@ import {
   useCallback,
   useEffect,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -126,23 +125,27 @@ export const ComicReader = memo(function ComicReader({
   comicId,
 }: ComicReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
+  const isAutoScrolling = useRef(false)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
-  const [currentIndex, setCurrentIndex] = useState(0)
+  const isImmersive = useUIStore((s) => s.isImmersive)
+  const activeTab = useTabsStore((s) => s.activeTab)
+
+  const updateComicTags = useLibraryStore((s) => s.updateComicTags)
+  const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
+  const getComicImages = useLibraryStore((s) => s.getComicImages)
 
   const comic = useLibraryStore((s) => s.comics[comicId])
   const images = useLibraryStore(
     (s) => s.comicImages[comicId]?.images ?? EMPTY_ARRAY,
   )
 
-  const updateComicTags = useLibraryStore((s) => s.updateComicTags)
-  const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
   const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
-  const getComicImages = useLibraryStore((s) => s.getComicImages)
-  const isImmersive = useUIStore((s) => s.isImmersive)
-  const activeTab = useTabsStore((s) => s.activeTab)
+  const progress = useProgressStore((s) => s.comics[comicId])
+  const currentIndex = progress?.current ?? 0
 
   const stateRef = useRef({ activeTab, comic, images, currentIndex })
+  // eslint-disable-next-line react-hooks/refs
   stateRef.current = { activeTab, comic, images, currentIndex }
 
   const throttledUpdateProgress = useRef(
@@ -150,7 +153,7 @@ export const ComicReader = memo(function ComicReader({
       (comicId: string, progress: ComicProgress) =>
         updateComicProgress(comicId, progress),
       300,
-      { leading: true, trailing: true },
+      { leading: false, trailing: true },
     ),
   )
 
@@ -162,52 +165,72 @@ export const ComicReader = memo(function ComicReader({
     }
   }, [])
 
-  const initialTopIndex = useMemo(() => {
-    if (!images.length) return 0
-    const progress = useProgressStore.getState().comics[comicId]
-    return Math.min(progress?.current ?? 0, images.length - 1)
-  }, [comicId, images.length])
+  useEffect(() => {
+    if (images.length) return
+    void getComicImages(comicId)
+  }, [comicId, images.length, getComicImages])
 
   const jumpTo = useCallback(
     (index: number) => {
-      const newIndex = Math.max(0, Math.min(index, images.length - 1))
-      if (newIndex === stateRef.current.currentIndex) return
-      setCurrentIndex(newIndex)
+      const total = images.length
+      const percent = total > 1 ? (index / (total - 1)) * 100 : 100
+      const newProgress = {
+        current: index,
+        total,
+        percent,
+        lastRead: Date.now(),
+      }
+      updateComicProgress(comicId, newProgress)
 
       if (viewMode === 'scroll') {
+        console.log('锁定滚动：', index)
+        isAutoScrolling.current = true
         virtuosoRef.current?.scrollToIndex({
-          index: newIndex,
-          align: 'start',
+          index,
+          align: 'center',
         })
-      } else {
-        const newProgress = {
-          current: newIndex,
-          total: images.length,
-          percent:
-            images.length > 1 ? (newIndex / (images.length - 1)) * 100 : 100,
-          lastRead: Date.now(),
-        }
-        updateComicProgress(comicId, newProgress)
+
+        setTimeout(() => {
+          console.log('解除锁定')
+          isAutoScrolling.current = false
+        }, 500)
       }
     },
-    [updateComicProgress, images.length, viewMode, setCurrentIndex, comicId],
+    [updateComicProgress, images.length, viewMode, comicId],
   )
 
-  useEffect(() => {
-    if (images.length === 0) {
-      void getComicImages(comicId)
-    }
-  }, [comicId, images.length, getComicImages])
-
   useLayoutEffect(() => {
-    const { comic, images } = stateRef.current
-    if (!images || activeTab !== comic?.id) return
-
-    const progress = useProgressStore.getState().comics[comic.id]
-    if (progress?.current !== undefined) {
-      jumpTo(progress.current)
-    }
+    const { comic, images, currentIndex } = stateRef.current
+    if (!images.length || activeTab !== comic.id) return
+    jumpTo(currentIndex)
   }, [activeTab, jumpTo])
+
+  const handleRangeChanged = useCallback(
+    (range: { startIndex: number; endIndex: number }) => {
+      if (isAutoScrolling.current) {
+        console.log('自动滚动中，忽略更新')
+        return
+      }
+
+      const { comic, images, currentIndex } = stateRef.current
+      if (!comic || !images.length) return
+
+      const newIndex = Math.floor((range.startIndex + range.endIndex) / 2)
+      if (currentIndex === newIndex) return
+
+      const total = images.length
+      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
+      const newProgress = {
+        current: newIndex,
+        total,
+        percent,
+        lastRead: Date.now(),
+      }
+
+      throttledUpdateProgress.current(comic.id, newProgress)
+    },
+    [],
+  )
 
   const toggleToc = useCallback(() => {
     setTocCollapsed((prev) => !prev)
@@ -235,37 +258,12 @@ export const ComicReader = memo(function ComicReader({
     setTocCollapsed(true)
   }, [])
 
-  const handleRangeChanged = useCallback(
-    (range: { startIndex: number; endIndex: number }) => {
-      const { comic, images, currentIndex } = stateRef.current
-      if (!comic || !images.length) return
-
-      const newIndex = Math.floor((range.startIndex + range.endIndex) / 2)
-      if (currentIndex === newIndex) return
-
-      const total = images.length
-      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
-
-      setCurrentIndex(newIndex)
-
-      const newProgress: ComicProgress = {
-        current: newIndex,
-        total,
-        percent,
-        lastRead: Date.now(),
-      }
-
-      throttledUpdateProgress.current(comic.id, newProgress)
-    },
-    [],
-  )
-
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
       const { activeTab, comic, images, currentIndex } = stateRef.current
-      if (activeTab !== comic?.id) return
+      if (activeTab !== comic.id) return
 
       switch (e.code) {
         case 'ArrowUp':
@@ -331,63 +329,61 @@ export const ComicReader = memo(function ComicReader({
         onClose={handleCloseToc}
       />
 
-      {!isImmersive && (
-        <div className="bg-base text-subtle flex h-8 w-full items-center border-b px-2 text-xs">
-          <Button
-            className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
-            onClick={toggleToc}
-            onMouseDown={(e) => e.stopPropagation()}
-          >
-            <SquareMenu className="h-4 w-4" />
-          </Button>
+      <div
+        className={cn(
+          'bg-base text-subtle flex h-8 w-full items-center border-b px-2 text-xs',
+          isImmersive && 'hidden',
+        )}
+      >
+        <Button
+          className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
+          onClick={toggleToc}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <SquareMenu className="h-4 w-4" />
+        </Button>
 
-          <Button
-            className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
-            onClick={toggleViewMode}
-            title={`切换到 ${viewMode === 'single' ? '滚动' : '单页'}`}
-          >
-            {viewMode === 'single' ? (
-              <Square className="h-4 w-4" />
-            ) : (
-              <Columns2 className="h-4 w-4" />
-            )}
-          </Button>
+        <Button
+          className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
+          onClick={toggleViewMode}
+          title={`切换到 ${viewMode === 'single' ? '滚动' : '单页'}`}
+        >
+          {viewMode === 'single' ? (
+            <Square className="h-4 w-4" />
+          ) : (
+            <Columns2 className="h-4 w-4" />
+          )}
+        </Button>
 
-          <Button
-            className="h-6 w-6"
-            onClick={() => handleSetComicTags({ deleted: !comic.deleted })}
-            title="标记删除"
-          >
-            <Trash2
-              className={cn(
-                'h-4 w-4',
-                comic.deleted && 'text-love fill-gold/80',
-              )}
-            />
-          </Button>
+        <Button
+          className="h-6 w-6"
+          onClick={() => handleSetComicTags({ deleted: !comic.deleted })}
+          title="标记删除"
+        >
+          <Trash2
+            className={cn('h-4 w-4', comic.deleted && 'text-love fill-gold/80')}
+          />
+        </Button>
 
-          <Button
-            className="h-6 w-6"
-            onClick={() => handleSetComicTags({ starred: !comic.starred })}
-            title="标记收藏"
-          >
-            <Star
-              className={cn(
-                'h-4 w-4',
-                comic.starred && 'text-love fill-gold/80',
-              )}
-            />
-          </Button>
+        <Button
+          className="h-6 w-6"
+          onClick={() => handleSetComicTags({ starred: !comic.starred })}
+          title="标记收藏"
+        >
+          <Star
+            className={cn('h-4 w-4', comic.starred && 'text-love fill-gold/80')}
+          />
+        </Button>
 
-          <h3 className="flex flex-1 justify-center truncate text-center">
-            {viewMode === 'single' ? currentImage?.filename : comic.title}
-          </h3>
+        <h3 className="flex flex-1 justify-center truncate text-center">
+          {viewMode === 'single' ? currentImage?.filename : comic.title}
+        </h3>
 
-          <span>
-            {currentIndex + 1} / {images.length}
-          </span>
-        </div>
-      )}
+        <span>
+          {currentIndex + 1} / {images.length}
+        </span>
+      </div>
+
       <div className="bg-surface flex h-0 flex-1 items-center justify-center overflow-hidden">
         {viewMode === 'single' ? (
           <>
@@ -396,7 +392,7 @@ export const ComicReader = memo(function ComicReader({
             {currentIndex > 0 && (
               <Button
                 className="hover:text-love transition-color text-subtle/60 absolute top-1/2 left-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
-                onClick={() => jumpTo(stateRef.current.currentIndex - 1)}
+                onClick={() => jumpTo(currentIndex - 1)}
               >
                 <CircleChevronLeft className="h-10 w-10" />
               </Button>
@@ -405,7 +401,7 @@ export const ComicReader = memo(function ComicReader({
             {currentIndex < images.length - 1 && (
               <Button
                 className="hover:text-love transition-color text-subtle/60 absolute top-1/2 right-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
-                onClick={() => jumpTo(stateRef.current.currentIndex + 1)}
+                onClick={() => jumpTo(currentIndex + 1)}
               >
                 <CircleChevronRight className="h-10 w-10" />
               </Button>
@@ -413,14 +409,15 @@ export const ComicReader = memo(function ComicReader({
           </>
         ) : (
           <Virtuoso
+            key={comicId}
             ref={virtuosoRef}
             className="h-full w-full overflow-y-hidden"
             horizontalDirection
             data={images}
-            initialTopMostItemIndex={initialTopIndex}
+            initialTopMostItemIndex={currentIndex}
             rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
-            increaseViewportBy={2000}
+            overscan={2000}
           />
         )}
       </div>

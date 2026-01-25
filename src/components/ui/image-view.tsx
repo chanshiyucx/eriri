@@ -17,6 +17,7 @@ export const GridImage = memo(function GridImage({
 }: ImageProps) {
   return (
     <div
+      key={image.path}
       className={cn(
         'flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
         image.deleted && 'opacity-40',
@@ -53,6 +54,7 @@ export const SingleImage = memo(function SingleImage({
 }: ImageProps) {
   return (
     <div
+      key={image.path}
       className={cn(
         'relative flex h-full w-full items-center justify-center',
         image.deleted && 'opacity-40',
@@ -84,7 +86,7 @@ export const ScrollImage = memo(function ScrollImage({
 }: ImageProps) {
   return (
     <div
-      data-index={image.index}
+      key={image.path}
       className={cn(
         'relative h-full shrink-0 bg-cover bg-center',
         image.deleted && 'opacity-40',
@@ -104,6 +106,7 @@ export const ScrollImage = memo(function ScrollImage({
         }}
       />
       <TagButtons
+        title={image.filename}
         starred={image.starred}
         deleted={image.deleted}
         onStar={() => onTags(image, { starred: !image.starred })}
