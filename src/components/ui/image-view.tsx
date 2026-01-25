@@ -4,6 +4,7 @@ import { cn } from '@/lib/style'
 import type { FileTags, Image } from '@/types/library'
 
 interface ImageProps {
+  className?: string
   image: Image
   onTags: (image: Image, tags: FileTags) => void
   onClick?: (index: number) => void
@@ -85,6 +86,7 @@ export const ScrollImage = memo(function ScrollImage({
   onTags,
   onContextMenu,
   onVisible,
+  className = 'h-full',
 }: ImageProps) {
   const ref = useRef<HTMLDivElement>(null)
 
@@ -108,8 +110,9 @@ export const ScrollImage = memo(function ScrollImage({
       key={image.path}
       ref={ref}
       className={cn(
-        'relative h-full shrink-0 bg-cover bg-center',
+        'relative shrink-0 bg-cover bg-center',
         image.deleted && 'opacity-40',
+        className,
       )}
       style={{
         aspectRatio: `${image.width} / ${image.height}`,

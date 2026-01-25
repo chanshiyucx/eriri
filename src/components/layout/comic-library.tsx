@@ -20,6 +20,7 @@ import { Virtuoso, VirtuosoGrid, type VirtuosoHandle } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { GridImage, ScrollImage } from '@/components/ui/image-view'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
@@ -518,12 +519,24 @@ export const ComicLibrary = memo(function ComicLibrary({
             listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
             increaseViewportBy={{ top: 0, bottom: 1000 }}
           />
+        ) : filterImage ? (
+          <ScrollArea viewportClassName="h-0 flex-1">
+            {showImages.map((img) => (
+              <ScrollImage
+                key={img.filename}
+                image={img}
+                onTags={handleSetImageTags}
+                onContextMenu={handleImageClick}
+                className="w-full"
+              />
+            ))}
+          </ScrollArea>
         ) : (
           <Virtuoso
             key={comicId}
             ref={virtuosoRef}
             className="flex-1"
-            data={showImages}
+            data={images}
             initialTopMostItemIndex={currentIndex}
             itemContent={renderScrollImage}
             increaseViewportBy={1000}
