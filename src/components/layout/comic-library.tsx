@@ -155,9 +155,23 @@ export const ComicLibrary = memo(function ComicLibrary({
   const progress = useProgressStore((s) => s.comics[comicId])
   const currentIndex = progress?.current ?? 0
 
-  const stateRef = useRef({ activeTab, comic, images, currentIndex, viewMode })
+  const stateRef = useRef({
+    activeTab,
+    comic,
+    images,
+    currentIndex,
+    viewMode,
+    filterImage,
+  })
   // eslint-disable-next-line react-hooks/refs
-  stateRef.current = { activeTab, comic, images, currentIndex, viewMode }
+  stateRef.current = {
+    activeTab,
+    comic,
+    images,
+    currentIndex,
+    viewMode,
+    filterImage,
+  }
 
   const throttledUpdateProgress = useRef(
     throttle(
@@ -221,7 +235,7 @@ export const ComicLibrary = memo(function ComicLibrary({
 
   useLayoutEffect(() => {
     lockScroll()
-  }, [lockScroll, viewMode])
+  }, [lockScroll, viewMode, filterImage])
 
   useLayoutEffect(() => {
     const { images, currentIndex } = stateRef.current
@@ -317,8 +331,8 @@ export const ComicLibrary = memo(function ComicLibrary({
       if (!visibleIndices.current.size) return
       const newIndex = Math.min(...visibleIndices.current)
 
-      const { comic, images, currentIndex } = stateRef.current
-      if (!comic || !images.length) return
+      const { comic, images, currentIndex, filterImage } = stateRef.current
+      if (!comic || !images.length || filterImage) return
 
       if (currentIndex === newIndex) return
 
