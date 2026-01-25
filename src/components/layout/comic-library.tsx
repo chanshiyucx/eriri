@@ -452,7 +452,12 @@ export const ComicLibrary = memo(function ComicLibrary({
               onClick={toggleFilterComic}
               title="过滤漫画"
             >
-              <Funnel className="h-4 w-4" />
+              <Funnel
+                className={cn(
+                  'h-4 w-4',
+                  filterComic && 'text-love fill-gold/80',
+                )}
+              />
             </Button>
             <Button
               className="h-6 w-6"
@@ -502,7 +507,12 @@ export const ComicLibrary = memo(function ComicLibrary({
               onClick={toggleFilterImage}
               title="过滤图片"
             >
-              <Funnel className="h-4 w-4" />
+              <Funnel
+                className={cn(
+                  'h-4 w-4',
+                  filterImage && 'text-love fill-gold/80',
+                )}
+              />
             </Button>
             <Button
               className="h-6 w-6"
