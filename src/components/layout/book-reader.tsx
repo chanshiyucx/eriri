@@ -96,7 +96,8 @@ export const BookReader = memo(function BookReader({
   showReading = false,
 }: BookReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const isAutoScrolling = useRef(false)
+  const isLock = useRef(false)
+  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [bookData, setBookData] = useState<BookData | null>(null)
 
@@ -160,9 +161,24 @@ export const BookReader = memo(function BookReader({
     void load()
   }, [bookId, book.path])
 
+  const lockScroll = useCallback(() => {
+    if (lockTimer.current) {
+      clearTimeout(lockTimer.current)
+    }
+    console.log('滚动锁定')
+    isLock.current = true
+    lockTimer.current = setTimeout(() => {
+      console.log('解除锁定')
+      isLock.current = false
+    }, 500)
+  }, [])
+
   const jumpTo = useCallback(
     (index: number) => {
+      console.log('跳转索引：', index)
+      const { content, book } = stateRef.current
       if (!content) return
+
       const total = content.lines.length ?? 0
       const percent = total > 1 ? (index / (total - 1)) * 100 : 100
       const match = content.chapters.findLast((c) => c.lineIndex <= index)
@@ -175,21 +191,15 @@ export const BookReader = memo(function BookReader({
         lastRead: Date.now(),
       }
 
-      updateBookProgress(bookId, newProgress)
+      updateBookProgress(book.id, newProgress)
 
-      console.log('锁定滚动：', index)
-      isAutoScrolling.current = true
+      lockScroll()
       virtuosoRef.current?.scrollToIndex({
         index,
         align: 'start',
       })
-
-      setTimeout(() => {
-        console.log('解除锁定')
-        isAutoScrolling.current = false
-      }, 500)
     },
-    [updateBookProgress, content, bookId],
+    [updateBookProgress, lockScroll],
   )
 
   useLayoutEffect(() => {
@@ -200,10 +210,7 @@ export const BookReader = memo(function BookReader({
 
   const handleRangeChanged = useCallback(
     (range: { startIndex: number; endIndex: number }) => {
-      if (isAutoScrolling.current) {
-        console.log('自动滚动中，忽略更新')
-        return
-      }
+      if (isLock.current) return
 
       const { book, content } = stateRef.current
       if (!content) return
