@@ -1,4 +1,5 @@
 import { LibraryArea } from './library-area'
+import { Mask } from './mask'
 import { Sidebar } from './sidebar'
 import { TabArea } from './tab-area'
 import { TabNav } from './tab-nav'
@@ -14,6 +15,8 @@ export function AppLayout() {
         <Sidebar />
         <LibraryArea />
       </div>
+
+      <Mask />
     </div>
   )
 }

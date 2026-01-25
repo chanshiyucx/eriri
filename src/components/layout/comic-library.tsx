@@ -122,6 +122,7 @@ export const ComicLibrary = memo(function ComicLibrary({
 }: ComicLibraryProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const isAutoScrolling = useRef(false)
+  const visibleIndices = useRef(new Set<number>())
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
   const [filterComic, setFilterComic] = useState<boolean>(false)
@@ -191,8 +192,9 @@ export const ComicLibrary = memo(function ComicLibrary({
       updateComicProgress(comicId, newProgress)
 
       if (viewMode === 'scroll') {
-        console.log('锁定滚动：', index)
+        console.log('滚动锁定并跳转：', index)
         isAutoScrolling.current = true
+        visibleIndices.current.clear()
         virtuosoRef.current?.scrollToIndex({
           index,
           align: 'center',
@@ -213,42 +215,6 @@ export const ComicLibrary = memo(function ComicLibrary({
     if (!images.length) return
     jumpTo(currentIndex)
   }, [activeTab, jumpTo])
-
-  const handleRangeChanged = useCallback(
-    (range: { startIndex: number; endIndex: number }) => {
-      if (isAutoScrolling.current) {
-        console.log('自动滚动中，忽略更新')
-        return
-      }
-
-      const { comic, images, currentIndex } = stateRef.current
-      if (!comic || !images.length) return
-
-      const newIndex = Math.floor((range.startIndex + range.endIndex) / 2)
-      if (currentIndex === newIndex) return
-
-      const total = images.length
-      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
-
-      const newProgress: ComicProgress = {
-        current: newIndex,
-        total,
-        percent,
-        lastRead: Date.now(),
-      }
-
-      console.log(
-        'handleRangeChanged:',
-        comic.title,
-        currentIndex,
-        newIndex,
-        range,
-      )
-
-      throttledUpdateProgress.current(comic.id, newProgress)
-    },
-    [],
-  )
 
   const toggleViewMode = useCallback(() => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
@@ -324,6 +290,42 @@ export const ComicLibrary = memo(function ComicLibrary({
     [updateComicProgress, addTab],
   )
 
+  const handleImageVisible = useCallback(
+    (index: number, isVisible: boolean) => {
+      if (isAutoScrolling.current) {
+        console.log('自动滚动中，忽略更新')
+        return
+      }
+
+      if (isVisible) {
+        visibleIndices.current.add(index)
+      } else {
+        visibleIndices.current.delete(index)
+      }
+      if (!visibleIndices.current.size) return
+      const newIndex = Math.min(...visibleIndices.current)
+
+      const { comic, images, currentIndex } = stateRef.current
+      if (!comic || !images.length) return
+
+      if (currentIndex === newIndex) return
+
+      const total = images.length
+      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
+
+      const newProgress = {
+        current: newIndex,
+        total,
+        percent,
+        lastRead: Date.now(),
+      }
+
+      console.log('更新进度:', newIndex, visibleIndices.current)
+      throttledUpdateProgress.current(comic.id, newProgress)
+    },
+    [],
+  )
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -392,9 +394,10 @@ export const ComicLibrary = memo(function ComicLibrary({
         image={image}
         onTags={handleSetImageTags}
         onContextMenu={handleImageClick}
+        onVisible={handleImageVisible}
       />
     ),
-    [handleSetImageTags, handleImageClick],
+    [handleSetImageTags, handleImageClick, handleImageVisible],
   )
 
   const showComics = useMemo(() => {
@@ -511,7 +514,6 @@ export const ComicLibrary = memo(function ComicLibrary({
             className="flex-1"
             data={showImages}
             initialTopMostItemIndex={currentIndex}
-            rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
             overscan={2000}
           />

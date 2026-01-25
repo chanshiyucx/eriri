@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { cn } from '@/lib/style'
 import type { FileTags, Image } from '@/types/library'
@@ -8,6 +8,7 @@ interface ImageProps {
   onTags: (image: Image, tags: FileTags) => void
   onClick?: (index: number) => void
   onContextMenu?: (index: number) => void
+  onVisible?: (index: number, isVisible: boolean) => void
 }
 
 export const GridImage = memo(function GridImage({
@@ -83,10 +84,29 @@ export const ScrollImage = memo(function ScrollImage({
   image,
   onTags,
   onContextMenu,
+  onVisible,
 }: ImageProps) {
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !onVisible) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => onVisible(image.index, entry.isIntersecting),
+      { threshold: 0.5 },
+    )
+    observer.observe(el)
+    return () => {
+      observer.disconnect()
+      onVisible(image.index, false)
+    }
+  }, [image.index, onVisible])
+
   return (
     <div
       key={image.path}
+      ref={ref}
       className={cn(
         'relative h-full shrink-0 bg-cover bg-center',
         image.deleted && 'opacity-40',
