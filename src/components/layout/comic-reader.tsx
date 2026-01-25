@@ -126,6 +126,7 @@ export const ComicReader = memo(function ComicReader({
 }: ComicReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const isAutoScrolling = useRef(false)
+  const visibleIndices = useRef(new Set<number>())
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
   const isImmersive = useUIStore((s) => s.isImmersive)
@@ -183,8 +184,9 @@ export const ComicReader = memo(function ComicReader({
       updateComicProgress(comicId, newProgress)
 
       if (viewMode === 'scroll') {
-        console.log('锁定滚动：', index)
+        console.log('滚动锁定并跳转：', index)
         isAutoScrolling.current = true
+        visibleIndices.current.clear()
         virtuosoRef.current?.scrollToIndex({
           index,
           align: 'center',
@@ -205,21 +207,29 @@ export const ComicReader = memo(function ComicReader({
     jumpTo(currentIndex)
   }, [activeTab, jumpTo])
 
-  const handleRangeChanged = useCallback(
-    (range: { startIndex: number; endIndex: number }) => {
+  const handleImageVisible = useCallback(
+    (index: number, isVisible: boolean) => {
       if (isAutoScrolling.current) {
         console.log('自动滚动中，忽略更新')
         return
       }
 
+      if (isVisible) {
+        visibleIndices.current.add(index)
+      } else {
+        visibleIndices.current.delete(index)
+      }
+      if (!visibleIndices.current.size) return
+      const newIndex = Math.min(...visibleIndices.current)
+
       const { comic, images, currentIndex } = stateRef.current
       if (!comic || !images.length) return
 
-      const newIndex = Math.floor((range.startIndex + range.endIndex) / 2)
       if (currentIndex === newIndex) return
 
       const total = images.length
       const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
+
       const newProgress = {
         current: newIndex,
         total,
@@ -227,6 +237,7 @@ export const ComicReader = memo(function ComicReader({
         lastRead: Date.now(),
       }
 
+      console.log('更新进度:', newIndex, visibleIndices.current)
       throttledUpdateProgress.current(comic.id, newProgress)
     },
     [],
@@ -240,18 +251,18 @@ export const ComicReader = memo(function ComicReader({
     setViewMode((prev) => (prev === 'single' ? 'scroll' : 'single'))
   }, [])
 
-  const handleSetImageTags = useCallback(
-    (image: Image, tags: FileTags) => {
-      void updateComicImageTags(comicId, image.filename, tags)
-    },
-    [comicId, updateComicImageTags],
-  )
-
   const handleSetComicTags = useCallback(
     (tags: FileTags) => {
       void updateComicTags(comicId, tags)
     },
     [comicId, updateComicTags],
+  )
+
+  const handleSetImageTags = useCallback(
+    (image: Image, tags: FileTags) => {
+      void updateComicImageTags(comicId, image.filename, tags)
+    },
+    [comicId, updateComicImageTags],
   )
 
   const handleCloseToc = useCallback(() => {
@@ -309,9 +320,13 @@ export const ComicReader = memo(function ComicReader({
 
   const renderScrollImage = useCallback(
     (_index: number, image: Image) => (
-      <ScrollImage image={image} onTags={handleSetImageTags} />
+      <ScrollImage
+        image={image}
+        onTags={handleSetImageTags}
+        onVisible={handleImageVisible}
+      />
     ),
-    [handleSetImageTags],
+    [handleSetImageTags, handleImageVisible],
   )
 
   const currentImage = images[currentIndex]
@@ -415,7 +430,6 @@ export const ComicReader = memo(function ComicReader({
             horizontalDirection
             data={images}
             initialTopMostItemIndex={currentIndex}
-            rangeChanged={handleRangeChanged}
             itemContent={renderScrollImage}
             overscan={2000}
           />
