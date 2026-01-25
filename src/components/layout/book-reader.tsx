@@ -1,6 +1,13 @@
 import { throttle } from 'lodash-es'
 import { SquareMenu, Star, StepForward, Trash2 } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -88,14 +95,13 @@ export const BookReader = memo(function BookReader({
   bookId,
   showReading = false,
 }: BookReaderProps) {
-  const [bookData, setBookData] = useState<BookData | null>(null)
-  const [currentChapterTitle, setCurrentChapterTitle] = useState<string>('')
-  const [isTocCollapsed, setTocCollapsed] = useState(true)
   const virtuosoRef = useRef<VirtuosoHandle>(null)
+  const isAutoScrolling = useRef(false)
+  const [isTocCollapsed, setTocCollapsed] = useState(true)
+  const [bookData, setBookData] = useState<BookData | null>(null)
 
   const book = useLibraryStore((s) => s.books[bookId])
   const updateBookTags = useLibraryStore((s) => s.updateBookTags)
-  const updateBookProgress = useProgressStore((s) => s.updateBookProgress)
   const activeTab = useTabsStore((s) => s.activeTab)
   const addTab = useTabsStore((s) => s.addTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
@@ -103,15 +109,33 @@ export const BookReader = memo(function BookReader({
   const content = bookData?.bookId === bookId ? bookData.content : null
   const lines = content?.lines ?? EMPTY_LINES
 
-  const stateRef = useRef({ activeTab, book, content, currentChapterTitle })
-  stateRef.current = { activeTab, book, content, currentChapterTitle }
+  const updateBookProgress = useProgressStore((s) => s.updateBookProgress)
+  const progress = useProgressStore((s) => s.books[bookId])
+  const currentIndex = progress?.current ?? 0
+  const currentChapterTitle = progress?.currentChapterTitle ?? ''
+
+  const stateRef = useRef({
+    activeTab,
+    book,
+    content,
+    currentIndex,
+    currentChapterTitle,
+  })
+  // eslint-disable-next-line react-hooks/refs
+  stateRef.current = {
+    activeTab,
+    book,
+    content,
+    currentIndex,
+    currentChapterTitle,
+  }
 
   const throttledUpdateProgress = useRef(
     throttle(
       (bookId: string, progress: BookProgress) =>
         updateBookProgress(bookId, progress),
       300,
-      { leading: true, trailing: true },
+      { leading: false, trailing: true },
     ),
   )
 
@@ -122,12 +146,6 @@ export const BookReader = memo(function BookReader({
       throttled.cancel()
     }
   }, [])
-
-  const initialTopIndex = useMemo(() => {
-    if (!content) return 0
-    const progress = useProgressStore.getState().books[bookId]
-    return Math.min(progress?.currentLineIndex ?? 0, content.lines.length - 1)
-  }, [content, bookId])
 
   useEffect(() => {
     if (!book.path) return
@@ -142,18 +160,76 @@ export const BookReader = memo(function BookReader({
     void load()
   }, [bookId, book.path])
 
+  const jumpTo = useCallback(
+    (index: number) => {
+      if (!content) return
+      const total = content.lines.length ?? 0
+      const percent = total > 1 ? (index / (total - 1)) * 100 : 100
+      const match = content.chapters.findLast((c) => c.lineIndex <= index)
+      const chapterTitle = match?.title ?? ''
+      const newProgress: BookProgress = {
+        current: index,
+        total,
+        percent,
+        currentChapterTitle: chapterTitle,
+        lastRead: Date.now(),
+      }
+
+      updateBookProgress(bookId, newProgress)
+
+      console.log('锁定滚动：', index)
+      isAutoScrolling.current = true
+      virtuosoRef.current?.scrollToIndex({
+        index,
+        align: 'start',
+      })
+
+      setTimeout(() => {
+        console.log('解除锁定')
+        isAutoScrolling.current = false
+      }, 500)
+    },
+    [updateBookProgress, content, bookId],
+  )
+
+  useLayoutEffect(() => {
+    const { activeTab, book, content, currentIndex } = stateRef.current
+    if (!content || (activeTab && activeTab !== book.id)) return
+    jumpTo(currentIndex)
+  }, [activeTab, jumpTo])
+
+  const handleRangeChanged = useCallback(
+    (range: { startIndex: number; endIndex: number }) => {
+      if (isAutoScrolling.current) {
+        console.log('自动滚动中，忽略更新')
+        return
+      }
+
+      const { book, content } = stateRef.current
+      if (!content) return
+
+      const total = content.lines.length
+      const newIndex = range.startIndex
+      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
+      const match = content.chapters.findLast((c) => c.lineIndex <= newIndex)
+      const chapterTitle = match?.title ?? ''
+      const newProgress: BookProgress = {
+        current: newIndex,
+        total,
+        percent,
+        currentChapterTitle: chapterTitle,
+        lastRead: Date.now(),
+      }
+
+      throttledUpdateProgress.current(book.id, newProgress)
+    },
+    [],
+  )
+
   const toggleToc = useCallback(() => {
     const { content } = stateRef.current
     if (!content?.chapters.length) return
     setTocCollapsed((prev) => !prev)
-  }, [])
-
-  const handleChapterClick = useCallback((lineIndex: number) => {
-    virtuosoRef.current?.scrollToIndex({
-      index: lineIndex,
-      align: 'start',
-      behavior: 'smooth',
-    })
   }, [])
 
   const handleCloseToc = useCallback(() => {
@@ -176,38 +252,6 @@ export const BookReader = memo(function BookReader({
       void updateBookTags(book.id, tags)
     },
     [updateBookTags, book.id],
-  )
-
-  const handleRangeChanged = useCallback(
-    (range: { startIndex: number; endIndex: number }) => {
-      const { book, content } = stateRef.current
-      if (!content) return
-
-      const totalLines = content.lines.length
-      const currentLine = range.startIndex
-      const safeLineIndex = Math.min(Math.max(0, currentLine), totalLines - 1)
-      const percent =
-        totalLines > 1 ? (safeLineIndex / (totalLines - 1)) * 100 : 100
-
-      const match = content.chapters.findLast(
-        (c) => c.lineIndex <= safeLineIndex,
-      )
-      const chapterTitle = match?.title ?? ''
-
-      if (chapterTitle !== stateRef.current.currentChapterTitle) {
-        setCurrentChapterTitle(chapterTitle)
-      }
-
-      const newProgress: BookProgress = {
-        currentLineIndex: safeLineIndex,
-        totalLines,
-        percent,
-        currentChapterTitle: chapterTitle,
-        lastRead: Date.now(),
-      }
-      throttledUpdateProgress.current(book.id, newProgress)
-    },
-    [],
   )
 
   useEffect(() => {
@@ -252,7 +296,7 @@ export const BookReader = memo(function BookReader({
           chapters={content.chapters}
           currentChapterTitle={currentChapterTitle}
           isCollapsed={isTocCollapsed}
-          onSelect={handleChapterClick}
+          onSelect={jumpTo}
           onClose={handleCloseToc}
         />
       )}
@@ -308,7 +352,7 @@ export const BookReader = memo(function BookReader({
         ref={virtuosoRef}
         className="flex-1"
         data={lines}
-        initialTopMostItemIndex={initialTopIndex}
+        initialTopMostItemIndex={currentIndex}
         rangeChanged={handleRangeChanged}
         itemContent={renderItem}
         components={ReaderPadding}

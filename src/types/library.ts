@@ -123,8 +123,8 @@ export interface ComicProgress {
 }
 
 export interface BookProgress {
-  currentLineIndex: number
-  totalLines: number
+  current: number
+  total: number
   percent: number
   lastRead: number
   currentChapterTitle?: string

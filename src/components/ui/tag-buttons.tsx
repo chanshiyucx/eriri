@@ -9,9 +9,11 @@ interface TagButtonsProps {
   onStar?: () => void
   onDelete?: () => void
   size?: 'sm' | 'md'
+  title?: string
 }
 
 export const TagButtons = memo(function TagButtons({
+  title,
   starred,
   deleted,
   onStar,
@@ -42,6 +44,11 @@ export const TagButtons = memo(function TagButtons({
           )}
         />
       </Button>
+      {title && (
+        <span className="text-love text-lg opacity-0 group-hover:opacity-100">
+          {title}
+        </span>
+      )}
       <Button
         className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
         onClick={(e) => {
