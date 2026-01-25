@@ -162,6 +162,7 @@ export const ComicLibrary = memo(function ComicLibrary({
     currentIndex,
     viewMode,
     filterImage,
+    collapsed,
   })
   // eslint-disable-next-line react-hooks/refs
   stateRef.current = {
@@ -171,6 +172,7 @@ export const ComicLibrary = memo(function ComicLibrary({
     currentIndex,
     viewMode,
     filterImage,
+    collapsed,
   }
 
   const throttledUpdateProgress = useRef(
@@ -235,7 +237,7 @@ export const ComicLibrary = memo(function ComicLibrary({
 
   useLayoutEffect(() => {
     lockScroll()
-  }, [lockScroll, viewMode, filterImage])
+  }, [lockScroll, viewMode, filterImage, collapsed])
 
   useLayoutEffect(() => {
     const { images, currentIndex } = stateRef.current
@@ -331,10 +333,17 @@ export const ComicLibrary = memo(function ComicLibrary({
       if (!visibleIndices.current.size) return
       const newIndex = Math.min(...visibleIndices.current)
 
-      const { comic, images, currentIndex, filterImage } = stateRef.current
-      if (!comic || !images.length || filterImage) return
-
-      if (currentIndex === newIndex) return
+      const { comic, images, currentIndex, filterImage, collapsed } =
+        stateRef.current
+      if (
+        !comic ||
+        !images.length ||
+        currentIndex === newIndex ||
+        filterImage ||
+        collapsed === 2
+      ) {
+        return
+      }
 
       const total = images.length
       const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
@@ -485,7 +494,7 @@ export const ComicLibrary = memo(function ComicLibrary({
       <div
         className={cn(
           'flex shrink-0 flex-col',
-          collapsed === 2 ? 'w-0' : 'flex-1',
+          collapsed === 2 ? 'hidden' : 'flex-1',
         )}
       >
         <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
