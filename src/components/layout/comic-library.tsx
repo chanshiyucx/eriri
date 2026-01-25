@@ -121,7 +121,8 @@ export const ComicLibrary = memo(function ComicLibrary({
   selectedLibrary,
 }: ComicLibraryProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const isAutoScrolling = useRef(false)
+  const isLock = useRef(true)
+  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const visibleIndices = useRef(new Set<number>())
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
@@ -153,9 +154,9 @@ export const ComicLibrary = memo(function ComicLibrary({
   const progress = useProgressStore((s) => s.comics[comicId])
   const currentIndex = progress?.current ?? 0
 
-  const stateRef = useRef({ activeTab, comic, images, currentIndex })
+  const stateRef = useRef({ activeTab, comic, images, currentIndex, viewMode })
   // eslint-disable-next-line react-hooks/refs
-  stateRef.current = { activeTab, comic, images, currentIndex }
+  stateRef.current = { activeTab, comic, images, currentIndex, viewMode }
 
   const throttledUpdateProgress = useRef(
     throttle(
@@ -179,8 +180,23 @@ export const ComicLibrary = memo(function ComicLibrary({
     void getComicImages(comicId)
   }, [comicId, images.length, getComicImages])
 
+  const lockScroll = useCallback(() => {
+    if (lockTimer.current) {
+      clearTimeout(lockTimer.current)
+    }
+    console.log('滚动锁定')
+    visibleIndices.current.clear()
+    isLock.current = true
+    lockTimer.current = setTimeout(() => {
+      console.log('解除锁定')
+      isLock.current = false
+    }, 500)
+  }, [])
+
   const jumpTo = useCallback(
     (index: number) => {
+      console.log('跳转索引：', index)
+      const { comic, images, viewMode } = stateRef.current
       const total = images.length
       const percent = total > 1 ? (index / (total - 1)) * 100 : 100
       const newProgress = {
@@ -189,30 +205,27 @@ export const ComicLibrary = memo(function ComicLibrary({
         percent,
         lastRead: Date.now(),
       }
-      updateComicProgress(comicId, newProgress)
+      updateComicProgress(comic.id, newProgress)
 
       if (viewMode === 'scroll') {
-        console.log('滚动锁定并跳转：', index)
-        isAutoScrolling.current = true
-        visibleIndices.current.clear()
+        lockScroll()
         virtuosoRef.current?.scrollToIndex({
           index,
           align: 'center',
         })
-
-        setTimeout(() => {
-          console.log('解除锁定')
-          isAutoScrolling.current = false
-        }, 500)
       }
     },
-    [updateComicProgress, images.length, viewMode, comicId],
+    [updateComicProgress, lockScroll],
   )
 
   useLayoutEffect(() => {
+    lockScroll()
+  }, [lockScroll, viewMode])
+
+  useLayoutEffect(() => {
     const { images, currentIndex } = stateRef.current
-    console.log('恢复进度:', currentIndex)
     if (!images.length) return
+    console.log('恢复进度:', currentIndex)
     jumpTo(currentIndex)
   }, [activeTab, jumpTo])
 
@@ -262,8 +275,9 @@ export const ComicLibrary = memo(function ComicLibrary({
       const { comic } = stateRef.current
       if (id === comic?.id) return
       updateLibrary(selectedLibrary.id, { status: { comicId: id } })
+      lockScroll()
     },
-    [selectedLibrary.id, updateLibrary],
+    [selectedLibrary.id, updateLibrary, lockScroll],
   )
 
   const handleImageClick = useCallback(
@@ -292,10 +306,7 @@ export const ComicLibrary = memo(function ComicLibrary({
 
   const handleImageVisible = useCallback(
     (index: number, isVisible: boolean) => {
-      if (isAutoScrolling.current) {
-        console.log('自动滚动中，忽略更新')
-        return
-      }
+      if (isLock.current) return
 
       if (isVisible) {
         visibleIndices.current.add(index)
@@ -320,7 +331,7 @@ export const ComicLibrary = memo(function ComicLibrary({
         lastRead: Date.now(),
       }
 
-      console.log('更新进度:', newIndex, visibleIndices.current)
+      console.log('更新进度:', comic.title, newIndex, visibleIndices.current)
       throttledUpdateProgress.current(comic.id, newProgress)
     },
     [],
@@ -515,7 +526,7 @@ export const ComicLibrary = memo(function ComicLibrary({
             data={showImages}
             initialTopMostItemIndex={currentIndex}
             itemContent={renderScrollImage}
-            overscan={2000}
+            increaseViewportBy={1000}
           />
         )}
       </div>
