@@ -449,7 +449,7 @@ export const ComicLibrary = memo(function ComicLibrary({
       <div
         className={cn(
           'flex shrink-0 flex-col',
-          collapsed === 0 ? 'w-0 border-none' : 'flex-1',
+          collapsed === 0 ? 'hidden' : 'flex-1',
           collapsed === 1 && 'border-r',
         )}
       >

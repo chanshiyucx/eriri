@@ -223,8 +223,8 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'bg-base flex h-full flex-col transition-all duration-300',
-        isSidebarCollapsed ? 'w-0' : 'w-56 border-r',
+        'bg-base flex h-full w-56 flex-col border-r transition-[margin-left] duration-300',
+        isSidebarCollapsed && '-ml-56 border-none',
       )}
     >
       <ScrollArea viewportClassName="h-0 flex-1">
