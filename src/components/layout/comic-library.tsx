@@ -24,6 +24,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
+import { openPathNative } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -65,6 +66,10 @@ const ComicItem = memo(function ComicItem({
         comic.starred ? 'bg-love/50' : 'hover:bg-overlay',
       )}
       onClick={() => onClick(comic.id)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        void openPathNative(comic.path)
+      }}
     >
       <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
         <img
