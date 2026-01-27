@@ -3,6 +3,7 @@ import { memo, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { openPathNative } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -68,6 +69,10 @@ const AuthorItem = memo(function AuthorItem({
   return (
     <Button
       onClick={() => onSelect(author.id)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        void openPathNative(author.path)
+      }}
       className={cn(
         'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm transition-colors',
         isSelected ? 'bg-overlay' : 'bg-surface',
