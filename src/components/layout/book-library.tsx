@@ -98,7 +98,13 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
     useShallow((s) => {
       if (!authorId) return []
       const bookIds = s.authorBooks[authorId]
-      return bookIds.map((id) => s.books[id])
+      return bookIds
+        .map((id) => s.books[id])
+        .toSorted((a, b) => {
+          if (a.deleted !== b.deleted) return a.deleted ? 1 : -1
+          if (a.starred !== b.starred) return a.starred ? -1 : 1
+          return 0
+        })
     }),
   )
 

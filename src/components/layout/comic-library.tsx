@@ -1,5 +1,4 @@
 import {
-  Funnel,
   Grid2x2,
   PanelLeftClose,
   PanelLeftOpen,
@@ -17,7 +16,6 @@ import { Virtuoso, VirtuosoGrid, type VirtuosoHandle } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { GridImage, ScrollImage } from '@/components/ui/image-view'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
@@ -122,8 +120,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
-  const [filterComic, setFilterComic] = useState<boolean>(false)
-  const [filterImage, setFilterImage] = useState<boolean>(false)
 
   const activeTab = useTabsStore((s) => s.activeTab)
   const addTab = useTabsStore((s) => s.addTab)
@@ -142,7 +138,13 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const comics = useLibraryStore(
     useShallow((s) => {
       const comicIds = s.libraryComics[selectedLibrary.id]
-      return comicIds.map((id) => s.comics[id])
+      return comicIds
+        .map((id) => s.comics[id])
+        .toSorted((a, b) => {
+          if (a.deleted !== b.deleted) return a.deleted ? 1 : -1
+          if (a.starred !== b.starred) return a.starred ? -1 : 1
+          return 0
+        })
     }),
   )
 
@@ -156,7 +158,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     images,
     currentIndex,
     viewMode,
-    filterImage,
     collapsed,
   })
 
@@ -184,7 +185,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
 
   useLayoutEffect(() => {
     lockScroll()
-  }, [lockScroll, viewMode, filterImage, collapsed])
+  }, [lockScroll, viewMode, collapsed])
 
   useLayoutEffect(() => {
     const { images, currentIndex } = stateRef.current
@@ -194,14 +195,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
 
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
-  }
-
-  const toggleFilterComic = () => {
-    setFilterComic((prev) => !prev)
-  }
-
-  const toggleFilterImage = () => {
-    setFilterImage((prev) => !prev)
   }
 
   const handleContinueReading = () => {
@@ -246,13 +239,11 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     if (!visibleIndices.current.size) return
     const newIndex = Math.min(...visibleIndices.current)
 
-    const { comic, images, currentIndex, filterImage, collapsed } =
-      stateRef.current
+    const { comic, images, currentIndex, collapsed } = stateRef.current
     if (
       !comic ||
       !images.length ||
       currentIndex === newIndex ||
-      filterImage ||
       collapsed === 2
     ) {
       return
@@ -280,12 +271,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         break
       case 'KeyB':
         toggleViewMode()
-        break
-      case 'KeyF':
-        toggleFilterComic()
-        break
-      case 'KeyG':
-        toggleFilterImage()
         break
     }
   })
@@ -323,9 +308,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     />
   )
 
-  const showComics = filterComic ? comics.filter((c) => c.starred) : comics
-  const showImages = filterImage ? images.filter((img) => img.starred) : images
-
   return (
     <div className="flex h-full w-full">
       {/* Left Column: Comic List */}
@@ -337,20 +319,8 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         )}
       >
         <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>Comics ({showComics.length})</span>
+          <span>Comics ({comics.length})</span>
           <div className="flex gap-2">
-            <Button
-              className="h-6 w-6"
-              onClick={toggleFilterComic}
-              title="过滤漫画"
-            >
-              <Funnel
-                className={cn(
-                  'h-4 w-4',
-                  filterComic && 'text-love fill-gold/80',
-                )}
-              />
-            </Button>
             <Button
               className="h-6 w-6"
               onClick={() => setCollapsed(collapsed === 1 ? 0 : 1)}
@@ -365,7 +335,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         </div>
         <VirtuosoGrid
           className="flex-1"
-          data={showComics}
+          data={comics}
           itemContent={renderComicItem}
           components={LibraryPadding}
           listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
@@ -381,7 +351,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         )}
       >
         <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>Images ({showImages.length})</span>
+          <span>Images ({images.length})</span>
           <div className="flex gap-2">
             <Button
               className="h-6 w-6"
@@ -393,18 +363,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
               ) : (
                 <Grid2x2 className="h-4 w-4" />
               )}
-            </Button>
-            <Button
-              className="h-6 w-6"
-              onClick={toggleFilterImage}
-              title="过滤图片"
-            >
-              <Funnel
-                className={cn(
-                  'h-4 w-4',
-                  filterImage && 'text-love fill-gold/80',
-                )}
-              />
             </Button>
             <Button
               className="h-6 w-6"
@@ -429,25 +387,12 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
           <VirtuosoGrid
             key={comicId}
             className="flex-1"
-            data={showImages}
+            data={images}
             itemContent={renderGridImage}
             components={LibraryPadding}
             listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
             increaseViewportBy={{ top: 0, bottom: 1000 }}
           />
-        ) : filterImage ? (
-          <ScrollArea viewportClassName="h-0 flex-1">
-            {showImages.map((img) => (
-              <ScrollImage
-                key={img.filename}
-                comicId={comicId}
-                image={img}
-                onTags={updateComicImageTags}
-                onContextMenu={handleImageClick}
-                className="w-full"
-              />
-            ))}
-          </ScrollArea>
         ) : (
           <Virtuoso
             key={comicId}

@@ -1,5 +1,5 @@
 import { Funnel, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useEffectEvent, useState } from 'react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { VideoPlayer } from '@/components/layout/video-player'
@@ -76,7 +76,14 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
   const videos = useLibraryStore(
     useShallow((s) => {
       const videoIds = s.libraryVideos[selectedLibrary.id] ?? EMPTY_ARRAY
-      return videoIds.map((id) => s.videos[id]).filter(Boolean)
+      return videoIds
+        .map((id) => s.videos[id])
+        .filter(Boolean)
+        .toSorted((a, b) => {
+          if (a.deleted !== b.deleted) return a.deleted ? 1 : -1
+          if (a.starred !== b.starred) return a.starred ? -1 : 1
+          return 0
+        })
     }),
   )
 
@@ -99,29 +106,29 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
     />
   )
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
 
-      const { activeTab, video } = stateRef.current
-      if (activeTab || !video) return
+    const { activeTab, video } = stateRef.current
+    if (activeTab || !video) return
 
-      switch (e.code) {
-        case 'KeyC':
-          void updateVideoTags(video.id, { deleted: !video.deleted })
-          break
-        case 'KeyV':
-          void updateVideoTags(video.id, { starred: !video.starred })
-          break
-        case 'KeyF':
-          setFilterVideo((prev) => !prev)
-          break
-      }
+    switch (e.code) {
+      case 'KeyC':
+        void updateVideoTags(video.id, { deleted: !video.deleted })
+        break
+      case 'KeyV':
+        void updateVideoTags(video.id, { starred: !video.starred })
+        break
+      case 'KeyF':
+        setFilterVideo((prev) => !prev)
+        break
     }
+  })
 
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [updateVideoTags, stateRef])
+  }, [])
 
   const showVideos = filterVideo ? videos.filter((v) => v.starred) : videos
 

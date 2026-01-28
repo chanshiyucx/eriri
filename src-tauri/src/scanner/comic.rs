@@ -37,7 +37,7 @@ pub fn scan_comic_library(
         .filter(|e| !is_hidden(&e.path()))
         .collect();
 
-    let processed_comics: Vec<Comic> = entries_vec
+    let mut comics: Vec<Comic> = entries_vec
         .par_iter()
         .map_init(
             || {
@@ -113,7 +113,6 @@ pub fn scan_comic_library(
         add_stat(&app, total_new_count, total_new_bytes);
     }
 
-    let mut comics = processed_comics;
     comics.sort_by(|a, b| natord::compare(&a.title, &b.title));
 
     info!(
@@ -126,10 +125,7 @@ pub fn scan_comic_library(
 }
 
 #[tauri::command]
-pub fn scan_comic_images(
-    app: AppHandle,
-    comic_path: &str,
-) -> Result<Vec<ComicImage>, String> {
+pub fn scan_comic_images(app: AppHandle, comic_path: &str) -> Result<Vec<ComicImage>, String> {
     let start = std::time::Instant::now();
     let path = Path::new(comic_path);
 
