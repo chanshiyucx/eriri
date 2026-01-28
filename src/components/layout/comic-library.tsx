@@ -1,4 +1,3 @@
-import { throttle } from 'lodash-es'
 import {
   Funnel,
   Grid2x2,
@@ -24,6 +23,9 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
+import { useScrollLock } from '@/hooks/use-scroll-lock'
+import { useThrottledProgress } from '@/hooks/use-throttled-progress'
+import { createComicProgress } from '@/lib/progress'
 import { openPathNative } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -32,7 +34,6 @@ import { useTabsStore } from '@/store/tabs'
 import {
   LibraryType,
   type Comic,
-  type ComicProgress,
   type FileTags,
   type Image,
   type Library,
@@ -127,9 +128,6 @@ export const ComicLibrary = memo(function ComicLibrary({
   selectedLibrary,
 }: ComicLibraryProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const isLock = useRef(true)
-  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const visibleIndices = useRef(new Set<number>())
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
   const [filterComic, setFilterComic] = useState<boolean>(false)
@@ -180,53 +178,18 @@ export const ComicLibrary = memo(function ComicLibrary({
     collapsed,
   }
 
-  const throttledUpdateProgress = useRef(
-    throttle(
-      (comicId: string, progress: ComicProgress) =>
-        updateComicProgress(comicId, progress),
-      300,
-      { leading: false, trailing: true },
-    ),
-  )
-
-  useEffect(() => {
-    const throttled = throttledUpdateProgress.current
-    return () => {
-      throttled.flush()
-      throttled.cancel()
-    }
-  }, [])
+  const { isLock, visibleIndices, lockScroll } = useScrollLock()
+  const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
 
   useEffect(() => {
     if (images.length) return
     void getComicImages(comicId)
   }, [comicId, images.length, getComicImages])
 
-  const lockScroll = useCallback(() => {
-    if (lockTimer.current) {
-      clearTimeout(lockTimer.current)
-    }
-    console.log('滚动锁定')
-    visibleIndices.current.clear()
-    isLock.current = true
-    lockTimer.current = setTimeout(() => {
-      console.log('解除锁定')
-      isLock.current = false
-    }, 500)
-  }, [])
-
   const jumpTo = useCallback(
     (index: number) => {
-      console.log('跳转索引：', index)
       const { comic, images, viewMode } = stateRef.current
-      const total = images.length
-      const percent = total > 1 ? (index / (total - 1)) * 100 : 100
-      const newProgress = {
-        current: index,
-        total,
-        percent,
-        lastRead: Date.now(),
-      }
+      const newProgress = createComicProgress(index, images.length)
       updateComicProgress(comic.id, newProgress)
 
       if (viewMode === 'scroll') {
@@ -247,7 +210,6 @@ export const ComicLibrary = memo(function ComicLibrary({
   useLayoutEffect(() => {
     const { images, currentIndex } = stateRef.current
     if (!images.length) return
-    console.log('恢复进度:', currentIndex)
     jumpTo(currentIndex)
   }, [activeTab, jumpTo])
 
@@ -307,15 +269,8 @@ export const ComicLibrary = memo(function ComicLibrary({
       const { comic, images } = stateRef.current
       if (!comic) return
 
-      const total = images.length
-      const percent = total > 1 ? (index / (total - 1)) * 100 : 100
-
-      updateComicProgress(comic.id, {
-        current: index,
-        total,
-        percent,
-        lastRead: Date.now(),
-      })
+      const newProgress = createComicProgress(index, images.length)
+      updateComicProgress(comic.id, newProgress)
 
       addTab({
         type: LibraryType.comic,
@@ -350,20 +305,10 @@ export const ComicLibrary = memo(function ComicLibrary({
         return
       }
 
-      const total = images.length
-      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
-
-      const newProgress = {
-        current: newIndex,
-        total,
-        percent,
-        lastRead: Date.now(),
-      }
-
-      console.log('更新进度:', comic.title, newIndex, visibleIndices.current)
+      const newProgress = createComicProgress(newIndex, images.length)
       throttledUpdateProgress.current(comic.id, newProgress)
     },
-    [],
+    [throttledUpdateProgress, isLock, visibleIndices],
   )
 
   useEffect(() => {
