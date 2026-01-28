@@ -4,7 +4,7 @@ import {
   plyrLayoutIcons,
   type PlyrControl,
 } from '@vidstack/react/player/layouts/plyr'
-import { memo, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import '@vidstack/react/player/styles/base.css'
 import '@vidstack/react/player/styles/plyr/theme.css'
 import { cn } from '@/lib/style'
@@ -24,9 +24,7 @@ interface VideoPlayerProps {
   videoId: string
 }
 
-export const VideoPlayer = memo(function VideoPlayer({
-  videoId,
-}: VideoPlayerProps) {
+export function VideoPlayer({ videoId }: VideoPlayerProps) {
   const video = useLibraryStore((s) => s.videos[videoId])
   const containerRef = useRef<HTMLDivElement>(null)
   const [shouldFillHeight, setShouldFillHeight] = useState(false)
@@ -75,4 +73,4 @@ export const VideoPlayer = memo(function VideoPlayer({
       </MediaPlayer>
     </div>
   )
-})
+}

@@ -7,7 +7,14 @@ const host = process.env.TAURI_DEV_HOST
 
 export default defineConfig(
   async (): Promise<UserConfig> => ({
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react({
+        babel: {
+          plugins: [['babel-plugin-react-compiler', { target: '19' }]],
+        },
+      }),
+      tailwindcss(),
+    ],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

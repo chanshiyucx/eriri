@@ -1,6 +1,6 @@
 import { ask, open as openDialog } from '@tauri-apps/plugin-dialog'
 import { FolderOpen, Trash2 } from 'lucide-react'
-import { startTransition, useCallback, useEffect, useState } from 'react'
+import { startTransition, useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
   cleanAllThumbnailCache,
@@ -26,20 +26,20 @@ export function CacheInfo() {
   const [cacheDir, setCacheDirState] = useState<string | null>(null)
   const isScanning = useLibraryStore((s) => s.isScanning)
 
-  const loadData = useCallback(async (rescan = false) => {
+  const loadData = async (rescan = false) => {
     const stats = await getThumbnailStats(rescan)
     const dir = await getCacheDir()
     startTransition(() => {
       setCache(stats)
       setCacheDirState(dir)
     })
-  }, [])
+  }
 
   useEffect(() => {
     if (!isScanning) {
       void loadData()
     }
-  }, [isScanning, loadData])
+  }, [isScanning])
 
   const handleCleanCache = async () => {
     try {

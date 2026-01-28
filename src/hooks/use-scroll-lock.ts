@@ -1,4 +1,4 @@
-import { useCallback, useRef } from 'react'
+import { useRef } from 'react'
 
 const SCROLL_LOCK_TIMEOUT = 500
 
@@ -7,7 +7,7 @@ export function useScrollLock() {
   const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const visibleIndices = useRef(new Set<number>())
 
-  const lockScroll = useCallback(() => {
+  const lockScroll = () => {
     if (lockTimer.current) {
       clearTimeout(lockTimer.current)
     }
@@ -19,7 +19,7 @@ export function useScrollLock() {
       console.log('解除锁定')
       isLock.current = false
     }, SCROLL_LOCK_TIMEOUT)
-  }, [])
+  }
 
   return { isLock, visibleIndices, lockScroll }
 }

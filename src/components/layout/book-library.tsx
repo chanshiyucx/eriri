@@ -1,5 +1,4 @@
 import { Book as BookIcon, Folder, Star, Trash2 } from 'lucide-react'
-import { memo, useCallback } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -16,11 +15,7 @@ interface BookItemProps {
   onClick: (id: string) => void
 }
 
-const BookItem = memo(function BookItem({
-  book,
-  isSelected,
-  onClick,
-}: BookItemProps) {
+function BookItem({ book, isSelected, onClick }: BookItemProps) {
   const progress = useProgressStore((s) => s.books[book.id])
 
   return (
@@ -53,7 +48,7 @@ const BookItem = memo(function BookItem({
       </div>
     </Button>
   )
-})
+}
 
 interface AuthorItemProps {
   author: Author
@@ -61,11 +56,7 @@ interface AuthorItemProps {
   onSelect: (id: string) => void
 }
 
-const AuthorItem = memo(function AuthorItem({
-  author,
-  isSelected,
-  onSelect,
-}: AuthorItemProps) {
+function AuthorItem({ author, isSelected, onSelect }: AuthorItemProps) {
   return (
     <Button
       onClick={() => onSelect(author.id)}
@@ -85,15 +76,13 @@ const AuthorItem = memo(function AuthorItem({
       </div>
     </Button>
   )
-})
+}
 
 interface BookLibraryProps {
   selectedLibrary: Library
 }
 
-export const BookLibrary = memo(function BookLibrary({
-  selectedLibrary,
-}: BookLibraryProps) {
+export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
 
   const { authorId, bookId } = selectedLibrary.status
@@ -113,23 +102,17 @@ export const BookLibrary = memo(function BookLibrary({
     }),
   )
 
-  const handleSelectAuthor = useCallback(
-    (id: string) => {
-      if (id === authorId) return
-      updateLibrary(selectedLibrary.id, {
-        status: { authorId: id, bookId: '' },
-      })
-    },
-    [updateLibrary, selectedLibrary.id, authorId],
-  )
+  const handleSelectAuthor = (id: string) => {
+    if (id === authorId) return
+    updateLibrary(selectedLibrary.id, {
+      status: { authorId: id, bookId: '' },
+    })
+  }
 
-  const handleSelectBook = useCallback(
-    (id: string) => {
-      if (id === bookId) return
-      updateLibrary(selectedLibrary.id, { status: { authorId, bookId: id } })
-    },
-    [updateLibrary, selectedLibrary.id, authorId, bookId],
-  )
+  const handleSelectBook = (id: string) => {
+    if (id === bookId) return
+    updateLibrary(selectedLibrary.id, { status: { authorId, bookId: id } })
+  }
 
   return (
     <div className="flex h-full w-full">
@@ -171,4 +154,4 @@ export const BookLibrary = memo(function BookLibrary({
       {bookId && <BookReader bookId={bookId} showReading />}
     </div>
   )
-})
+}

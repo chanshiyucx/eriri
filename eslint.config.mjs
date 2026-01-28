@@ -1,6 +1,7 @@
 import js from '@eslint/js'
 import prettierConfig from 'eslint-config-prettier'
 import reactPlugin from 'eslint-plugin-react'
+import reactCompilerPlugin from 'eslint-plugin-react-compiler'
 import reactHooksPlugin from 'eslint-plugin-react-hooks'
 import tseslint from 'typescript-eslint'
 
@@ -16,6 +17,14 @@ export default [
   },
 
   js.configs.recommended,
+  {
+    plugins: {
+      'react-compiler': reactCompilerPlugin,
+    },
+    rules: {
+      'react-compiler/react-compiler': 'error',
+    },
+  },
   ...tseslint.configs.recommendedTypeChecked.map((conf) => ({
     ...conf,
     files: ['**/*.{ts,tsx}'],
