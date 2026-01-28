@@ -1,4 +1,3 @@
-import { throttle } from 'lodash-es'
 import {
   CircleChevronLeft,
   CircleChevronRight,
@@ -22,12 +21,15 @@ import { ScrollImage, SingleImage } from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { useClickOutside } from '@/hooks/use-click-outside'
+import { useScrollLock } from '@/hooks/use-scroll-lock'
+import { useThrottledProgress } from '@/hooks/use-throttled-progress'
+import { createComicProgress } from '@/lib/progress'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
-import type { ComicProgress, FileTags, Image } from '@/types/library'
+import type { FileTags, Image } from '@/types/library'
 
 type ViewMode = 'single' | 'scroll'
 
@@ -125,9 +127,6 @@ export const ComicReader = memo(function ComicReader({
   comicId,
 }: ComicReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const isLock = useRef(true)
-  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const visibleIndices = useRef(new Set<number>())
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
   const isImmersive = useUIStore((s) => s.isImmersive)
@@ -146,57 +145,34 @@ export const ComicReader = memo(function ComicReader({
   const progress = useProgressStore((s) => s.comics[comicId])
   const currentIndex = progress?.current ?? 0
 
-  const stateRef = useRef({ activeTab, comic, images, currentIndex, viewMode })
+  const stateRef = useRef({
+    activeTab,
+    comic,
+    images,
+    currentIndex,
+    viewMode,
+  })
   // eslint-disable-next-line react-hooks/refs
-  stateRef.current = { activeTab, comic, images, currentIndex, viewMode }
+  stateRef.current = {
+    activeTab,
+    comic,
+    images,
+    currentIndex,
+    viewMode,
+  }
 
-  const throttledUpdateProgress = useRef(
-    throttle(
-      (comicId: string, progress: ComicProgress) =>
-        updateComicProgress(comicId, progress),
-      300,
-      { leading: false, trailing: true },
-    ),
-  )
-
-  useEffect(() => {
-    const throttled = throttledUpdateProgress.current
-    return () => {
-      throttled.flush()
-      throttled.cancel()
-    }
-  }, [])
+  const { isLock, visibleIndices, lockScroll } = useScrollLock()
+  const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
 
   useEffect(() => {
     if (images.length) return
     void getComicImages(comicId)
   }, [comicId, images.length, getComicImages])
 
-  const lockScroll = useCallback(() => {
-    if (lockTimer.current) {
-      clearTimeout(lockTimer.current)
-    }
-    console.log('滚动锁定')
-    visibleIndices.current.clear()
-    isLock.current = true
-    lockTimer.current = setTimeout(() => {
-      console.log('解除锁定')
-      isLock.current = false
-    }, 500)
-  }, [])
-
   const jumpTo = useCallback(
     (index: number) => {
-      console.log('跳转索引：', index)
       const { comic, images, viewMode } = stateRef.current
-      const total = images.length
-      const percent = total > 1 ? (index / (total - 1)) * 100 : 100
-      const newProgress = {
-        current: index,
-        total,
-        percent,
-        lastRead: Date.now(),
-      }
+      const newProgress = createComicProgress(index, images.length)
       updateComicProgress(comic.id, newProgress)
 
       if (viewMode === 'scroll') {
@@ -237,20 +213,10 @@ export const ComicReader = memo(function ComicReader({
 
       if (currentIndex === newIndex) return
 
-      const total = images.length
-      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
-
-      const newProgress = {
-        current: newIndex,
-        total,
-        percent,
-        lastRead: Date.now(),
-      }
-
-      console.log('更新进度:', newIndex, visibleIndices.current)
+      const newProgress = createComicProgress(newIndex, images.length)
       throttledUpdateProgress.current(comic.id, newProgress)
     },
-    [],
+    [throttledUpdateProgress, isLock, visibleIndices],
   )
 
   const toggleToc = useCallback(() => {

@@ -1,4 +1,3 @@
-import { throttle } from 'lodash-es'
 import { SquareMenu, Star, StepForward, Trash2 } from 'lucide-react'
 import {
   memo,
@@ -13,6 +12,9 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ReaderPadding } from '@/components/ui/virtuoso-config'
 import { useClickOutside } from '@/hooks/use-click-outside'
+import { useScrollLock } from '@/hooks/use-scroll-lock'
+import { useThrottledProgress } from '@/hooks/use-throttled-progress'
+import { createBookProgress } from '@/lib/progress'
 import { parseBook } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -21,7 +23,6 @@ import { useTabsStore } from '@/store/tabs'
 import {
   LibraryType,
   type BookContent,
-  type BookProgress,
   type Chapter,
   type FileTags,
 } from '@/types/library'
@@ -96,8 +97,6 @@ export const BookReader = memo(function BookReader({
   showReading = false,
 }: BookReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const isLock = useRef(false)
-  const lockTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [bookData, setBookData] = useState<BookData | null>(null)
 
@@ -131,22 +130,8 @@ export const BookReader = memo(function BookReader({
     currentChapterTitle,
   }
 
-  const throttledUpdateProgress = useRef(
-    throttle(
-      (bookId: string, progress: BookProgress) =>
-        updateBookProgress(bookId, progress),
-      300,
-      { leading: false, trailing: true },
-    ),
-  )
-
-  useEffect(() => {
-    const throttled = throttledUpdateProgress.current
-    return () => {
-      throttled.flush()
-      throttled.cancel()
-    }
-  }, [])
+  const { isLock, lockScroll } = useScrollLock()
+  const throttledUpdateProgress = useThrottledProgress(updateBookProgress)
 
   useEffect(() => {
     if (!book.path) return
@@ -161,36 +146,17 @@ export const BookReader = memo(function BookReader({
     void load()
   }, [bookId, book.path])
 
-  const lockScroll = useCallback(() => {
-    if (lockTimer.current) {
-      clearTimeout(lockTimer.current)
-    }
-    console.log('滚动锁定')
-    isLock.current = true
-    lockTimer.current = setTimeout(() => {
-      console.log('解除锁定')
-      isLock.current = false
-    }, 500)
-  }, [])
-
   const jumpTo = useCallback(
     (index: number) => {
       console.log('跳转索引：', index)
       const { content, book } = stateRef.current
       if (!content) return
 
-      const total = content.lines.length ?? 0
-      const percent = total > 1 ? (index / (total - 1)) * 100 : 100
-      const match = content.chapters.findLast((c) => c.lineIndex <= index)
-      const chapterTitle = match?.title ?? ''
-      const newProgress: BookProgress = {
-        current: index,
-        total,
-        percent,
-        currentChapterTitle: chapterTitle,
-        lastRead: Date.now(),
-      }
-
+      const newProgress = createBookProgress(
+        index,
+        content.lines.length,
+        content.chapters,
+      )
       updateBookProgress(book.id, newProgress)
 
       lockScroll()
@@ -215,22 +181,14 @@ export const BookReader = memo(function BookReader({
       const { book, content } = stateRef.current
       if (!content) return
 
-      const total = content.lines.length
-      const newIndex = range.startIndex
-      const percent = total > 1 ? (newIndex / (total - 1)) * 100 : 100
-      const match = content.chapters.findLast((c) => c.lineIndex <= newIndex)
-      const chapterTitle = match?.title ?? ''
-      const newProgress: BookProgress = {
-        current: newIndex,
-        total,
-        percent,
-        currentChapterTitle: chapterTitle,
-        lastRead: Date.now(),
-      }
-
+      const newProgress = createBookProgress(
+        range.startIndex,
+        content.lines.length,
+        content.chapters,
+      )
       throttledUpdateProgress.current(book.id, newProgress)
     },
-    [],
+    [throttledUpdateProgress, isLock],
   )
 
   const toggleToc = useCallback(() => {
