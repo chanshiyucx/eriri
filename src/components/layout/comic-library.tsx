@@ -7,11 +7,9 @@ import {
   StepForward,
 } from 'lucide-react'
 import {
-  memo,
-  useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
-  useMemo,
   useRef,
   useState,
 } from 'react'
@@ -23,6 +21,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
+import { useLatest } from '@/hooks/use-latest'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
@@ -47,15 +46,10 @@ interface ComicItemProps {
   comic: Comic
   isSelected: boolean
   onClick: (id: string) => void
-  onTags: (comic: Comic, tags: FileTags) => void
+  onTags: (id: string, tags: FileTags) => Promise<void>
 }
 
-const ComicItem = memo(function ComicItem({
-  comic,
-  isSelected,
-  onClick,
-  onTags,
-}: ComicItemProps) {
+function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
   const progress = useProgressStore((s) => s.comics[comic.id])
 
   return (
@@ -83,8 +77,8 @@ const ComicItem = memo(function ComicItem({
         <TagButtons
           starred={comic.starred}
           deleted={comic.deleted}
-          onStar={() => onTags(comic, { starred: !comic.starred })}
-          onDelete={() => onTags(comic, { deleted: !comic.deleted })}
+          onStar={() => void onTags(comic.id, { starred: !comic.starred })}
+          onDelete={() => void onTags(comic.id, { deleted: !comic.deleted })}
           size="sm"
         />
         {comic.pageCount && (
@@ -118,15 +112,13 @@ const ComicItem = memo(function ComicItem({
       </div>
     </div>
   )
-})
+}
 
 interface ComicLibraryProps {
   selectedLibrary: Library
 }
 
-export const ComicLibrary = memo(function ComicLibrary({
-  selectedLibrary,
-}: ComicLibraryProps) {
+export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
@@ -158,7 +150,7 @@ export const ComicLibrary = memo(function ComicLibrary({
   const progress = useProgressStore((s) => s.comics[comicId])
   const currentIndex = progress?.current ?? 0
 
-  const stateRef = useRef({
+  const stateRef = useLatest({
     activeTab,
     comic,
     images,
@@ -167,16 +159,6 @@ export const ComicLibrary = memo(function ComicLibrary({
     filterImage,
     collapsed,
   })
-  // eslint-disable-next-line react-hooks/refs
-  stateRef.current = {
-    activeTab,
-    comic,
-    images,
-    currentIndex,
-    viewMode,
-    filterImage,
-    collapsed,
-  }
 
   const { isLock, visibleIndices, lockScroll } = useScrollLock()
   const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
@@ -186,22 +168,19 @@ export const ComicLibrary = memo(function ComicLibrary({
     void getComicImages(comicId)
   }, [comicId, images.length, getComicImages])
 
-  const jumpTo = useCallback(
-    (index: number) => {
-      const { comic, images, viewMode } = stateRef.current
-      const newProgress = createComicProgress(index, images.length)
-      updateComicProgress(comic.id, newProgress)
+  const jumpTo = useEffectEvent((index: number) => {
+    const { comic, images, viewMode } = stateRef.current
+    const newProgress = createComicProgress(index, images.length)
+    updateComicProgress(comic.id, newProgress)
 
-      if (viewMode === 'scroll') {
-        lockScroll()
-        virtuosoRef.current?.scrollToIndex({
-          index,
-          align: 'center',
-        })
-      }
-    },
-    [updateComicProgress, lockScroll],
-  )
+    if (viewMode === 'scroll') {
+      lockScroll()
+      virtuosoRef.current?.scrollToIndex({
+        index,
+        align: 'center',
+      })
+    }
+  })
 
   useLayoutEffect(() => {
     lockScroll()
@@ -211,21 +190,21 @@ export const ComicLibrary = memo(function ComicLibrary({
     const { images, currentIndex } = stateRef.current
     if (!images.length) return
     jumpTo(currentIndex)
-  }, [activeTab, jumpTo])
+  }, [activeTab, stateRef])
 
-  const toggleViewMode = useCallback(() => {
+  const toggleViewMode = () => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
-  }, [])
+  }
 
-  const toggleFilterComic = useCallback(() => {
+  const toggleFilterComic = () => {
     setFilterComic((prev) => !prev)
-  }, [])
+  }
 
-  const toggleFilterImage = useCallback(() => {
+  const toggleFilterImage = () => {
     setFilterImage((prev) => !prev)
-  }, [])
+  }
 
-  const handleContinueReading = useCallback(() => {
+  const handleContinueReading = () => {
     const { comic } = stateRef.current
     if (!comic) return
 
@@ -235,163 +214,117 @@ export const ComicLibrary = memo(function ComicLibrary({
       title: comic.title,
     })
     setActiveTab(comic.id)
-  }, [addTab, setActiveTab])
+  }
 
-  const handleSetComicTags = useCallback(
-    (comic: Comic, tags: FileTags) => {
-      void updateComicTags(comic.id, tags)
-    },
-    [updateComicTags],
-  )
+  const handleSelectComic = (id: string) => {
+    const { comic } = stateRef.current
+    if (id === comic?.id) return
+    updateLibrary(selectedLibrary.id, { status: { comicId: id } })
+    lockScroll()
+  }
 
-  const handleSetImageTags = useCallback(
-    (image: Image, tags: FileTags) => {
-      const { comic } = stateRef.current
-      if (!comic) return
+  const handleImageClick = (index: number) => {
+    const { comic, images } = stateRef.current
+    const newProgress = createComicProgress(index, images.length)
+    updateComicProgress(comic.id, newProgress)
 
-      void updateComicImageTags(comic.id, image.filename, tags)
-    },
-    [updateComicImageTags],
-  )
+    addTab({
+      type: LibraryType.comic,
+      id: comic.id,
+      title: comic.title,
+    })
+  }
 
-  const handleSelectComic = useCallback(
-    (id: string) => {
-      const { comic } = stateRef.current
-      if (id === comic?.id) return
-      updateLibrary(selectedLibrary.id, { status: { comicId: id } })
-      lockScroll()
-    },
-    [selectedLibrary.id, updateLibrary, lockScroll],
-  )
+  const handleImageVisible = (index: number, isVisible: boolean) => {
+    if (isLock.current) return
 
-  const handleImageClick = useCallback(
-    (index: number) => {
-      const { comic, images } = stateRef.current
-      if (!comic) return
+    if (isVisible) {
+      visibleIndices.current.add(index)
+    } else {
+      visibleIndices.current.delete(index)
+    }
+    if (!visibleIndices.current.size) return
+    const newIndex = Math.min(...visibleIndices.current)
 
-      const newProgress = createComicProgress(index, images.length)
-      updateComicProgress(comic.id, newProgress)
-
-      addTab({
-        type: LibraryType.comic,
-        id: comic.id,
-        title: comic.title,
-      })
-    },
-    [updateComicProgress, addTab],
-  )
-
-  const handleImageVisible = useCallback(
-    (index: number, isVisible: boolean) => {
-      if (isLock.current) return
-
-      if (isVisible) {
-        visibleIndices.current.add(index)
-      } else {
-        visibleIndices.current.delete(index)
-      }
-      if (!visibleIndices.current.size) return
-      const newIndex = Math.min(...visibleIndices.current)
-
-      const { comic, images, currentIndex, filterImage, collapsed } =
-        stateRef.current
-      if (
-        !comic ||
-        !images.length ||
-        currentIndex === newIndex ||
-        filterImage ||
-        collapsed === 2
-      ) {
-        return
-      }
-
-      const newProgress = createComicProgress(newIndex, images.length)
-      throttledUpdateProgress.current(comic.id, newProgress)
-    },
-    [throttledUpdateProgress, isLock, visibleIndices],
-  )
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-
-      const { activeTab, comic } = stateRef.current
-      if (activeTab || !comic) return
-
-      switch (e.code) {
-        case 'KeyC':
-          handleSetComicTags(comic, { deleted: !comic.deleted })
-          break
-        case 'KeyV':
-          handleSetComicTags(comic, { starred: !comic.starred })
-          break
-        case 'KeyP':
-          handleContinueReading()
-          break
-        case 'KeyB':
-          toggleViewMode()
-          break
-        case 'KeyF':
-          toggleFilterComic()
-          break
-        case 'KeyG':
-          toggleFilterImage()
-          break
-      }
+    const { comic, images, currentIndex, filterImage, collapsed } =
+      stateRef.current
+    if (
+      !comic ||
+      !images.length ||
+      currentIndex === newIndex ||
+      filterImage ||
+      collapsed === 2
+    ) {
+      return
     }
 
+    const newProgress = createComicProgress(newIndex, images.length)
+    throttledUpdateProgress.current(comic.id, newProgress)
+  }
+
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+
+    const { activeTab, comic } = stateRef.current
+    if (activeTab || !comic) return
+
+    switch (e.code) {
+      case 'KeyC':
+        void updateComicTags(comic.id, { deleted: !comic.deleted })
+        break
+      case 'KeyV':
+        void updateComicTags(comic.id, { starred: !comic.starred })
+        break
+      case 'KeyP':
+        handleContinueReading()
+        break
+      case 'KeyB':
+        toggleViewMode()
+        break
+      case 'KeyF':
+        toggleFilterComic()
+        break
+      case 'KeyG':
+        toggleFilterImage()
+        break
+    }
+  })
+
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [
-    handleSetComicTags,
-    handleContinueReading,
-    toggleViewMode,
-    toggleFilterComic,
-    toggleFilterImage,
-  ])
+  }, [])
 
-  const renderComicItem = useCallback(
-    (_index: number, comic: Comic) => (
-      <ComicItem
-        comic={comic}
-        isSelected={comicId === comic.id}
-        onClick={handleSelectComic}
-        onTags={handleSetComicTags}
-      />
-    ),
-    [comicId, handleSelectComic, handleSetComicTags],
+  const renderComicItem = (_index: number, comic: Comic) => (
+    <ComicItem
+      comic={comic}
+      isSelected={comicId === comic.id}
+      onClick={handleSelectComic}
+      onTags={updateComicTags}
+    />
   )
 
-  const renderGridImage = useCallback(
-    (_index: number, img: Image) => (
-      <GridImage
-        image={img}
-        onClick={handleImageClick}
-        onTags={handleSetImageTags}
-      />
-    ),
-    [handleImageClick, handleSetImageTags],
+  const renderGridImage = (_index: number, img: Image) => (
+    <GridImage
+      comicId={comicId}
+      image={img}
+      onClick={handleImageClick}
+      onTags={updateComicImageTags}
+    />
   )
 
-  const renderScrollImage = useCallback(
-    (_index: number, image: Image) => (
-      <ScrollImage
-        image={image}
-        onTags={handleSetImageTags}
-        onContextMenu={handleImageClick}
-        onVisible={handleImageVisible}
-      />
-    ),
-    [handleSetImageTags, handleImageClick, handleImageVisible],
+  const renderScrollImage = (_index: number, image: Image) => (
+    <ScrollImage
+      comicId={comicId}
+      image={image}
+      onTags={updateComicImageTags}
+      onContextMenu={handleImageClick}
+      onVisible={handleImageVisible}
+    />
   )
 
-  const showComics = useMemo(() => {
-    return filterComic ? comics.filter((c) => c.starred) : comics
-  }, [comics, filterComic])
-
-  const showImages = useMemo(() => {
-    return filterImage ? images.filter((img) => img.starred) : images
-  }, [images, filterImage])
+  const showComics = filterComic ? comics.filter((c) => c.starred) : comics
+  const showImages = filterImage ? images.filter((img) => img.starred) : images
 
   return (
     <div className="flex h-full w-full">
@@ -507,8 +440,9 @@ export const ComicLibrary = memo(function ComicLibrary({
             {showImages.map((img) => (
               <ScrollImage
                 key={img.filename}
+                comicId={comicId}
                 image={img}
-                onTags={handleSetImageTags}
+                onTags={updateComicImageTags}
                 onContextMenu={handleImageClick}
                 className="w-full"
               />
@@ -528,4 +462,4 @@ export const ComicLibrary = memo(function ComicLibrary({
       </div>
     </div>
   )
-})
+}

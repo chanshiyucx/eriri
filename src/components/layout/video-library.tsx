@@ -1,5 +1,5 @@
 import { Funnel, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { VideoPlayer } from '@/components/layout/video-player'
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
+import { useLatest } from '@/hooks/use-latest'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
@@ -16,15 +17,10 @@ interface VideoItemProps {
   video: Video
   isSelected: boolean
   onClick: (id: string) => void
-  onTags: (video: Video, tags: FileTags) => void
+  onTags: (id: string, tags: FileTags) => Promise<void>
 }
 
-const VideoItem = memo(function VideoItem({
-  video,
-  isSelected,
-  onClick,
-  onTags,
-}: VideoItemProps) {
+function VideoItem({ video, isSelected, onClick, onTags }: VideoItemProps) {
   return (
     <div
       className={cn(
@@ -47,8 +43,8 @@ const VideoItem = memo(function VideoItem({
         <TagButtons
           starred={video.starred}
           deleted={video.deleted}
-          onStar={() => void onTags(video, { starred: !video.starred })}
-          onDelete={() => void onTags(video, { deleted: !video.deleted })}
+          onStar={() => void onTags(video.id, { starred: !video.starred })}
+          onDelete={() => void onTags(video.id, { deleted: !video.deleted })}
           size="sm"
         />
       </div>
@@ -62,7 +58,7 @@ const VideoItem = memo(function VideoItem({
       </div>
     </div>
   )
-})
+}
 
 interface VideoLibraryProps {
   selectedLibrary: Library
@@ -70,9 +66,7 @@ interface VideoLibraryProps {
 
 const EMPTY_ARRAY: string[] = []
 
-export const VideoLibrary = memo(function VideoLibrary({
-  selectedLibrary,
-}: VideoLibraryProps) {
+export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
   const [filterVideo, setFilterVideo] = useState(false)
   const { collapsed, setCollapsed } = useCollapse()
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
@@ -89,39 +83,20 @@ export const VideoLibrary = memo(function VideoLibrary({
   const { videoId } = selectedLibrary.status
   const video = useLibraryStore((s) => (videoId ? s.videos[videoId] : null))
 
-  const stateRef = useRef({ activeTab, video })
-  // eslint-disable-next-line react-hooks/refs
-  stateRef.current = { activeTab, video }
+  const stateRef = useLatest({ activeTab, video })
 
-  const handleSetVideoTags = useCallback(
-    (video: Video, tags: FileTags) => {
-      void updateVideoTags(video.id, tags)
-    },
-    [updateVideoTags],
-  )
+  const handleSelectVideo = (id: string) => {
+    if (id === videoId) return
+    updateLibrary(selectedLibrary.id, { status: { videoId: id } })
+  }
 
-  const handleSelectVideo = useCallback(
-    (id: string) => {
-      if (id === videoId) return
-      updateLibrary(selectedLibrary.id, { status: { videoId: id } })
-    },
-    [selectedLibrary.id, updateLibrary, videoId],
-  )
-
-  const toggleFilterVideo = useCallback(() => {
-    setFilterVideo((prev) => !prev)
-  }, [])
-
-  const renderVideoItem = useCallback(
-    (_index: number, video: Video) => (
-      <VideoItem
-        video={video}
-        isSelected={videoId === video.id}
-        onClick={handleSelectVideo}
-        onTags={handleSetVideoTags}
-      />
-    ),
-    [videoId, handleSelectVideo, handleSetVideoTags],
+  const renderVideoItem = (_index: number, video: Video) => (
+    <VideoItem
+      video={video}
+      isSelected={videoId === video.id}
+      onClick={handleSelectVideo}
+      onTags={updateVideoTags}
+    />
   )
 
   useEffect(() => {
@@ -133,24 +108,22 @@ export const VideoLibrary = memo(function VideoLibrary({
 
       switch (e.code) {
         case 'KeyC':
-          handleSetVideoTags(video, { deleted: !video.deleted })
+          void updateVideoTags(video.id, { deleted: !video.deleted })
           break
         case 'KeyV':
-          handleSetVideoTags(video, { starred: !video.starred })
+          void updateVideoTags(video.id, { starred: !video.starred })
           break
         case 'KeyF':
-          toggleFilterVideo()
+          setFilterVideo((prev) => !prev)
           break
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSetVideoTags, toggleFilterVideo])
+  }, [updateVideoTags, stateRef])
 
-  const showVideos = useMemo(() => {
-    return filterVideo ? videos.filter((v) => v.starred) : videos
-  }, [videos, filterVideo])
+  const showVideos = filterVideo ? videos.filter((v) => v.starred) : videos
 
   return (
     <div className="flex h-full w-full">
@@ -167,7 +140,7 @@ export const VideoLibrary = memo(function VideoLibrary({
           <div className="flex gap-2">
             <Button
               className="h-6 w-6"
-              onClick={toggleFilterVideo}
+              onClick={() => setFilterVideo((prev) => !prev)}
               title="过滤视频"
             >
               <Funnel className="h-4 w-4" />
@@ -219,4 +192,4 @@ export const VideoLibrary = memo(function VideoLibrary({
       </div>
     </div>
   )
-})
+}

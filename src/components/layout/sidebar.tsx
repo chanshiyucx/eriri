@@ -21,7 +21,6 @@ import {
   RefreshCw,
   Trash2,
 } from 'lucide-react'
-import { memo, useCallback, useMemo } from 'react'
 import { CacheInfo } from '@/components/layout/cache-info'
 import { ThemeSwitcher } from '@/components/layout/theme-switcher'
 import { Button } from '@/components/ui/button'
@@ -49,7 +48,7 @@ interface SortableLibraryItemProps {
   onRemove: (library: Library) => Promise<void>
 }
 
-const SortableLibraryItem = memo(function SortableLibraryItem({
+function SortableLibraryItem({
   library,
   isSelected,
   isScanning,
@@ -117,7 +116,7 @@ const SortableLibraryItem = memo(function SortableLibraryItem({
       </div>
     </div>
   )
-})
+}
 
 export function Sidebar() {
   const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed)
@@ -131,40 +130,30 @@ export function Sidebar() {
   const setSelectedLibraryId = useLibraryStore((s) => s.setSelectedLibraryId)
   const isScanning = useLibraryStore((s) => s.isScanning)
 
-  const librariesList = useMemo(() => {
-    return Object.values(libraries).sort((a, b) => a.sortOrder - b.sortOrder)
-  }, [libraries])
-
-  const libraryIds = useMemo(
-    () => librariesList.map((lib) => lib.id),
-    [librariesList],
+  const librariesList = Object.values(libraries).sort(
+    (a, b) => a.sortOrder - b.sortOrder,
   )
+  const libraryIds = librariesList.map((lib) => lib.id)
 
   const sensors = useSensors(useSensor(PointerSensor, POINTER_SENSOR_OPTIONS))
 
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event
-      if (!over || active.id === over.id) return
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
 
-      const oldIndex = libraryIds.indexOf(active.id as string)
-      const newIndex = libraryIds.indexOf(over.id as string)
-      if (oldIndex === -1 || newIndex === -1) return
+    const oldIndex = libraryIds.indexOf(active.id as string)
+    const newIndex = libraryIds.indexOf(over.id as string)
+    if (oldIndex === -1 || newIndex === -1) return
 
-      const newOrder = [...libraryIds]
-      newOrder.splice(oldIndex, 1)
-      newOrder.splice(newIndex, 0, active.id as string)
-      reorderLibrary(newOrder)
-    },
-    [libraryIds, reorderLibrary],
-  )
+    const newOrder = [...libraryIds]
+    newOrder.splice(oldIndex, 1)
+    newOrder.splice(newIndex, 0, active.id as string)
+    reorderLibrary(newOrder)
+  }
 
-  const handleSelect = useCallback(
-    (library: Library) => {
-      setSelectedLibraryId(library.id)
-    },
-    [setSelectedLibraryId],
-  )
+  const handleSelect = (library: Library) => {
+    setSelectedLibraryId(library.id)
+  }
 
   const handleImport = async () => {
     try {
@@ -188,37 +177,31 @@ export function Sidebar() {
     }
   }
 
-  const handleRefresh = useCallback(
-    async (library: Library) => {
-      try {
-        const yes = await ask(`确认刷新库 "${library.name}"?`, {
-          title: '刷新库',
-          kind: 'warning',
-        })
-        if (!yes) return
-        await refreshLibrary(library.id)
-      } catch (error) {
-        alert('刷新库失败: ' + String(error))
-      }
-    },
-    [refreshLibrary],
-  )
+  const handleRefresh = async (library: Library) => {
+    try {
+      const yes = await ask(`确认刷新库 "${library.name}"?`, {
+        title: '刷新库',
+        kind: 'warning',
+      })
+      if (!yes) return
+      await refreshLibrary(library.id)
+    } catch (error) {
+      alert('刷新库失败: ' + String(error))
+    }
+  }
 
-  const handleRemove = useCallback(
-    async (library: Library) => {
-      try {
-        const yes = await ask(`确认删除库 "${library.name}"?`, {
-          title: '删除库',
-          kind: 'warning',
-        })
-        if (!yes) return
-        removeLibrary(library.id)
-      } catch (error) {
-        alert('删除库失败: ' + String(error))
-      }
-    },
-    [removeLibrary],
-  )
+  const handleRemove = async (library: Library) => {
+    try {
+      const yes = await ask(`确认删除库 "${library.name}"?`, {
+        title: '删除库',
+        kind: 'warning',
+      })
+      if (!yes) return
+      removeLibrary(library.id)
+    } catch (error) {
+      alert('删除库失败: ' + String(error))
+    }
+  }
 
   return (
     <aside

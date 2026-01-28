@@ -1,7 +1,8 @@
 import { Home, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
-import { memo, useCallback, useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useLatest } from '@/hooks/use-latest'
 import { cn } from '@/lib/style'
 import { useTabsStore, type Tab } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
@@ -13,12 +14,7 @@ interface TabItemProps {
   onRemove: (id: string) => void
 }
 
-const TabItem = memo(function TabItem({
-  tab,
-  isActive,
-  onSelect,
-  onRemove,
-}: TabItemProps) {
+function TabItem({ tab, isActive, onSelect, onRemove }: TabItemProps) {
   return (
     <div
       className={cn(
@@ -39,7 +35,7 @@ const TabItem = memo(function TabItem({
       </Button>
     </div>
   )
-})
+}
 
 export function TabNav() {
   const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed)
@@ -50,64 +46,59 @@ export function TabNav() {
   const removeTab = useTabsStore((s) => s.removeTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  const stateRef = useRef({ tabs, activeTab })
-  // eslint-disable-next-line react-hooks/refs
-  stateRef.current = { tabs, activeTab }
+  const stateRef = useLatest({ tabs, activeTab })
 
-  const navigateTab = useCallback(
-    (direction: 1 | -1) => {
-      const { tabs, activeTab } = stateRef.current
-      if (!tabs.length) return
+  const navigateTab = (direction: 1 | -1) => {
+    const { tabs, activeTab } = stateRef.current
+    if (!tabs.length) return
 
-      const currentIndex = tabs.findIndex((tab) => tab.id === activeTab)
+    const currentIndex = tabs.findIndex((tab) => tab.id === activeTab)
 
-      if (direction === -1) {
-        if (currentIndex > 0) {
-          setActiveTab(tabs[currentIndex - 1].id)
-        } else if (currentIndex === -1) {
-          setActiveTab(tabs[tabs.length - 1].id)
-        } else if (currentIndex === 0) {
-          setActiveTab('')
-        }
-      } else if (direction === 1) {
-        if (currentIndex < tabs.length - 1 && currentIndex !== -1) {
-          setActiveTab(tabs[currentIndex + 1].id)
-        } else if (currentIndex === -1) {
-          setActiveTab(tabs[0].id)
-        } else if (currentIndex === tabs.length - 1) {
-          setActiveTab('')
-        }
+    if (direction === -1) {
+      if (currentIndex > 0) {
+        setActiveTab(tabs[currentIndex - 1].id)
+      } else if (currentIndex === -1) {
+        setActiveTab(tabs[tabs.length - 1].id)
+      } else if (currentIndex === 0) {
+        setActiveTab('')
       }
-    },
-    [setActiveTab],
-  )
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-
-      const { activeTab } = stateRef.current
-      switch (e.code) {
-        case 'Space':
-          e.preventDefault() // Prevent page scrolling
-          toggleImmersive()
-          break
-        case 'KeyX':
-          removeTab(activeTab)
-          break
-        case 'KeyA':
-          toggleSidebar()
-          break
-        case 'ArrowLeft':
-        case 'ArrowRight':
-          navigateTab(e.code === 'ArrowLeft' ? -1 : 1)
-          break
+    } else if (direction === 1) {
+      if (currentIndex < tabs.length - 1 && currentIndex !== -1) {
+        setActiveTab(tabs[currentIndex + 1].id)
+      } else if (currentIndex === -1) {
+        setActiveTab(tabs[0].id)
+      } else if (currentIndex === tabs.length - 1) {
+        setActiveTab('')
       }
     }
+  }
 
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+
+    const { activeTab } = stateRef.current
+    switch (e.code) {
+      case 'Space':
+        e.preventDefault() // Prevent page scrolling
+        toggleImmersive()
+        break
+      case 'KeyX':
+        removeTab(activeTab)
+        break
+      case 'KeyA':
+        toggleSidebar()
+        break
+      case 'ArrowLeft':
+      case 'ArrowRight':
+        navigateTab(e.code === 'ArrowLeft' ? -1 : 1)
+        break
+    }
+  })
+
+  useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [toggleImmersive, removeTab, toggleSidebar, navigateTab])
+  }, [])
 
   return (
     <div className="bg-base flex h-8 items-center gap-2 border-b px-2">

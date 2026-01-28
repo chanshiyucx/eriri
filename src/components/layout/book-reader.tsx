@@ -1,8 +1,7 @@
 import { SquareMenu, Star, StepForward, Trash2 } from 'lucide-react'
 import {
-  memo,
-  useCallback,
   useEffect,
+  useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
@@ -12,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { ReaderPadding } from '@/components/ui/virtuoso-config'
 import { useClickOutside } from '@/hooks/use-click-outside'
+import { useLatest } from '@/hooks/use-latest'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createBookProgress } from '@/lib/progress'
@@ -20,22 +20,17 @@ import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
-import {
-  LibraryType,
-  type BookContent,
-  type Chapter,
-  type FileTags,
-} from '@/types/library'
+import { LibraryType, type BookContent, type Chapter } from '@/types/library'
 
 const EMPTY_LINES: string[] = []
 
-const BookLine = memo(function BookLine({ line }: { line: string }) {
+function BookLine({ line }: { line: string }) {
   return (
     <p className="text-text mx-auto w-full max-w-3xl px-8 pb-4 font-serif leading-relaxed break-words whitespace-pre-wrap">
       {line}
     </p>
   )
-})
+}
 
 interface TableOfContentsProps {
   chapters: Chapter[]
@@ -45,7 +40,7 @@ interface TableOfContentsProps {
   onClose: () => void
 }
 
-const TableOfContents = memo(function TableOfContents({
+function TableOfContents({
   chapters,
   currentChapterTitle,
   isCollapsed,
@@ -80,7 +75,7 @@ const TableOfContents = memo(function TableOfContents({
       </ScrollArea>
     </div>
   )
-})
+}
 
 interface BookData {
   bookId: string
@@ -92,10 +87,7 @@ interface BookReaderProps {
   showReading?: boolean
 }
 
-export const BookReader = memo(function BookReader({
-  bookId,
-  showReading = false,
-}: BookReaderProps) {
+export function BookReader({ bookId, showReading = false }: BookReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [bookData, setBookData] = useState<BookData | null>(null)
@@ -114,21 +106,13 @@ export const BookReader = memo(function BookReader({
   const currentIndex = progress?.current ?? 0
   const currentChapterTitle = progress?.currentChapterTitle ?? ''
 
-  const stateRef = useRef({
+  const stateRef = useLatest({
     activeTab,
     book,
     content,
     currentIndex,
     currentChapterTitle,
   })
-  // eslint-disable-next-line react-hooks/refs
-  stateRef.current = {
-    activeTab,
-    book,
-    content,
-    currentIndex,
-    currentChapterTitle,
-  }
 
   const { isLock, lockScroll } = useScrollLock()
   const throttledUpdateProgress = useThrottledProgress(updateBookProgress)
@@ -146,62 +130,56 @@ export const BookReader = memo(function BookReader({
     void load()
   }, [bookId, book.path])
 
-  const jumpTo = useCallback(
-    (index: number) => {
-      console.log('跳转索引：', index)
-      const { content, book } = stateRef.current
-      if (!content) return
+  const jumpTo = (index: number) => {
+    console.log('跳转索引：', index)
+    const { content, book } = stateRef.current
+    if (!content) return
 
-      const newProgress = createBookProgress(
-        index,
-        content.lines.length,
-        content.chapters,
-      )
-      updateBookProgress(book.id, newProgress)
+    const newProgress = createBookProgress(
+      index,
+      content.lines.length,
+      content.chapters,
+    )
+    updateBookProgress(book.id, newProgress)
 
-      lockScroll()
-      virtuosoRef.current?.scrollToIndex({
-        index,
-        align: 'start',
-      })
-    },
-    [updateBookProgress, lockScroll],
-  )
+    lockScroll()
+    virtuosoRef.current?.scrollToIndex({
+      index,
+      align: 'start',
+    })
+  }
+  const jumpToFn = useEffectEvent(jumpTo)
 
   useLayoutEffect(() => {
     const { activeTab, book, content, currentIndex } = stateRef.current
     if (!content || (activeTab && activeTab !== book.id)) return
-    jumpTo(currentIndex)
-  }, [activeTab, jumpTo])
+    jumpToFn(currentIndex)
+  }, [activeTab, stateRef])
 
-  const handleRangeChanged = useCallback(
-    (range: { startIndex: number; endIndex: number }) => {
-      if (isLock.current) return
+  const handleRangeChanged = (range: {
+    startIndex: number
+    endIndex: number
+  }) => {
+    if (isLock.current) return
 
-      const { book, content } = stateRef.current
-      if (!content) return
+    const { book, content } = stateRef.current
+    if (!content) return
 
-      const newProgress = createBookProgress(
-        range.startIndex,
-        content.lines.length,
-        content.chapters,
-      )
-      throttledUpdateProgress.current(book.id, newProgress)
-    },
-    [throttledUpdateProgress, isLock],
-  )
+    const newProgress = createBookProgress(
+      range.startIndex,
+      content.lines.length,
+      content.chapters,
+    )
+    throttledUpdateProgress.current(book.id, newProgress)
+  }
 
-  const toggleToc = useCallback(() => {
+  const toggleToc = () => {
     const { content } = stateRef.current
     if (!content?.chapters.length) return
     setTocCollapsed((prev) => !prev)
-  }, [])
+  }
 
-  const handleCloseToc = useCallback(() => {
-    setTocCollapsed(true)
-  }, [])
-
-  const handleContinueReading = useCallback(() => {
+  const handleContinueReading = () => {
     const { activeTab, book } = stateRef.current
     if (!book || activeTab === book.id) return
     addTab({
@@ -210,47 +188,37 @@ export const BookReader = memo(function BookReader({
       title: book.title,
     })
     setActiveTab(book.id)
-  }, [addTab, setActiveTab])
+  }
 
-  const handleSetBookTags = useCallback(
-    (tags: FileTags) => {
-      void updateBookTags(book.id, tags)
-    },
-    [updateBookTags, book.id],
-  )
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+
+    const { activeTab, book } = stateRef.current
+    if (!book) return
+    if (activeTab && activeTab !== book.id) return
+
+    switch (e.code) {
+      case 'KeyT':
+        toggleToc()
+        break
+      case 'KeyC':
+        void updateBookTags(book.id, { deleted: !book.deleted })
+        break
+      case 'KeyV':
+        void updateBookTags(book.id, { starred: !book.starred })
+        break
+      case 'KeyP':
+        handleContinueReading()
+        break
+    }
+  })
 
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-
-      const { activeTab, book } = stateRef.current
-      if (!book) return
-      if (activeTab && activeTab !== book.id) return
-
-      switch (e.code) {
-        case 'KeyT':
-          toggleToc()
-          break
-        case 'KeyC':
-          handleSetBookTags({ deleted: !book.deleted })
-          break
-        case 'KeyV':
-          handleSetBookTags({ starred: !book.starred })
-          break
-        case 'KeyP':
-          handleContinueReading()
-          break
-      }
-    }
-
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleSetBookTags, toggleToc, handleContinueReading])
+  }, [])
 
-  const renderItem = useCallback(
-    (_index: number, line: string) => <BookLine line={line} />,
-    [],
-  )
+  const renderItem = (_index: number, line: string) => <BookLine line={line} />
 
   if (!book || !content) return null
 
@@ -262,7 +230,7 @@ export const BookReader = memo(function BookReader({
           currentChapterTitle={currentChapterTitle}
           isCollapsed={isTocCollapsed}
           onSelect={jumpTo}
-          onClose={handleCloseToc}
+          onClose={() => setTocCollapsed(true)}
         />
       )}
 
@@ -289,7 +257,9 @@ export const BookReader = memo(function BookReader({
 
         <Button
           className="h-6 w-6"
-          onClick={() => handleSetBookTags({ deleted: !book.deleted })}
+          onClick={() =>
+            void updateBookTags(book.id, { deleted: !book.deleted })
+          }
           title="标记删除"
         >
           <Trash2
@@ -299,7 +269,9 @@ export const BookReader = memo(function BookReader({
 
         <Button
           className="h-6 w-6"
-          onClick={() => handleSetBookTags({ starred: !book.starred })}
+          onClick={() =>
+            void updateBookTags(book.id, { starred: !book.starred })
+          }
           title="标记收藏"
         >
           <Star
@@ -325,4 +297,4 @@ export const BookReader = memo(function BookReader({
       />
     </div>
   )
-})
+}

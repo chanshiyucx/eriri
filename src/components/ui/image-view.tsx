@@ -1,22 +1,23 @@
-import { memo, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { cn } from '@/lib/style'
 import type { FileTags, Image } from '@/types/library'
 
 interface ImageProps {
   className?: string
+  comicId: string
   image: Image
-  onTags: (image: Image, tags: FileTags) => void
+  onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
   onClick?: (index: number) => void
   onContextMenu?: (index: number) => void
   onVisible?: (index: number, isVisible: boolean) => void
 }
 
-export const GridImage = memo(function GridImage({
-  image,
-  onClick,
-  onTags,
-}: ImageProps) {
+export function GridImage({ comicId, image, onClick, onTags }: ImageProps) {
+  const handleSetTags = (tags: FileTags) => {
+    void onTags(comicId, image.filename, tags)
+  }
+
   return (
     <div
       key={image.path}
@@ -38,8 +39,8 @@ export const GridImage = memo(function GridImage({
         <TagButtons
           starred={image.starred}
           deleted={image.deleted}
-          onStar={() => void onTags(image, { starred: !image.starred })}
-          onDelete={() => void onTags(image, { deleted: !image.deleted })}
+          onStar={() => handleSetTags({ starred: !image.starred })}
+          onDelete={() => handleSetTags({ deleted: !image.deleted })}
           size="sm"
         />
       </div>
@@ -48,12 +49,13 @@ export const GridImage = memo(function GridImage({
       </div>
     </div>
   )
-})
+}
 
-export const SingleImage = memo(function SingleImage({
-  image,
-  onTags,
-}: ImageProps) {
+export function SingleImage({ comicId, image, onTags }: ImageProps) {
+  const handleSetTags = (tags: FileTags) => {
+    void onTags(comicId, image.filename, tags)
+  }
+
   return (
     <div
       key={image.path}
@@ -72,16 +74,17 @@ export const SingleImage = memo(function SingleImage({
         <TagButtons
           starred={image.starred}
           deleted={image.deleted}
-          onStar={() => onTags(image, { starred: !image.starred })}
-          onDelete={() => onTags(image, { deleted: !image.deleted })}
+          onStar={() => handleSetTags({ starred: !image.starred })}
+          onDelete={() => handleSetTags({ deleted: !image.deleted })}
           size="md"
         />
       </figure>
     </div>
   )
-})
+}
 
-export const ScrollImage = memo(function ScrollImage({
+export function ScrollImage({
+  comicId,
   image,
   onTags,
   onContextMenu,
@@ -104,6 +107,10 @@ export const ScrollImage = memo(function ScrollImage({
       onVisible(image.index, false)
     }
   }, [image.index, onVisible])
+
+  const handleSetTags = (tags: FileTags) => {
+    void onTags(comicId, image.filename, tags)
+  }
 
   return (
     <div
@@ -132,10 +139,10 @@ export const ScrollImage = memo(function ScrollImage({
         title={image.filename}
         starred={image.starred}
         deleted={image.deleted}
-        onStar={() => onTags(image, { starred: !image.starred })}
-        onDelete={() => onTags(image, { deleted: !image.deleted })}
+        onStar={() => handleSetTags({ starred: !image.starred })}
+        onDelete={() => handleSetTags({ deleted: !image.deleted })}
         size="md"
       />
     </div>
   )
-})
+}

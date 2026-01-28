@@ -1,5 +1,4 @@
 import { Star, Trash2 } from 'lucide-react'
-import { memo } from 'react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/style'
 
@@ -12,7 +11,7 @@ interface TagButtonsProps {
   title?: string
 }
 
-export const TagButtons = memo(function TagButtons({
+export function TagButtons({
   title,
   starred,
   deleted,
@@ -66,4 +65,4 @@ export const TagButtons = memo(function TagButtons({
       </Button>
     </div>
   )
-})
+}

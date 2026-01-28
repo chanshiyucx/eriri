@@ -1,4 +1,3 @@
-import { memo } from 'react'
 import { BookReader } from '@/components/layout/book-reader'
 import { ComicReader } from '@/components/layout/comic-reader'
 import { VideoPlayer } from '@/components/layout/video-player'
@@ -13,11 +12,7 @@ interface TabContentProps {
   isImmersive: boolean
 }
 
-const TabContent = memo(function TabContent({
-  tab,
-  isActive,
-  isImmersive,
-}: TabContentProps) {
+function TabContent({ tab, isActive, isImmersive }: TabContentProps) {
   const { type, id } = tab
 
   return (
@@ -37,7 +32,7 @@ const TabContent = memo(function TabContent({
       )}
     </div>
   )
-})
+}
 
 export function TabArea() {
   const tabs = useTabsStore((s) => s.tabs)
