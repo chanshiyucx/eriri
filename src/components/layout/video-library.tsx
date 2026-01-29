@@ -5,7 +5,6 @@ import { useShallow } from 'zustand/react/shallow'
 import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
 import { TagButtons } from '@/components/ui/tag-buttons'
-import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
 import { useLatest } from '@/hooks/use-latest'
 import { cn } from '@/lib/style'
@@ -22,41 +21,33 @@ interface VideoItemProps {
 
 function VideoItem({ video, isSelected, onClick, onTags }: VideoItemProps) {
   return (
-    <div
+    <figure
       className={cn(
-        'flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
-        isSelected && 'bg-overlay ring-rose ring-2',
+        'group relative flex aspect-[2/3] w-full shrink-0 cursor-pointer flex-col',
         video.deleted && 'opacity-40',
-        video.starred ? 'bg-love/50' : 'hover:bg-overlay',
+        isSelected &&
+          'after:inset-ring-rose after:pointer-events-none after:absolute after:inset-0 after:inset-ring-2',
       )}
       onClick={() => onClick(video.id)}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
-        <img
-          src={video.cover}
-          alt={video.title}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-
-        <TagButtons
-          starred={video.starred}
-          deleted={video.deleted}
-          onStar={() => void onTags(video.id, { starred: !video.starred })}
-          onDelete={() => void onTags(video.id, { deleted: !video.deleted })}
-          size="sm"
-        />
-      </div>
-      <div
-        className={cn(
-          'truncate text-center text-sm transition-colors',
-          isSelected && 'text-love',
-        )}
-      >
+      <img
+        src={video.cover}
+        alt={video.title}
+        className="h-full w-full object-cover"
+        loading="lazy"
+        decoding="async"
+      />
+      <TagButtons
+        starred={video.starred}
+        deleted={video.deleted}
+        onStar={() => void onTags(video.id, { starred: !video.starred })}
+        onDelete={() => void onTags(video.id, { deleted: !video.deleted })}
+        size="sm"
+      />
+      <figcaption className="text-love absolute bottom-2 left-1/2 -translate-x-1/2 truncate text-center text-sm opacity-0 group-hover:opacity-100">
         {video.title}
-      </div>
-    </div>
+      </figcaption>
+    </figure>
   )
 }
 
@@ -166,8 +157,7 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
           className="flex-1"
           data={videos}
           itemContent={renderVideoItem}
-          components={LibraryPadding}
-          listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
+          listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
           increaseViewportBy={{ top: 0, bottom: 1000 }}
         />
       </div>

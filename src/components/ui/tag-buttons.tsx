@@ -23,11 +23,7 @@ export function TagButtons({
   const iconSize = size === 'sm' ? 'h-5 w-5' : 'h-6 w-6'
 
   return (
-    <div
-      className={cn(
-        'group absolute top-0 right-0 left-0 flex justify-between p-2',
-      )}
-    >
+    <div className="absolute top-0 right-0 left-0 flex justify-between px-1 py-1">
       <Button
         className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
         onClick={(e) => {

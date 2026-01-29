@@ -9,7 +9,6 @@ import {
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { ReaderPadding } from '@/components/ui/virtuoso-config'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { useLatest } from '@/hooks/use-latest'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
@@ -23,6 +22,11 @@ import { useTabsStore } from '@/store/tabs'
 import { LibraryType, type BookContent, type Chapter } from '@/types/library'
 
 const EMPTY_LINES: string[] = []
+
+const ReaderPadding = {
+  Header: () => <div className="h-16" />,
+  Footer: () => <div className="h-16" />,
+}
 
 function BookLine({ line }: { line: string }) {
   return (
