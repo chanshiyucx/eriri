@@ -39,12 +39,8 @@ function BookItem({ book, isSelected, onClick }: BookItemProps) {
         <span className="truncate">{book.title}</span>
         <span className="text-subtle/60 flex shrink-0 items-center gap-1 text-xs whitespace-nowrap">
           {progress?.percent > 0 && (
-            <>
-              <span>{Math.round(progress.percent)}%</span>
-              <span>•</span>
-            </>
+            <span>{Math.round(progress.percent)}%</span>
           )}
-          <span>{(book.size / 1024).toFixed(1)}k</span>
         </span>
       </div>
     </Button>
@@ -136,7 +132,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
     <div className="flex h-full w-full">
       {/* Column 1: Authors */}
       <div className="flex w-[300px] shrink-0 flex-col border-r">
-        <div className="bg-base text-subtle border-b px-4 py-2 text-xs uppercase">
+        <div className="bg-base text-subtle border-b px-3 py-2 text-xs uppercase">
           Authors ({authors.length})
         </div>
         <ScrollArea viewportClassName="h-0 flex-1">
@@ -153,7 +149,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
 
       {/* Column 2: Books */}
       <div className="flex w-[300px] shrink-0 flex-col border-r">
-        <div className="bg-base text-subtle border-b px-4 py-2 text-xs uppercase">
+        <div className="bg-base text-subtle border-b px-3 py-2 text-xs uppercase">
           Books ({books.length})
         </div>
         <ScrollArea viewportClassName="h-0 flex-1">

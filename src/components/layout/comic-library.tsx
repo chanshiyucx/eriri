@@ -332,7 +332,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         )}
       >
         <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>Comics ({comics.length})</span>
           <div className="flex gap-2">
             <Button
               className="h-6 w-6"
@@ -345,6 +344,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
               )}
             </Button>
           </div>
+          <span>Comics ({comics.length})</span>
         </div>
         <VirtuosoGrid
           className="flex-1"
@@ -363,9 +363,18 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
           collapsed === 2 ? 'hidden' : 'flex-1',
         )}
       >
-        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>Images ({images.length})</span>
+        <div className="bg-base text-subtle relative flex h-8 items-center justify-between border-b px-3 text-xs">
           <div className="flex gap-2">
+            <Button
+              className="h-6 w-6"
+              onClick={() => setCollapsed(collapsed === 1 ? 2 : 1)}
+            >
+              {collapsed === 2 ? (
+                <PanelLeftClose className="h-4 w-4" />
+              ) : (
+                <PanelLeftOpen className="h-4 w-4" />
+              )}
+            </Button>
             <Button
               className="h-6 w-6"
               onClick={toggleViewMode}
@@ -384,17 +393,13 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             >
               <StepForward className="h-4 w-4" />
             </Button>
-            <Button
-              className="h-6 w-6"
-              onClick={() => setCollapsed(collapsed === 1 ? 2 : 1)}
-            >
-              {collapsed === 2 ? (
-                <PanelLeftClose className="h-4 w-4" />
-              ) : (
-                <PanelLeftOpen className="h-4 w-4" />
-              )}
-            </Button>
           </div>
+
+          <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
+            {comic.title}
+          </h3>
+
+          <span>Images ({images.length})</span>
         </div>
         {viewMode === 'grid' ? (
           <VirtuosoGrid

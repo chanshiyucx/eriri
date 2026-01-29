@@ -297,58 +297,65 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         onTags={updateComicImageTags}
         onClose={handleCloseToc}
       />
-
       <div
         className={cn(
-          'bg-base text-subtle flex h-8 w-full items-center border-b px-2 text-xs',
+          'bg-base text-subtle relative flex h-8 w-full items-center justify-between border-b px-3 text-xs',
           isImmersive && 'hidden',
         )}
       >
-        <Button
-          className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
-          onClick={toggleToc}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <SquareMenu className="h-4 w-4" />
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
+            onClick={toggleToc}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <SquareMenu className="h-4 w-4" />
+          </Button>
 
-        <Button
-          className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
-          onClick={toggleViewMode}
-          title={`切换到 ${viewMode === 'single' ? '滚动' : '单页'}`}
-        >
-          {viewMode === 'single' ? (
-            <Square className="h-4 w-4" />
-          ) : (
-            <Columns2 className="h-4 w-4" />
-          )}
-        </Button>
+          <Button
+            className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
+            onClick={toggleViewMode}
+            title={`切换到 ${viewMode === 'single' ? '滚动' : '单页'}`}
+          >
+            {viewMode === 'single' ? (
+              <Square className="h-4 w-4" />
+            ) : (
+              <Columns2 className="h-4 w-4" />
+            )}
+          </Button>
 
-        <Button
-          className="h-6 w-6"
-          onClick={() =>
-            void updateComicTags(comic.id, { deleted: !comic.deleted })
-          }
-          title="标记删除"
-        >
-          <Trash2
-            className={cn('h-4 w-4', comic.deleted && 'text-love fill-gold/80')}
-          />
-        </Button>
+          <Button
+            className="h-6 w-6"
+            onClick={() =>
+              void updateComicTags(comic.id, { deleted: !comic.deleted })
+            }
+            title="标记删除"
+          >
+            <Trash2
+              className={cn(
+                'h-4 w-4',
+                comic.deleted && 'text-love fill-gold/80',
+              )}
+            />
+          </Button>
 
-        <Button
-          className="h-6 w-6"
-          onClick={() =>
-            void updateComicTags(comic.id, { starred: !comic.starred })
-          }
-          title="标记收藏"
-        >
-          <Star
-            className={cn('h-4 w-4', comic.starred && 'text-love fill-gold/80')}
-          />
-        </Button>
+          <Button
+            className="h-6 w-6"
+            onClick={() =>
+              void updateComicTags(comic.id, { starred: !comic.starred })
+            }
+            title="标记收藏"
+          >
+            <Star
+              className={cn(
+                'h-4 w-4',
+                comic.starred && 'text-love fill-gold/80',
+              )}
+            />
+          </Button>
+        </div>
 
-        <h3 className="flex flex-1 justify-center truncate text-center">
+        <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
           {viewMode === 'single' ? currentImage?.filename : comic.title}
         </h3>
 
