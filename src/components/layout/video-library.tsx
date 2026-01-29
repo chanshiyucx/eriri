@@ -156,7 +156,7 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
           data={videos}
           itemContent={renderVideoItem}
           listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
-          increaseViewportBy={{ top: 0, bottom: 1000 }}
+          increaseViewportBy={600}
         />
       </div>
 

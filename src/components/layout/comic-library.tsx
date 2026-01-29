@@ -319,7 +319,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
           data={comics}
           itemContent={renderComicItem}
           listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
-          increaseViewportBy={{ top: 0, bottom: 1000 }}
+          increaseViewportBy={600}
         />
       </div>
 
@@ -380,7 +380,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             data={images}
             itemContent={renderGridImage}
             listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
-            increaseViewportBy={{ top: 0, bottom: 1000 }}
+            increaseViewportBy={600}
           />
         ) : (
           <Virtuoso
@@ -390,7 +390,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             data={images}
             initialTopMostItemIndex={currentIndex}
             itemContent={renderScrollImage}
-            increaseViewportBy={1000}
+            increaseViewportBy={2000}
           />
         )}
       </div>

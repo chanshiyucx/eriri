@@ -386,7 +386,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             data={images}
             initialTopMostItemIndex={currentIndex}
             itemContent={renderScrollImage}
-            increaseViewportBy={1000}
+            increaseViewportBy={2000}
           />
         )}
       </div>
