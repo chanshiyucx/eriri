@@ -120,6 +120,10 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
+  const sortedIdsCache = useRef<{ libraryId: string; comicIds: string[] }>({
+    libraryId: '',
+    comicIds: [],
+  })
 
   const activeTab = useTabsStore((s) => s.activeTab)
   const addTab = useTabsStore((s) => s.addTab)
@@ -138,13 +142,22 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const comics = useLibraryStore(
     useShallow((s) => {
       const comicIds = s.libraryComics[selectedLibrary.id]
-      return comicIds
-        .map((id) => s.comics[id])
-        .toSorted((a, b) => {
+
+      if (sortedIdsCache.current.libraryId !== selectedLibrary.id) {
+        const sortedIds = comicIds.toSorted((idA, idB) => {
+          const a = s.comics[idA]
+          const b = s.comics[idB]
           if (a.deleted !== b.deleted) return a.deleted ? 1 : -1
           if (a.starred !== b.starred) return a.starred ? -1 : 1
           return 0
         })
+        sortedIdsCache.current = {
+          libraryId: selectedLibrary.id,
+          comicIds: sortedIds,
+        }
+      }
+
+      return sortedIdsCache.current.comicIds.map((id) => s.comics[id])
     }),
   )
 
