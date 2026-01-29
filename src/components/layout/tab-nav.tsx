@@ -2,7 +2,6 @@ import { Home, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
 import { useEffect, useEffectEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { useLatest } from '@/hooks/use-latest'
 import { cn } from '@/lib/style'
 import { useTabsStore, type Tab } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
@@ -46,10 +45,7 @@ export function TabNav() {
   const removeTab = useTabsStore((s) => s.removeTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  const stateRef = useLatest({ tabs, activeTab })
-
   const navigateTab = (direction: 1 | -1) => {
-    const { tabs, activeTab } = stateRef.current
     if (!tabs.length) return
 
     const currentIndex = tabs.findIndex((tab) => tab.id === activeTab)
@@ -76,7 +72,6 @@ export function TabNav() {
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
 
-    const { activeTab } = stateRef.current
     switch (e.code) {
       case 'Space':
         e.preventDefault() // Prevent page scrolling

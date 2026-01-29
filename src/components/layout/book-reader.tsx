@@ -10,7 +10,6 @@ import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useClickOutside } from '@/hooks/use-click-outside'
-import { useLatest } from '@/hooks/use-latest'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createBookProgress } from '@/lib/progress'
@@ -110,35 +109,13 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
   const currentIndex = progress?.current ?? 0
   const currentChapterTitle = progress?.currentChapterTitle ?? ''
 
-  const stateRef = useLatest({
-    activeTab,
-    book,
-    content,
-    currentIndex,
-    currentChapterTitle,
-  })
-
   const { isLock, lockScroll } = useScrollLock()
   const throttledUpdateProgress = useThrottledProgress(updateBookProgress)
 
-  useEffect(() => {
-    if (!book.path) return
-    const load = async () => {
-      try {
-        const data = await parseBook(book.path)
-        setBookData({ bookId, content: data })
-      } catch (e) {
-        console.error('Failed to load book', e)
-      }
-    }
-    void load()
-  }, [bookId, book.path])
-
-  const jumpTo = (index: number) => {
-    console.log('跳转索引：', index)
-    const { content, book } = stateRef.current
+  const jumpTo = (targetIndex?: number) => {
     if (!content) return
 
+    const index = targetIndex ?? currentIndex
     const newProgress = createBookProgress(
       index,
       content.lines.length,
@@ -154,11 +131,26 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
   }
   const jumpToFn = useEffectEvent(jumpTo)
 
+  useEffect(() => {
+    if (!book.path) return
+    const load = async () => {
+      try {
+        const data = await parseBook(book.path)
+        setBookData({ bookId, content: data })
+      } catch (e) {
+        console.error('Failed to load book', e)
+      }
+    }
+    void load()
+  }, [bookId, book.path])
+
   useLayoutEffect(() => {
-    const { activeTab, book, content, currentIndex } = stateRef.current
-    if (!content || (activeTab && activeTab !== book.id)) return
-    jumpToFn(currentIndex)
-  }, [activeTab, stateRef])
+    lockScroll()
+  }, [lockScroll, bookId])
+
+  useLayoutEffect(() => {
+    jumpToFn()
+  }, [activeTab])
 
   const handleRangeChanged = (range: {
     startIndex: number
@@ -166,7 +158,6 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
   }) => {
     if (isLock.current) return
 
-    const { book, content } = stateRef.current
     if (!content) return
 
     const newProgress = createBookProgress(
@@ -178,13 +169,11 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
   }
 
   const toggleToc = () => {
-    const { content } = stateRef.current
     if (!content?.chapters.length) return
     setTocCollapsed((prev) => !prev)
   }
 
   const handleContinueReading = () => {
-    const { activeTab, book } = stateRef.current
     if (!book || activeTab === book.id) return
     addTab({
       type: LibraryType.book,
@@ -196,8 +185,6 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
-
-    const { activeTab, book } = stateRef.current
     if (!book) return
     if (activeTab && activeTab !== book.id) return
 
@@ -295,7 +282,12 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
           {currentChapterTitle || book.title}
         </h3>
 
-        <span>{(book.size / 1024).toFixed(1)}k</span>
+        <div className="flex gap-2">
+          {progress?.percent > 0 && (
+            <span>{Math.round(progress.percent)}%</span>
+          )}
+          <span>{(book.size / 1024).toFixed(1)}k</span>
+        </div>
       </div>
 
       <Virtuoso

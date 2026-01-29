@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { cn } from '@/lib/style'
 import type { FileTags, Image } from '@/types/library'
@@ -94,20 +94,24 @@ export function ScrollImage({
 }: ImageProps) {
   const ref = useRef<HTMLDivElement>(null)
 
+  const onVisibleEvent = useEffectEvent((index: number, isVisible: boolean) => {
+    onVisible?.(index, isVisible)
+  })
+
   useEffect(() => {
     const el = ref.current
-    if (!el || !onVisible) return
+    if (!el) return
 
     const observer = new IntersectionObserver(
-      ([entry]) => onVisible(image.index, entry.isIntersecting),
+      ([entry]) => onVisibleEvent(image.index, entry.isIntersecting),
       { threshold: 0.5 },
     )
     observer.observe(el)
     return () => {
       observer.disconnect()
-      onVisible(image.index, false)
+      onVisibleEvent(image.index, false)
     }
-  }, [image.index, onVisible])
+  }, [image.index])
 
   const handleSetTags = (tags: FileTags) => {
     void onTags(comicId, image.filename, tags)
