@@ -63,7 +63,7 @@ export function SingleImage({ comicId, image, onTags }: ImageProps) {
   return (
     <figure
       className={cn(
-        'relative flex h-full w-full items-center justify-center',
+        'group relative flex h-full w-full items-center justify-center',
         image.deleted && 'opacity-40',
       )}
     >
@@ -121,7 +121,7 @@ export function ScrollImage({
     <figure
       ref={ref}
       className={cn(
-        'relative shrink-0 bg-cover bg-center',
+        'group relative shrink-0 bg-cover bg-center',
         image.deleted && 'opacity-40',
         className,
       )}
