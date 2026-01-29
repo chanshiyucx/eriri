@@ -20,7 +20,6 @@ import { ScrollImage, SingleImage } from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { useClickOutside } from '@/hooks/use-click-outside'
-import { useLatest } from '@/hooks/use-latest'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
@@ -153,24 +152,11 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   const progress = useProgressStore((s) => s.comics[comicId])
   const currentIndex = progress?.current ?? 0
 
-  const stateRef = useLatest({
-    activeTab,
-    comic,
-    images,
-    currentIndex,
-    viewMode,
-  })
-
   const { isLock, visibleIndices, lockScroll } = useScrollLock()
   const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
 
-  useEffect(() => {
-    if (images.length) return
-    void getComicImages(comicId)
-  }, [comicId, images.length, getComicImages])
-
-  const jumpTo = (index: number) => {
-    const { comic, images, viewMode } = stateRef.current
+  const jumpTo = (targetIndex?: number) => {
+    const index = targetIndex ?? currentIndex
     const newProgress = createComicProgress(index, images.length)
     updateComicProgress(comic.id, newProgress)
 
@@ -184,15 +170,18 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   }
   const jumpToFn = useEffectEvent(jumpTo)
 
+  useEffect(() => {
+    if (images.length) return
+    void getComicImages(comicId)
+  }, [comicId, images.length, getComicImages])
+
   useLayoutEffect(() => {
     lockScroll()
   }, [lockScroll, viewMode])
 
   useLayoutEffect(() => {
-    const { comic, images, currentIndex } = stateRef.current
-    if (!images.length || activeTab !== comic.id) return
-    jumpToFn(currentIndex)
-  }, [activeTab, stateRef])
+    jumpToFn()
+  }, [activeTab])
 
   const handleImageVisible = (index: number, isVisible: boolean) => {
     if (isLock.current) return
@@ -205,7 +194,6 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     if (!visibleIndices.current.size) return
     const newIndex = Math.min(...visibleIndices.current)
 
-    const { comic, images, currentIndex } = stateRef.current
     if (!comic || !images.length) return
 
     if (currentIndex === newIndex) return
@@ -228,8 +216,6 @@ export function ComicReader({ comicId }: ComicReaderProps) {
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
-
-    const { activeTab, comic, images, currentIndex } = stateRef.current
     if (activeTab !== comic.id) return
 
     switch (e.code) {

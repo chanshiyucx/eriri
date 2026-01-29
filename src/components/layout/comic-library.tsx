@@ -18,7 +18,6 @@ import { Button } from '@/components/ui/button'
 import { GridImage, ScrollImage } from '@/components/ui/image-view'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { useCollapse } from '@/hooks/use-collapse'
-import { useLatest } from '@/hooks/use-latest'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
@@ -49,6 +48,10 @@ interface ComicItemProps {
 function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
   const progress = useProgressStore((s) => s.comics[comic.id])
 
+  const handleSetTags = (tags: FileTags) => {
+    void onTags(comic.id, tags)
+  }
+
   return (
     <figure
       className={cn(
@@ -73,8 +76,8 @@ function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
       <TagButtons
         starred={comic.starred}
         deleted={comic.deleted}
-        onStar={() => void onTags(comic.id, { starred: !comic.starred })}
-        onDelete={() => void onTags(comic.id, { deleted: !comic.deleted })}
+        onStar={() => handleSetTags({ starred: !comic.starred })}
+        onDelete={() => handleSetTags({ deleted: !comic.deleted })}
         size="sm"
       />
 
@@ -89,17 +92,6 @@ function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
           {progress?.percent > 0 && (
             <span>{Math.round(progress.percent)}%</span>
           )}
-        </div>
-      )}
-
-      {progress && progress.percent > 0 && (
-        <div className="bg-rose/30 absolute inset-x-0 bottom-0 h-1">
-          <div
-            className="bg-rose h-full"
-            style={{
-              width: `${progress.percent}%`,
-            }}
-          />
         </div>
       )}
     </figure>
@@ -159,25 +151,11 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const progress = useProgressStore((s) => s.comics[comicId])
   const currentIndex = progress?.current ?? 0
 
-  const stateRef = useLatest({
-    activeTab,
-    comic,
-    images,
-    currentIndex,
-    viewMode,
-    collapsed,
-  })
-
   const { isLock, visibleIndices, lockScroll } = useScrollLock()
   const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
 
-  useEffect(() => {
-    if (images.length) return
-    void getComicImages(comicId)
-  }, [comicId, images.length, getComicImages])
-
-  const jumpTo = useEffectEvent((index: number) => {
-    const { comic, images, viewMode } = stateRef.current
+  const jumpTo = useEffectEvent((targetIndex?: number) => {
+    const index = targetIndex ?? currentIndex
     const newProgress = createComicProgress(index, images.length)
     updateComicProgress(comic.id, newProgress)
 
@@ -190,22 +168,24 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     }
   })
 
-  useLayoutEffect(() => {
-    lockScroll()
-  }, [lockScroll, viewMode, collapsed])
+  useEffect(() => {
+    if (images.length) return
+    void getComicImages(comicId)
+  }, [comicId, images.length, getComicImages])
 
   useLayoutEffect(() => {
-    const { images, currentIndex } = stateRef.current
-    if (!images.length) return
-    jumpTo(currentIndex)
-  }, [activeTab, stateRef])
+    lockScroll()
+  }, [lockScroll, comicId, viewMode, collapsed])
+
+  useLayoutEffect(() => {
+    jumpTo()
+  }, [activeTab])
 
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
   }
 
   const handleContinueReading = () => {
-    const { comic } = stateRef.current
     if (!comic) return
 
     addTab({
@@ -217,14 +197,11 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   }
 
   const handleSelectComic = (id: string) => {
-    const { comic } = stateRef.current
     if (id === comic?.id) return
     updateLibrary(selectedLibrary.id, { status: { comicId: id } })
-    lockScroll()
   }
 
   const handleImageClick = (index: number) => {
-    const { comic, images } = stateRef.current
     const newProgress = createComicProgress(index, images.length)
     updateComicProgress(comic.id, newProgress)
 
@@ -246,7 +223,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     if (!visibleIndices.current.size) return
     const newIndex = Math.min(...visibleIndices.current)
 
-    const { comic, images, currentIndex, collapsed } = stateRef.current
     if (
       !comic ||
       !images.length ||
@@ -262,8 +238,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
-
-    const { activeTab, comic } = stateRef.current
     if (activeTab || !comic) return
 
     switch (e.code) {
@@ -325,7 +299,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
           collapsed === 1 && 'border-r',
         )}
       >
-        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-3 text-xs uppercase">
+        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-3 text-xs">
           <div className="flex gap-2">
             <Button
               className="h-6 w-6"
@@ -338,7 +312,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
               )}
             </Button>
           </div>
-          <span>Comics ({comics.length})</span>
+          <span>COMICS ({comics.length})</span>
         </div>
         <VirtuosoGrid
           className="flex-1"
@@ -392,7 +366,12 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             {comic.title}
           </h3>
 
-          <span>Images ({images.length})</span>
+          <div className="flex gap-2">
+            {progress?.current > 0 && (
+              <span>{Math.round(progress.percent)}%</span>
+            )}
+            <span>{images.length}P</span>
+          </div>
         </div>
         {viewMode === 'grid' ? (
           <VirtuosoGrid

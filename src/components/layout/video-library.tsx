@@ -6,7 +6,6 @@ import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { useCollapse } from '@/hooks/use-collapse'
-import { useLatest } from '@/hooks/use-latest'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
@@ -20,6 +19,10 @@ interface VideoItemProps {
 }
 
 function VideoItem({ video, isSelected, onClick, onTags }: VideoItemProps) {
+  const handleSetTags = (tags: FileTags) => {
+    void onTags(video.id, tags)
+  }
+
   return (
     <figure
       className={cn(
@@ -40,8 +43,8 @@ function VideoItem({ video, isSelected, onClick, onTags }: VideoItemProps) {
       <TagButtons
         starred={video.starred}
         deleted={video.deleted}
-        onStar={() => void onTags(video.id, { starred: !video.starred })}
-        onDelete={() => void onTags(video.id, { deleted: !video.deleted })}
+        onStar={() => handleSetTags({ starred: !video.starred })}
+        onDelete={() => handleSetTags({ deleted: !video.deleted })}
         size="sm"
       />
       <figcaption className="text-love absolute bottom-2 left-1/2 -translate-x-1/2 truncate text-center text-sm opacity-0 group-hover:opacity-100">
@@ -66,6 +69,8 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
   const updateVideoTags = useLibraryStore((s) => s.updateVideoTags)
   const activeTab = useTabsStore((s) => s.activeTab)
 
+  const { videoId = '' } = selectedLibrary.status
+  const video = useLibraryStore((s) => s.videos[videoId])
   const videos = useLibraryStore(
     useShallow((s) => {
       const videoIds = s.libraryVideos[selectedLibrary.id]
@@ -88,11 +93,6 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
     }),
   )
 
-  const { videoId } = selectedLibrary.status
-  const video = useLibraryStore((s) => (videoId ? s.videos[videoId] : null))
-
-  const stateRef = useLatest({ activeTab, video })
-
   const handleSelectVideo = (id: string) => {
     if (id === videoId) return
     updateLibrary(selectedLibrary.id, { status: { videoId: id } })
@@ -109,8 +109,6 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
-
-    const { activeTab, video } = stateRef.current
     if (activeTab || !video) return
 
     switch (e.code) {
@@ -138,7 +136,7 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
           collapsed === 1 && 'border-r',
         )}
       >
-        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-3 text-xs uppercase">
+        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-3 text-xs">
           <div className="flex gap-2">
             <Button
               className="h-6 w-6"
@@ -151,7 +149,7 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
               )}
             </Button>
           </div>
-          <span>Videos ({videos.length})</span>
+          <span>VIDEOS ({videos.length})</span>
         </div>
         <VirtuosoGrid
           className="flex-1"
