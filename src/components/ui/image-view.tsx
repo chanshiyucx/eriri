@@ -13,41 +13,45 @@ interface ImageProps {
   onVisible?: (index: number, isVisible: boolean) => void
 }
 
-export function GridImage({ comicId, image, onClick, onTags }: ImageProps) {
+export function GridImage({
+  comicId,
+  image,
+  onContextMenu,
+  onTags,
+}: ImageProps) {
   const handleSetTags = (tags: FileTags) => {
     void onTags(comicId, image.filename, tags)
   }
 
   return (
-    <div
-      key={image.path}
+    <figure
       className={cn(
-        'flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
+        'group relative flex aspect-[2/3] w-full shrink-0 cursor-pointer flex-col',
         image.deleted && 'opacity-40',
-        image.starred ? 'bg-love/50' : 'hover:bg-overlay',
       )}
-      onClick={() => onClick?.(image.index)}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
-        <img
-          src={image.thumbnail}
-          alt={image.filename}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-        <TagButtons
-          starred={image.starred}
-          deleted={image.deleted}
-          onStar={() => handleSetTags({ starred: !image.starred })}
-          onDelete={() => handleSetTags({ deleted: !image.deleted })}
-          size="sm"
-        />
-      </div>
-      <div className="truncate text-center text-sm transition-colors">
+      <img
+        src={image.thumbnail}
+        alt={image.filename}
+        className="h-full w-full object-cover"
+        loading="lazy"
+        decoding="async"
+        onContextMenu={(e) => {
+          e.preventDefault()
+          onContextMenu?.(image.index)
+        }}
+      />
+      <TagButtons
+        starred={image.starred}
+        deleted={image.deleted}
+        onStar={() => handleSetTags({ starred: !image.starred })}
+        onDelete={() => handleSetTags({ deleted: !image.deleted })}
+        size="sm"
+      />
+      <figcaption className="text-love absolute bottom-2 left-1/2 -translate-x-1/2 truncate text-center text-sm opacity-0 group-hover:opacity-100">
         {image.filename}
-      </div>
-    </div>
+      </figcaption>
+    </figure>
   )
 }
 
@@ -57,29 +61,26 @@ export function SingleImage({ comicId, image, onTags }: ImageProps) {
   }
 
   return (
-    <div
-      key={image.path}
+    <figure
       className={cn(
         'relative flex h-full w-full items-center justify-center',
         image.deleted && 'opacity-40',
       )}
     >
-      <figure className="relative h-full w-auto">
-        <img
-          key={image.url}
-          src={image.url}
-          alt={image.filename}
-          className="block h-full w-auto object-contain select-none"
-        />
-        <TagButtons
-          starred={image.starred}
-          deleted={image.deleted}
-          onStar={() => handleSetTags({ starred: !image.starred })}
-          onDelete={() => handleSetTags({ deleted: !image.deleted })}
-          size="md"
-        />
-      </figure>
-    </div>
+      <img
+        key={image.url}
+        src={image.url}
+        alt={image.filename}
+        className="block h-full w-auto object-contain select-none"
+      />
+      <TagButtons
+        starred={image.starred}
+        deleted={image.deleted}
+        onStar={() => handleSetTags({ starred: !image.starred })}
+        onDelete={() => handleSetTags({ deleted: !image.deleted })}
+        size="md"
+      />
+    </figure>
   )
 }
 
@@ -113,8 +114,7 @@ export function ScrollImage({
   }
 
   return (
-    <div
-      key={image.path}
+    <figure
       ref={ref}
       className={cn(
         'relative shrink-0 bg-cover bg-center',
@@ -143,6 +143,6 @@ export function ScrollImage({
         onDelete={() => handleSetTags({ deleted: !image.deleted })}
         size="md"
       />
-    </div>
+    </figure>
   )
 }

@@ -17,7 +17,6 @@ import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { GridImage, ScrollImage } from '@/components/ui/image-view'
 import { TagButtons } from '@/components/ui/tag-buttons'
-import { LibraryPadding } from '@/components/ui/virtuoso-config'
 import { useCollapse } from '@/hooks/use-collapse'
 import { useLatest } from '@/hooks/use-latest'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
@@ -51,12 +50,12 @@ function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
   const progress = useProgressStore((s) => s.comics[comic.id])
 
   return (
-    <div
+    <figure
       className={cn(
-        'flex w-[128px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
-        isSelected && 'bg-overlay ring-rose ring-2',
+        'group relative flex aspect-[2/3] w-full shrink-0 cursor-pointer flex-col',
         comic.deleted && 'opacity-40',
-        comic.starred ? 'bg-love/50' : 'hover:bg-overlay',
+        isSelected &&
+          'after:inset-ring-rose after:pointer-events-none after:absolute after:inset-0 after:inset-ring-2',
       )}
       onClick={() => onClick(comic.id)}
       onContextMenu={(e) => {
@@ -64,51 +63,46 @@ function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
         void openPathNative(comic.path)
       }}
     >
-      <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
-        <img
-          src={comic.cover}
-          alt={comic.title}
-          className="h-full w-full object-cover"
-          loading="lazy"
-          decoding="async"
-        />
-        <TagButtons
-          starred={comic.starred}
-          deleted={comic.deleted}
-          onStar={() => void onTags(comic.id, { starred: !comic.starred })}
-          onDelete={() => void onTags(comic.id, { deleted: !comic.deleted })}
-          size="sm"
-        />
-        {comic.pageCount && (
-          <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-xs text-white">
-            <span>{comic.pageCount}P</span>
+      <img
+        src={comic.cover}
+        alt={comic.title}
+        className="h-full w-full object-cover"
+        loading="lazy"
+        decoding="async"
+      />
+      <TagButtons
+        starred={comic.starred}
+        deleted={comic.deleted}
+        onStar={() => void onTags(comic.id, { starred: !comic.starred })}
+        onDelete={() => void onTags(comic.id, { deleted: !comic.deleted })}
+        size="sm"
+      />
 
-            {progress && progress.percent > 0 && (
-              <span>{Math.round(progress.percent)}%</span>
-            )}
-          </div>
-        )}
-
-        {progress && progress.percent > 0 && (
-          <div className="bg-rose/30 absolute inset-x-0 bottom-0 h-1">
-            <div
-              className="bg-rose h-full"
-              style={{
-                width: `${progress.percent}%`,
-              }}
-            />
-          </div>
-        )}
-      </div>
-      <div
-        className={cn(
-          'truncate text-center text-sm transition-colors',
-          isSelected && 'text-love',
-        )}
-      >
+      <figcaption className="text-love absolute bottom-2 left-1/2 -translate-x-1/2 truncate text-center text-sm opacity-0 group-hover:opacity-100">
         {comic.title}
-      </div>
-    </div>
+      </figcaption>
+
+      {comic.pageCount && (
+        <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-xs text-white">
+          <span>{comic.pageCount}P</span>
+
+          {progress?.percent > 0 && (
+            <span>{Math.round(progress.percent)}%</span>
+          )}
+        </div>
+      )}
+
+      {progress && progress.percent > 0 && (
+        <div className="bg-rose/30 absolute inset-x-0 bottom-0 h-1">
+          <div
+            className="bg-rose h-full"
+            style={{
+              width: `${progress.percent}%`,
+            }}
+          />
+        </div>
+      )}
+    </figure>
   )
 }
 
@@ -119,7 +113,7 @@ interface ComicLibraryProps {
 export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { collapsed, setCollapsed } = useCollapse()
-  const [viewMode, setViewMode] = useState<ViewMode>('scroll')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const sortedIdsCache = useRef<{ libraryId: string; comicIds: string[] }>({
     libraryId: '',
     comicIds: [],
@@ -306,7 +300,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     <GridImage
       comicId={comicId}
       image={img}
-      onClick={handleImageClick}
+      onContextMenu={handleImageClick}
       onTags={updateComicImageTags}
     />
   )
@@ -331,7 +325,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
           collapsed === 1 && 'border-r',
         )}
       >
-        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
+        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-3 text-xs uppercase">
           <div className="flex gap-2">
             <Button
               className="h-6 w-6"
@@ -350,8 +344,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
           className="flex-1"
           data={comics}
           itemContent={renderComicItem}
-          components={LibraryPadding}
-          listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
+          listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
           increaseViewportBy={{ top: 0, bottom: 1000 }}
         />
       </div>
@@ -407,8 +400,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             className="flex-1"
             data={images}
             itemContent={renderGridImage}
-            components={LibraryPadding}
-            listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
+            listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
             increaseViewportBy={{ top: 0, bottom: 1000 }}
           />
         ) : (
