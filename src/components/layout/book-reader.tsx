@@ -234,54 +234,64 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
         />
       )}
 
-      <div className="bg-base text-subtle flex h-8 w-full items-center gap-2 border-b px-2 text-xs">
-        <Button
-          className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
-          onClick={toggleToc}
-          onMouseDown={(e) => e.stopPropagation()}
-          title="展开目录"
-          disabled={!content.chapters.length}
-        >
-          <SquareMenu className="h-4 w-4" />
-        </Button>
+      <div className="bg-base text-subtle relative flex h-8 items-center justify-between border-b px-3 text-xs">
+        <div className="flex gap-2">
+          <Button
+            className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
+            onClick={toggleToc}
+            onMouseDown={(e) => e.stopPropagation()}
+            title="展开目录"
+            disabled={!content.chapters.length}
+          >
+            <SquareMenu className="h-4 w-4" />
+          </Button>
 
-        {showReading && (
+          {showReading && (
+            <Button
+              className="h-6 w-6"
+              onClick={handleContinueReading}
+              title="继续阅读"
+            >
+              <StepForward className="h-4 w-4" />
+            </Button>
+          )}
+
           <Button
             className="h-6 w-6"
-            onClick={handleContinueReading}
-            title="继续阅读"
+            onClick={() =>
+              void updateBookTags(book.id, { deleted: !book.deleted })
+            }
+            title="标记删除"
           >
-            <StepForward className="h-4 w-4" />
+            <Trash2
+              className={cn(
+                'h-4 w-4',
+                book.deleted && 'text-love fill-gold/80',
+              )}
+            />
           </Button>
-        )}
 
-        <Button
-          className="h-6 w-6"
-          onClick={() =>
-            void updateBookTags(book.id, { deleted: !book.deleted })
-          }
-          title="标记删除"
-        >
-          <Trash2
-            className={cn('h-4 w-4', book.deleted && 'text-love fill-gold/80')}
-          />
-        </Button>
+          <Button
+            className="h-6 w-6"
+            onClick={() =>
+              void updateBookTags(book.id, { starred: !book.starred })
+            }
+            title="标记收藏"
+          >
+            <Star
+              className={cn(
+                'h-4 w-4',
+                book.starred && 'text-love fill-gold/80',
+              )}
+            />
+          </Button>
+        </div>
 
-        <Button
-          className="h-6 w-6"
-          onClick={() =>
-            void updateBookTags(book.id, { starred: !book.starred })
-          }
-          title="标记收藏"
-        >
-          <Star
-            className={cn('h-4 w-4', book.starred && 'text-love fill-gold/80')}
-          />
-        </Button>
-
-        <h3 className="flex-1 truncate text-center">
+        <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
           {currentChapterTitle || book.title}
         </h3>
+
+        <span>{(book.size / 1024).toFixed(1)}k</span>
       </div>
 
       <Virtuoso

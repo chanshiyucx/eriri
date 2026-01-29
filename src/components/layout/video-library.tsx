@@ -1,5 +1,5 @@
-import { Funnel, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { useEffect, useEffectEvent, useState } from 'react'
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { VideoPlayer } from '@/components/layout/video-player'
@@ -64,10 +64,12 @@ interface VideoLibraryProps {
   selectedLibrary: Library
 }
 
-const EMPTY_ARRAY: string[] = []
-
 export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
-  const [filterVideo, setFilterVideo] = useState(false)
+  const sortedIdsCache = useRef<{ libraryId: string; videoIds: string[] }>({
+    libraryId: '',
+    videoIds: [],
+  })
+
   const { collapsed, setCollapsed } = useCollapse()
   const updateLibrary = useLibraryStore((s) => s.updateLibrary)
   const updateVideoTags = useLibraryStore((s) => s.updateVideoTags)
@@ -75,15 +77,23 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
 
   const videos = useLibraryStore(
     useShallow((s) => {
-      const videoIds = s.libraryVideos[selectedLibrary.id] ?? EMPTY_ARRAY
-      return videoIds
-        .map((id) => s.videos[id])
-        .filter(Boolean)
-        .toSorted((a, b) => {
+      const videoIds = s.libraryVideos[selectedLibrary.id]
+
+      if (sortedIdsCache.current.libraryId !== selectedLibrary.id) {
+        const sortedIds = videoIds.toSorted((idA, idB) => {
+          const a = s.videos[idA]
+          const b = s.videos[idB]
           if (a.deleted !== b.deleted) return a.deleted ? 1 : -1
           if (a.starred !== b.starred) return a.starred ? -1 : 1
           return 0
         })
+        sortedIdsCache.current = {
+          libraryId: selectedLibrary.id,
+          videoIds: sortedIds,
+        }
+      }
+
+      return sortedIdsCache.current.videoIds.map((id) => s.videos[id])
     }),
   )
 
@@ -119,9 +129,6 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
       case 'KeyV':
         void updateVideoTags(video.id, { starred: !video.starred })
         break
-      case 'KeyF':
-        setFilterVideo((prev) => !prev)
-        break
     }
   })
 
@@ -130,28 +137,18 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const showVideos = filterVideo ? videos.filter((v) => v.starred) : videos
-
   return (
     <div className="flex h-full w-full">
       {/* Left Column: Video List */}
       <div
         className={cn(
           'flex shrink-0 flex-col',
-          collapsed === 0 ? 'w-0 border-none' : 'flex-1',
+          collapsed === 0 ? 'hidden' : 'flex-1',
           collapsed === 1 && 'border-r',
         )}
       >
-        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>Videos ({showVideos.length})</span>
+        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-3 text-xs uppercase">
           <div className="flex gap-2">
-            <Button
-              className="h-6 w-6"
-              onClick={() => setFilterVideo((prev) => !prev)}
-              title="过滤视频"
-            >
-              <Funnel className="h-4 w-4" />
-            </Button>
             <Button
               className="h-6 w-6"
               onClick={() => setCollapsed(collapsed === 1 ? 0 : 1)}
@@ -163,11 +160,11 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
               )}
             </Button>
           </div>
+          <span>Videos ({videos.length})</span>
         </div>
         <VirtuosoGrid
           className="flex-1"
-          data={showVideos}
-          totalCount={showVideos.length}
+          data={videos}
           itemContent={renderVideoItem}
           components={LibraryPadding}
           listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))] place-items-start gap-3 px-4"
@@ -179,11 +176,10 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
       <div
         className={cn(
           'flex shrink-0 flex-col overflow-hidden',
-          collapsed === 2 ? 'w-0' : 'flex-1',
+          collapsed === 2 ? 'hidden' : 'flex-1',
         )}
       >
-        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-4 text-xs uppercase">
-          <span>{video?.title}</span>
+        <div className="bg-base text-subtle relative flex h-8 items-center justify-between border-b px-3 text-xs">
           <Button
             className="h-6 w-6"
             onClick={() => setCollapsed(collapsed === 1 ? 2 : 1)}
@@ -194,6 +190,10 @@ export function VideoLibrary({ selectedLibrary }: VideoLibraryProps) {
               <PanelLeftOpen className="h-4 w-4" />
             )}
           </Button>
+
+          <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
+            {video?.title}
+          </h3>
         </div>
         {video && <VideoPlayer videoId={video.id} />}
       </div>
