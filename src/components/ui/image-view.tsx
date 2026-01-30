@@ -16,6 +16,7 @@ interface ImageProps {
 export function GridImage({
   comicId,
   image,
+  onClick,
   onContextMenu,
   onTags,
 }: ImageProps) {
@@ -36,21 +37,23 @@ export function GridImage({
         className="h-full w-full object-cover"
         loading="lazy"
         decoding="async"
+        onClick={(e) => {
+          e.preventDefault()
+          onClick?.(image.index)
+        }}
         onContextMenu={(e) => {
           e.preventDefault()
           onContextMenu?.(image.index)
         }}
       />
       <TagButtons
+        title={image.filename}
         starred={image.starred}
         deleted={image.deleted}
         onStar={() => handleSetTags({ starred: !image.starred })}
         onDelete={() => handleSetTags({ deleted: !image.deleted })}
         size="sm"
       />
-      <figcaption className="text-love absolute bottom-2 left-1/2 -translate-x-1/2 truncate text-center text-sm opacity-0 group-hover:opacity-100">
-        {image.filename}
-      </figcaption>
     </figure>
   )
 }
