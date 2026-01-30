@@ -74,12 +74,17 @@ export function SingleImage({
         onContextMenu?.(image.index)
       }}
     >
-      <div className="relative h-full w-auto">
+      <div
+        className="relative max-h-full max-w-full"
+        style={{
+          aspectRatio: `${image.width} / ${image.height}`,
+        }}
+      >
         <img
           key={image.url}
           src={image.url}
           alt={image.filename}
-          className="block h-full w-auto object-contain select-none"
+          className="block h-full w-full object-contain"
         />
         <TagButtons
           starred={image.starred}
@@ -148,7 +153,7 @@ export function ScrollImage({
       <img
         src={image.url}
         alt={image.filename}
-        className="h-full w-full object-contain"
+        className="block h-full w-full object-contain"
       />
       <TagButtons
         title={image.filename}
@@ -181,12 +186,13 @@ export function ImagePreview({
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
+    if (index < 0) return
 
     switch (e.code) {
       case 'ArrowLeft':
         if (index > 0) onIndexChange(index - 1)
         break
-      case 'Arrow':
+      case 'ArrowRight':
         if (index < images.length - 1) onIndexChange(index + 1)
         break
     }

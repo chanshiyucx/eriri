@@ -42,7 +42,10 @@ export function GridItem({
       )}
       onClick={onClick}
       onDoubleClick={onDoubleClick}
-      onContextMenu={onContextMenu}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu()
+      }}
     >
       <img
         src={cover}
