@@ -369,6 +369,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             initialTopMostItemIndex={currentIndex}
             itemContent={renderScrollImage}
             increaseViewportBy={2000}
+            computeItemKey={(_index, item) => item.filename}
           />
         )}
       </div>

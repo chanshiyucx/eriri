@@ -81,10 +81,10 @@ export function SingleImage({
         }}
       >
         <img
-          key={image.url}
           src={image.url}
           alt={image.filename}
-          className="block h-full w-full object-contain"
+          decoding="async"
+          className="block h-full w-full"
         />
         <TagButtons
           starred={image.starred}
@@ -142,7 +142,7 @@ export function ScrollImage({
       )}
       style={{
         aspectRatio: `${image.width} / ${image.height}`,
-        backgroundImage: `url(${image.thumbnail})`,
+        contain: 'layout style paint',
       }}
       onDoubleClick={() => onDoubleClick?.(image.index)}
       onContextMenu={(e) => {
@@ -153,7 +153,8 @@ export function ScrollImage({
       <img
         src={image.url}
         alt={image.filename}
-        className="block h-full w-full object-contain"
+        decoding="async"
+        className="block h-full w-full"
       />
       <TagButtons
         title={image.filename}
