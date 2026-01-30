@@ -1,16 +1,18 @@
 import { useEffect, useEffectEvent, useRef } from 'react'
+import { GridItem } from '@/components/ui/grid-item'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { cn } from '@/lib/style'
 import type { FileTags, Image } from '@/types/library'
 
 interface ImageProps {
-  className?: string
   comicId: string
   image: Image
   onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
   onClick?: (index: number) => void
   onContextMenu?: (index: number) => void
   onVisible?: (index: number, isVisible: boolean) => void
+  isSelected?: boolean
+  className?: string
 }
 
 export function GridImage({
@@ -19,42 +21,26 @@ export function GridImage({
   onClick,
   onContextMenu,
   onTags,
+  isSelected,
+  className,
 }: ImageProps) {
-  const handleSetTags = (tags: FileTags) => {
-    void onTags(comicId, image.filename, tags)
-  }
-
   return (
-    <figure
-      className={cn(
-        'group relative flex aspect-[2/3] w-full shrink-0 cursor-pointer flex-col',
-        image.deleted && 'opacity-40',
-      )}
-    >
-      <img
-        src={image.thumbnail}
-        alt={image.filename}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        decoding="async"
-        onClick={(e) => {
-          e.preventDefault()
-          onClick?.(image.index)
-        }}
-        onContextMenu={(e) => {
-          e.preventDefault()
-          onContextMenu?.(image.index)
-        }}
-      />
-      <TagButtons
-        title={image.filename}
-        starred={image.starred}
-        deleted={image.deleted}
-        onStar={() => handleSetTags({ starred: !image.starred })}
-        onDelete={() => handleSetTags({ deleted: !image.deleted })}
-        size="sm"
-      />
-    </figure>
+    <GridItem
+      className={className}
+      title={image.filename}
+      cover={image.thumbnail}
+      starred={image.starred}
+      deleted={image.deleted}
+      isSelected={isSelected}
+      onClick={() => onClick?.(image.index)}
+      onContextMenu={() => onContextMenu?.(image.index)}
+      onStar={() =>
+        void onTags(comicId, image.filename, { starred: !image.starred })
+      }
+      onDelete={() =>
+        void onTags(comicId, image.filename, { deleted: !image.deleted })
+      }
+    />
   )
 }
 

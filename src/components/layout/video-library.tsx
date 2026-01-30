@@ -4,12 +4,13 @@ import { VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { VideoPlayer } from '@/components/layout/video-player'
 import { Button } from '@/components/ui/button'
-import { TagButtons } from '@/components/ui/tag-buttons'
+import { GridItem } from '@/components/ui/grid-item'
 import { useCollapse } from '@/hooks/use-collapse'
+import { openPathNative } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useTabsStore } from '@/store/tabs'
-import { type FileTags, type Library, type Video } from '@/types/library'
+import type { FileTags, Library, Video } from '@/types/library'
 
 interface VideoItemProps {
   video: Video
@@ -19,36 +20,18 @@ interface VideoItemProps {
 }
 
 function VideoItem({ video, isSelected, onClick, onTags }: VideoItemProps) {
-  const handleSetTags = (tags: FileTags) => {
-    void onTags(video.id, tags)
-  }
-
   return (
-    <figure
-      className={cn(
-        'group relative flex aspect-[2/3] w-full shrink-0 cursor-pointer flex-col',
-        video.deleted && 'opacity-40',
-        isSelected &&
-          'after:inset-ring-rose after:pointer-events-none after:absolute after:inset-0 after:inset-ring-2',
-      )}
+    <GridItem
+      title={video.title}
+      cover={video.cover}
+      starred={video.starred}
+      deleted={video.deleted}
+      isSelected={isSelected}
       onClick={() => onClick(video.id)}
-    >
-      <img
-        src={video.cover}
-        alt={video.title}
-        className="h-full w-full object-cover"
-        loading="lazy"
-        decoding="async"
-      />
-      <TagButtons
-        title={video.title}
-        starred={video.starred}
-        deleted={video.deleted}
-        onStar={() => handleSetTags({ starred: !video.starred })}
-        onDelete={() => handleSetTags({ deleted: !video.deleted })}
-        size="sm"
-      />
-    </figure>
+      onContextMenu={() => void openPathNative(video.path)}
+      onStar={() => void onTags(video.id, { starred: !video.starred })}
+      onDelete={() => void onTags(video.id, { deleted: !video.deleted })}
+    />
   )
 }
 

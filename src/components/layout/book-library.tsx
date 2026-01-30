@@ -25,7 +25,7 @@ function BookItem({ book, isSelected, onClick }: BookItemProps) {
       className={cn(
         'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-sm transition-all',
         isSelected ? 'bg-overlay' : 'bg-surface',
-        book.deleted && 'text-subtle/60',
+        book.deleted && 'text-subtle/40',
       )}
     >
       {book.deleted ? (
@@ -37,7 +37,7 @@ function BookItem({ book, isSelected, onClick }: BookItemProps) {
       )}
       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
         <span className="truncate">{book.title}</span>
-        <span className="text-subtle/60 flex shrink-0 items-center gap-1 text-xs whitespace-nowrap">
+        <span className="text-subtle/40 flex shrink-0 items-center gap-1 text-xs whitespace-nowrap">
           {progress?.percent > 0 && (
             <span>{Math.round(progress.percent)}%</span>
           )}
@@ -69,7 +69,7 @@ function AuthorItem({ author, isSelected, onSelect }: AuthorItemProps) {
       <Folder className="h-4 w-4 shrink-0" />
       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
         <span className="truncate">{author.name}</span>
-        <span className="text-subtle/60 text-xs">{author.bookCount}</span>
+        <span className="text-subtle/40 text-xs">{author.bookCount}</span>
       </div>
     </Button>
   )
