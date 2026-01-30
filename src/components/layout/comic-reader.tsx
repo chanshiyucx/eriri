@@ -324,7 +324,6 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             initialTopMostItemIndex={currentIndex}
             itemContent={renderScrollImage}
             increaseViewportBy={4000}
-            computeItemKey={(_index, item) => item.filename}
           />
         )}
       </div>
