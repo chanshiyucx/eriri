@@ -41,15 +41,13 @@ function VideoItem({ video, isSelected, onClick, onTags }: VideoItemProps) {
         decoding="async"
       />
       <TagButtons
+        title={video.title}
         starred={video.starred}
         deleted={video.deleted}
         onStar={() => handleSetTags({ starred: !video.starred })}
         onDelete={() => handleSetTags({ deleted: !video.deleted })}
         size="sm"
       />
-      <figcaption className="text-love absolute bottom-2 left-1/2 -translate-x-1/2 truncate text-center text-sm opacity-0 group-hover:opacity-100">
-        {video.title}
-      </figcaption>
     </figure>
   )
 }

@@ -47,6 +47,8 @@ interface ComicItemProps {
 
 function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
   const progress = useProgressStore((s) => s.comics[comic.id])
+  const currentIndex = progress?.current ?? 0
+  const percent = Math.round(progress.percent)
 
   const handleSetTags = (tags: FileTags) => {
     void onTags(comic.id, tags)
@@ -58,7 +60,7 @@ function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
         'group relative flex aspect-[2/3] w-full shrink-0 cursor-pointer flex-col',
         comic.deleted && 'opacity-40',
         isSelected &&
-          'after:inset-ring-rose after:pointer-events-none after:absolute after:inset-0 after:inset-ring-2',
+          'after:inset-ring-rose after:pointer-events-none after:absolute after:inset-0 after:inset-ring-3',
       )}
       onClick={() => onClick(comic.id)}
       onContextMenu={(e) => {
@@ -74,6 +76,7 @@ function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
         decoding="async"
       />
       <TagButtons
+        title={comic.title}
         starred={comic.starred}
         deleted={comic.deleted}
         onStar={() => handleSetTags({ starred: !comic.starred })}
@@ -81,17 +84,12 @@ function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
         size="sm"
       />
 
-      <figcaption className="text-love absolute bottom-2 left-1/2 -translate-x-1/2 truncate text-center text-sm opacity-0 group-hover:opacity-100">
-        {comic.title}
-      </figcaption>
-
       {comic.pageCount && (
-        <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-xs text-white">
-          <span>{comic.pageCount}P</span>
-
-          {progress?.percent > 0 && (
-            <span>{Math.round(progress.percent)}%</span>
-          )}
+        <div className="absolute inset-x-0 bottom-0 flex justify-between bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-xs text-white group-hover:opacity-0">
+          <span>
+            {currentIndex + 1} / {comic.pageCount}
+          </span>
+          {percent > 0 && <span>{percent}%</span>}
         </div>
       )}
     </figure>
@@ -366,12 +364,9 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             {comic.title}
           </h3>
 
-          <div className="flex gap-2">
-            {progress?.current > 0 && (
-              <span>{Math.round(progress.percent)}%</span>
-            )}
-            <span>{images.length}P</span>
-          </div>
+          <span>
+            {currentIndex + 1} / {images.length}
+          </span>
         </div>
         {viewMode === 'grid' ? (
           <VirtuosoGrid

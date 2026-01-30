@@ -11,6 +11,19 @@ interface TagButtonsProps {
   title?: string
 }
 
+const STYLES = {
+  sm: {
+    btn: 'h-6 w-6',
+    icon: 'h-5 w-5',
+    font: 'bottom-2 text-sm',
+  },
+  md: {
+    btn: 'h-8 w-8',
+    icon: 'h-6 w-6',
+    font: 'top-2 text-lg',
+  },
+} as const
+
 export function TagButtons({
   title,
   starred,
@@ -19,13 +32,16 @@ export function TagButtons({
   onDelete,
   size = 'sm',
 }: TagButtonsProps) {
-  const btnSize = size === 'sm' ? 'h-6 w-6' : 'h-8 w-8'
-  const iconSize = size === 'sm' ? 'h-5 w-5' : 'h-6 w-6'
+  const styles = STYLES[size]
 
   return (
-    <div className="absolute top-0 right-0 left-0 flex justify-between px-1 py-1">
+    <div
+      className={cn(
+        'pointer-events-none absolute inset-0 isolate flex justify-between p-1',
+      )}
+    >
       <Button
-        className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
+        className={cn(styles.btn, 'bg-transparent hover:bg-transparent')}
         onClick={(e) => {
           e.stopPropagation()
           onDelete?.()
@@ -33,19 +49,17 @@ export function TagButtons({
       >
         <Trash2
           className={cn(
-            'text-love',
-            iconSize,
-            deleted ? 'fill-gold/80' : 'opacity-0 group-hover:opacity-100',
+            'drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]',
+            styles.icon,
+            deleted
+              ? 'fill-gold/80 stroke-love'
+              : 'opacity-0 group-hover:opacity-100',
           )}
+          strokeWidth={2.5}
         />
       </Button>
-      {title && (
-        <span className="text-love text-lg opacity-0 group-hover:opacity-100">
-          {title}
-        </span>
-      )}
       <Button
-        className={cn(btnSize, 'bg-transparent hover:bg-transparent')}
+        className={cn(styles.btn, 'bg-transparent hover:bg-transparent')}
         onClick={(e) => {
           e.stopPropagation()
           onStar?.()
@@ -53,12 +67,26 @@ export function TagButtons({
       >
         <Star
           className={cn(
-            'text-love',
-            iconSize,
-            starred ? 'fill-gold/80' : 'opacity-0 group-hover:opacity-100',
+            'drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]',
+            styles.icon,
+            starred
+              ? 'fill-gold/80 stroke-love'
+              : 'opacity-0 group-hover:opacity-100',
           )}
+          strokeWidth={2.5}
         />
       </Button>
+
+      {title && (
+        <span
+          className={cn(
+            'absolute left-1/2 w-full -translate-x-1/2 truncate px-2 text-center font-bold opacity-0 text-shadow-md group-hover:opacity-100',
+            styles.font,
+          )}
+        >
+          {title}
+        </span>
+      )}
     </div>
   )
 }

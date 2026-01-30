@@ -16,9 +16,8 @@ import {
 } from 'react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
-import { ScrollImage, SingleImage } from '@/components/ui/image-view'
+import { GridImage, ScrollImage, SingleImage } from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { TagButtons } from '@/components/ui/tag-buttons'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
@@ -69,10 +68,6 @@ function TableOfContents({
       })
   }, [currentIndex, isCollapsed])
 
-  const handleSetTags = (filename: string, tags: FileTags) => {
-    void onTags(comicId, filename, tags)
-  }
-
   return (
     <div
       ref={tocRef}
@@ -84,43 +79,22 @@ function TableOfContents({
           : 'translate-y-0 opacity-100',
       )}
     >
-      <ScrollArea
-        ref={scrollRef}
-        orientation="horizontal"
-        className="flex gap-1 p-2"
-      >
-        {images.map((image) => (
+      <ScrollArea ref={scrollRef} orientation="horizontal" className="flex">
+        {images.map((img) => (
           <div
-            key={image.index}
-            data-index={image.index}
+            key={img.filename}
             className={cn(
-              'flex w-[100px] shrink-0 cursor-pointer flex-col gap-1 rounded-sm p-1 transition-all',
-              currentIndex === image.index && 'bg-overlay ring-rose ring-2',
-              image.deleted && 'opacity-40',
-              image.starred ? 'bg-love/50' : 'hover:bg-overlay',
+              'relative w-[100px] shrink-0',
+              currentIndex === img.index &&
+                'after:inset-ring-rose after:pointer-events-none after:absolute after:inset-0 after:inset-ring-3',
             )}
-            onClick={() => onSelect(image.index)}
           >
-            <div className="relative aspect-[2/3] w-full overflow-hidden rounded-sm transition-all">
-              <img
-                src={image.thumbnail}
-                alt={image.filename}
-                className="h-full w-full object-cover"
-                loading="lazy"
-                decoding="async"
-              />
-              <TagButtons
-                starred={image.starred}
-                deleted={image.deleted}
-                onStar={() =>
-                  handleSetTags(image.filename, { starred: !image.starred })
-                }
-                onDelete={() =>
-                  handleSetTags(image.filename, { deleted: !image.deleted })
-                }
-                size="sm"
-              />
-            </div>
+            <GridImage
+              comicId={comicId}
+              image={img}
+              onClick={() => onSelect(img.index)}
+              onTags={onTags}
+            />
           </div>
         ))}
       </ScrollArea>
@@ -134,7 +108,7 @@ interface ComicReaderProps {
 
 export function ComicReader({ comicId }: ComicReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const [isTocCollapsed, setTocCollapsed] = useState(true)
+  const [isTocCollapsed, setTocCollapsed] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
   const isImmersive = useUIStore((s) => s.isImmersive)
   const activeTab = useTabsStore((s) => s.activeTab)
