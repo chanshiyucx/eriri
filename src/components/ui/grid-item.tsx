@@ -50,9 +50,8 @@ export function GridItem({
       <img
         src={cover}
         alt={title}
-        className="h-full w-full object-cover"
-        loading="lazy"
         decoding="async"
+        className="h-full w-full object-cover"
       />
       <TagButtons
         title={title}
