@@ -1,4 +1,6 @@
+import { CircleChevronLeft, CircleChevronRight } from 'lucide-react'
 import { useEffect, useEffectEvent, useRef } from 'react'
+import { Button } from '@/components/ui/button'
 import { GridItem } from '@/components/ui/grid-item'
 import { TagButtons } from '@/components/ui/tag-buttons'
 import { cn } from '@/lib/style'
@@ -9,6 +11,7 @@ interface ImageProps {
   image: Image
   onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
   onClick?: (index: number) => void
+  onDoubleClick?: (index: number) => void
   onContextMenu?: (index: number) => void
   onVisible?: (index: number, isVisible: boolean) => void
   isSelected?: boolean
@@ -19,6 +22,7 @@ export function GridImage({
   comicId,
   image,
   onClick,
+  onDoubleClick,
   onContextMenu,
   onTags,
   isSelected,
@@ -33,6 +37,7 @@ export function GridImage({
       deleted={image.deleted}
       isSelected={isSelected}
       onClick={() => onClick?.(image.index)}
+      onDoubleClick={() => onDoubleClick?.(image.index)}
       onContextMenu={() => onContextMenu?.(image.index)}
       onStar={() =>
         void onTags(comicId, image.filename, { starred: !image.starred })
@@ -44,7 +49,15 @@ export function GridImage({
   )
 }
 
-export function SingleImage({ comicId, image, onTags }: ImageProps) {
+export function SingleImage({
+  comicId,
+  image,
+  onTags,
+  onDoubleClick,
+  onContextMenu,
+}: ImageProps) {
+  if (!image) return null
+
   const handleSetTags = (tags: FileTags) => {
     void onTags(comicId, image.filename, tags)
   }
@@ -52,23 +65,30 @@ export function SingleImage({ comicId, image, onTags }: ImageProps) {
   return (
     <figure
       className={cn(
-        'group relative flex h-full w-full items-center justify-center',
+        'group flex h-full w-full items-center justify-center',
         image.deleted && 'opacity-40',
       )}
+      onDoubleClick={() => onDoubleClick?.(image.index)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.(image.index)
+      }}
     >
-      <img
-        key={image.url}
-        src={image.url}
-        alt={image.filename}
-        className="block h-full w-auto object-contain select-none"
-      />
-      <TagButtons
-        starred={image.starred}
-        deleted={image.deleted}
-        onStar={() => handleSetTags({ starred: !image.starred })}
-        onDelete={() => handleSetTags({ deleted: !image.deleted })}
-        size="md"
-      />
+      <div className="relative h-full w-auto">
+        <img
+          key={image.url}
+          src={image.url}
+          alt={image.filename}
+          className="block h-full w-auto object-contain select-none"
+        />
+        <TagButtons
+          starred={image.starred}
+          deleted={image.deleted}
+          onStar={() => handleSetTags({ starred: !image.starred })}
+          onDelete={() => handleSetTags({ deleted: !image.deleted })}
+          size="md"
+        />
+      </div>
     </figure>
   )
 }
@@ -77,6 +97,7 @@ export function ScrollImage({
   comicId,
   image,
   onTags,
+  onDoubleClick,
   onContextMenu,
   onVisible,
   className = 'h-full',
@@ -118,15 +139,16 @@ export function ScrollImage({
         aspectRatio: `${image.width} / ${image.height}`,
         backgroundImage: `url(${image.thumbnail})`,
       }}
+      onDoubleClick={() => onDoubleClick?.(image.index)}
+      onContextMenu={(e) => {
+        e.preventDefault()
+        onContextMenu?.(image.index)
+      }}
     >
       <img
         src={image.url}
         alt={image.filename}
         className="h-full w-full object-contain"
-        onContextMenu={(e) => {
-          e.preventDefault()
-          onContextMenu?.(image.index)
-        }}
       />
       <TagButtons
         title={image.filename}
@@ -137,5 +159,73 @@ export function ScrollImage({
         size="md"
       />
     </figure>
+  )
+}
+
+interface ImagePreviewProps extends Omit<ImageProps, 'image' | 'onClick'> {
+  images: Image[]
+  index: number
+  onIndexChange: (index: number) => void
+}
+
+export function ImagePreview({
+  comicId,
+  images,
+  index,
+  onIndexChange,
+  onTags,
+  onDoubleClick,
+  onContextMenu,
+}: ImagePreviewProps) {
+  const currentImage = images[index]
+
+  const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+
+    switch (e.code) {
+      case 'ArrowLeft':
+        if (index > 0) onIndexChange(index - 1)
+        break
+      case 'Arrow':
+        if (index < images.length - 1) onIndexChange(index + 1)
+        break
+    }
+  })
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+
+  if (!currentImage) return null
+
+  return (
+    <div className="relative flex h-full w-full flex-col">
+      <SingleImage
+        comicId={comicId}
+        image={currentImage}
+        onTags={onTags}
+        onDoubleClick={onDoubleClick}
+        onContextMenu={onContextMenu}
+      />
+
+      {index > 0 && (
+        <Button
+          className="hover:text-love transition-color text-subtle/60 absolute top-1/2 left-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
+          onClick={() => onIndexChange(index - 1)}
+        >
+          <CircleChevronLeft className="h-10 w-10" />
+        </Button>
+      )}
+
+      {index < images.length - 1 && (
+        <Button
+          className="hover:text-love transition-color text-subtle/60 absolute top-1/2 right-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
+          onClick={() => onIndexChange(index + 1)}
+        >
+          <CircleChevronRight className="h-10 w-10" />
+        </Button>
+      )}
+    </div>
   )
 }

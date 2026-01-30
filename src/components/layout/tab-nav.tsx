@@ -83,9 +83,9 @@ export function TabNav() {
       case 'KeyA':
         toggleSidebar()
         break
-      case 'ArrowLeft':
-      case 'ArrowRight':
-        navigateTab(e.code === 'ArrowLeft' ? -1 : 1)
+      case 'ArrowUp':
+      case 'ArrowDown':
+        navigateTab(e.code === 'ArrowUp' ? -1 : 1)
         break
     }
   })

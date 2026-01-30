@@ -16,7 +16,11 @@ import { Virtuoso, VirtuosoGrid, type VirtuosoHandle } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { GridItem } from '@/components/ui/grid-item'
-import { GridImage, ScrollImage } from '@/components/ui/image-view'
+import {
+  GridImage,
+  ImagePreview,
+  ScrollImage,
+} from '@/components/ui/image-view'
 import { useCollapse } from '@/hooks/use-collapse'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
@@ -42,10 +46,17 @@ interface ComicItemProps {
   comic: Comic
   isSelected: boolean
   onClick: (id: string) => void
+  onDoubleClick?: (id: string) => void
   onTags: (id: string, tags: FileTags) => Promise<void>
 }
 
-function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
+function ComicItem({
+  comic,
+  isSelected,
+  onClick,
+  onDoubleClick,
+  onTags,
+}: ComicItemProps) {
   const progress = useProgressStore((s) => s.comics[comic.id])
 
   return (
@@ -57,6 +68,7 @@ function ComicItem({ comic, isSelected, onClick, onTags }: ComicItemProps) {
       isSelected={isSelected}
       progress={progress}
       onClick={() => onClick(comic.id)}
+      onDoubleClick={() => onDoubleClick?.(comic.id)}
       onContextMenu={() => void openPathNative(comic.path)}
       onStar={() => void onTags(comic.id, { starred: !comic.starred })}
       onDelete={() => void onTags(comic.id, { deleted: !comic.deleted })}
@@ -72,6 +84,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [previewIndex, setPreviewIndex] = useState<number>(-1)
   const sortedIdsCache = useRef<{ libraryId: string; comicIds: string[] }>({
     libraryId: '',
     comicIds: [],
@@ -240,6 +253,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     <GridImage
       comicId={comicId}
       image={img}
+      onDoubleClick={setPreviewIndex}
       onContextMenu={handleImageClick}
       onTags={updateComicImageTags}
     />
@@ -249,8 +263,9 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     <ScrollImage
       comicId={comicId}
       image={image}
-      onTags={updateComicImageTags}
+      onDoubleClick={setPreviewIndex}
       onContextMenu={handleImageClick}
+      onTags={updateComicImageTags}
       onVisible={handleImageVisible}
     />
   )
@@ -356,6 +371,27 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             increaseViewportBy={2000}
           />
         )}
+      </div>
+
+      {/* Fullscreen Preview Overlay */}
+      <div
+        className={cn(
+          'bg-base fixed inset-0 z-100 flex items-center justify-center',
+          previewIndex >= 0 ? 'visible' : 'hidden',
+        )}
+      >
+        <ImagePreview
+          comicId={comicId}
+          images={images}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onTags={updateComicImageTags}
+          onDoubleClick={() => setPreviewIndex(-1)}
+          onContextMenu={(idx: number) => {
+            setPreviewIndex(-1)
+            handleImageClick(idx)
+          }}
+        />
       </div>
     </div>
   )

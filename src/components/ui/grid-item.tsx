@@ -11,6 +11,7 @@ interface GridItemProps {
   isSelected?: boolean
   progress?: ComicProgress
   onClick: () => void
+  onDoubleClick?: () => void
   onContextMenu: () => void
   onStar: () => void
   onDelete: () => void
@@ -25,6 +26,7 @@ export function GridItem({
   isSelected,
   progress,
   onClick,
+  onDoubleClick,
   onContextMenu,
   onStar,
   onDelete,
@@ -35,10 +37,11 @@ export function GridItem({
         'group relative flex aspect-[2/3] w-full shrink-0 cursor-pointer flex-col overflow-hidden transition-all',
         deleted && 'opacity-40',
         isSelected &&
-          'after:inset-ring-rose after:pointer-events-none after:absolute after:inset-0 after:inset-ring-3',
+          'after:inset-ring-love after:pointer-events-none after:absolute after:inset-0 after:inset-ring-3',
         className,
       )}
       onClick={onClick}
+      onDoubleClick={onDoubleClick}
       onContextMenu={onContextMenu}
     >
       <img
