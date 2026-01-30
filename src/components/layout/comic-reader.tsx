@@ -1,12 +1,4 @@
-import {
-  CircleChevronLeft,
-  CircleChevronRight,
-  Columns2,
-  Square,
-  SquareMenu,
-  Star,
-  Trash2,
-} from 'lucide-react'
+import { Columns2, Square, SquareMenu, Star, Trash2 } from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -16,7 +8,11 @@ import {
 } from 'react'
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
-import { GridImage, ScrollImage, SingleImage } from '@/components/ui/image-view'
+import {
+  GridImage,
+  ImagePreview,
+  ScrollImage,
+} from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
@@ -187,12 +183,6 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     if (activeTab !== comic.id) return
 
     switch (e.code) {
-      case 'ArrowUp':
-        jumpTo(currentIndex - 1)
-        break
-      case 'ArrowDown':
-        jumpTo(currentIndex + 1)
-        break
       case 'KeyB':
         toggleViewMode()
         break
@@ -286,10 +276,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             title="标记删除"
           >
             <Trash2
-              className={cn(
-                'h-4 w-4',
-                comic.deleted && 'text-love fill-gold/80',
-              )}
+              className={cn('h-4 w-4', comic.deleted && 'text-subtle/40')}
             />
           </Button>
 
@@ -320,31 +307,13 @@ export function ComicReader({ comicId }: ComicReaderProps) {
 
       <div className="bg-surface flex h-0 flex-1 items-center justify-center overflow-hidden">
         {viewMode === 'single' ? (
-          <>
-            <SingleImage
-              comicId={comicId}
-              image={currentImage}
-              onTags={updateComicImageTags}
-            />
-
-            {currentIndex > 0 && (
-              <Button
-                className="hover:text-love transition-color text-subtle/60 absolute top-1/2 left-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
-                onClick={() => jumpTo(currentIndex - 1)}
-              >
-                <CircleChevronLeft className="h-10 w-10" />
-              </Button>
-            )}
-
-            {currentIndex < images.length - 1 && (
-              <Button
-                className="hover:text-love transition-color text-subtle/60 absolute top-1/2 right-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
-                onClick={() => jumpTo(currentIndex + 1)}
-              >
-                <CircleChevronRight className="h-10 w-10" />
-              </Button>
-            )}
-          </>
+          <ImagePreview
+            comicId={comicId}
+            images={images}
+            index={currentIndex}
+            onIndexChange={jumpTo}
+            onTags={updateComicImageTags}
+          />
         ) : (
           <Virtuoso
             key={comicId}
