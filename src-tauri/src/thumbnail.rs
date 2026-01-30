@@ -122,7 +122,11 @@ pub fn get_thumbnail_hash(metadata: &fs::Metadata) -> String {
 pub fn is_image_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext_str| IMAGE_EXTENSIONS.iter().any(|&x| x.eq_ignore_ascii_case(ext_str)))
+        .is_some_and(|ext_str| {
+            IMAGE_EXTENSIONS
+                .iter()
+                .any(|&x| x.eq_ignore_ascii_case(ext_str))
+        })
 }
 
 pub fn get_image_dimensions_fast(path: &Path) -> Result<(u32, u32), Box<dyn std::error::Error>> {
@@ -143,7 +147,7 @@ pub fn process_and_get_dimensions(
 ) -> Result<(u32, u32, u64), Box<dyn std::error::Error>> {
     // Return early if thumbnail already exists
     if thumb_path.exists() {
-        if let Ok((w, h)) = get_image_dimensions_fast(thumb_path) {
+        if let Ok((w, h)) = get_image_dimensions_fast(source_path) {
             return Ok((w, h, 0));
         }
     }
@@ -193,8 +197,7 @@ pub fn process_and_get_dimensions(
         )
     } else {
         // Standard image decoding for PNG and other formats
-        let reader = ImageReader::new(std::io::Cursor::new(&mmap[..]))
-            .with_guessed_format()?;
+        let reader = ImageReader::new(std::io::Cursor::new(&mmap[..])).with_guessed_format()?;
         let img = reader.decode()?;
         let (width, height) = (img.width(), img.height());
 
@@ -233,15 +236,11 @@ fn resize_and_save(
 
     let dst_width = NonZeroU32::new(target_width).ok_or("Dst width is 0")?;
     let dst_height = NonZeroU32::new(target_height).ok_or("Dst height is 0")?;
-    let mut dst_image = fr::images::Image::new(
-        dst_width.get(),
-        dst_height.get(),
-        src_image.pixel_type(),
-    );
+    let mut dst_image =
+        fr::images::Image::new(dst_width.get(), dst_height.get(), src_image.pixel_type());
 
-    let options = fr::ResizeOptions::new().resize_alg(
-        fr::ResizeAlg::Convolution(fr::FilterType::Bilinear)
-    );
+    let options =
+        fr::ResizeOptions::new().resize_alg(fr::ResizeAlg::Convolution(fr::FilterType::Bilinear));
     resizer.resize(&src_image, &mut dst_image, &options)?;
 
     let file = File::create(thumb_path)?;
@@ -256,7 +255,7 @@ fn resize_and_save(
     drop(writer);
 
     let file_size = fs::metadata(thumb_path).map(|m| m.len()).unwrap_or(0);
-    Ok((target_width, target_height, file_size))
+    Ok((orig_w, orig_h, file_size))
 }
 
 pub fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {

@@ -13,11 +13,13 @@ interface TagButtonsProps {
 
 const STYLES = {
   sm: {
+    padding: 'p-1',
     btn: 'h-6 w-6',
     icon: 'h-5 w-5',
     font: 'bottom-2 text-sm',
   },
   md: {
+    padding: 'p-2',
     btn: 'h-8 w-8',
     icon: 'h-6 w-6',
     font: 'top-2 text-lg',
@@ -37,7 +39,8 @@ export function TagButtons({
   return (
     <div
       className={cn(
-        'pointer-events-none absolute inset-0 isolate flex justify-between p-1',
+        'pointer-events-none absolute inset-0 isolate flex justify-between',
+        styles.padding,
       )}
     >
       <Button
@@ -78,7 +81,7 @@ export function TagButtons({
       {title && (
         <span
           className={cn(
-            'absolute left-1/2 w-full -translate-x-1/2 truncate px-2 text-center font-bold opacity-0 text-shadow-md group-hover:opacity-100',
+            'absolute left-1/2 w-full -translate-x-1/2 truncate px-2 text-center font-bold text-white opacity-0 text-shadow-md group-hover:opacity-100',
             styles.font,
           )}
         >
