@@ -42,7 +42,7 @@ export interface Comic {
   id: string
   title: string
   path: string
-  cover?: string
+  cover: string
   libraryId: string
   starred: boolean
   deleted: boolean

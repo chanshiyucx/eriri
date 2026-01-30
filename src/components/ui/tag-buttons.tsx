@@ -49,11 +49,9 @@ export function TagButtons({
       >
         <Trash2
           className={cn(
-            'drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]',
+            'stroke-white drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]',
             styles.icon,
-            deleted
-              ? 'fill-gold/80 stroke-love'
-              : 'opacity-0 group-hover:opacity-100',
+            deleted ? 'text-subtle/40' : 'opacity-0 group-hover:opacity-100',
           )}
           strokeWidth={2.5}
         />
@@ -67,7 +65,7 @@ export function TagButtons({
       >
         <Star
           className={cn(
-            'drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]',
+            'stroke-white drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]',
             styles.icon,
             starred
               ? 'fill-gold/80 stroke-love'

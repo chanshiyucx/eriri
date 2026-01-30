@@ -255,10 +255,7 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
             title="标记删除"
           >
             <Trash2
-              className={cn(
-                'h-4 w-4',
-                book.deleted && 'text-love fill-gold/80',
-              )}
+              className={cn('h-4 w-4', book.deleted && 'text-subtle/40')}
             />
           </Button>
 

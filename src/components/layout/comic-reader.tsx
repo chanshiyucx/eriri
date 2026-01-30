@@ -81,21 +81,15 @@ function TableOfContents({
     >
       <ScrollArea ref={scrollRef} orientation="horizontal" className="flex">
         {images.map((img) => (
-          <div
+          <GridImage
             key={img.filename}
-            className={cn(
-              'relative w-[100px] shrink-0',
-              currentIndex === img.index &&
-                'after:inset-ring-rose after:pointer-events-none after:absolute after:inset-0 after:inset-ring-3',
-            )}
-          >
-            <GridImage
-              comicId={comicId}
-              image={img}
-              onClick={() => onSelect(img.index)}
-              onTags={onTags}
-            />
-          </div>
+            className="w-[100px]"
+            comicId={comicId}
+            image={img}
+            isSelected={currentIndex === img.index}
+            onClick={() => onSelect(img.index)}
+            onTags={onTags}
+          />
         ))}
       </ScrollArea>
     </div>
@@ -108,7 +102,7 @@ interface ComicReaderProps {
 
 export function ComicReader({ comicId }: ComicReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
-  const [isTocCollapsed, setTocCollapsed] = useState(false)
+  const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
   const isImmersive = useUIStore((s) => s.isImmersive)
   const activeTab = useTabsStore((s) => s.activeTab)
