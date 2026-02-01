@@ -1,4 +1,4 @@
-import { throttle } from 'lodash-es'
+import { throttle } from 'es-toolkit'
 import { useEffect, useRef } from 'react'
 import type { BookProgress, ComicProgress } from '@/types/library'
 
@@ -9,8 +9,7 @@ export function useThrottledProgress(
 ) {
   const throttled = useRef(
     throttle(updateFn, PROGRESS_THROTTLE_DELAY, {
-      leading: false,
-      trailing: true,
+      edges: ['trailing'],
     }),
   )
 
