@@ -134,6 +134,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
 
   const jumpTo = useEffectEvent((targetIndex?: number) => {
+    if (!comic) return
     const index = targetIndex ?? currentIndex
     const newProgress = createComicProgress(index, images.length)
     updateComicProgress(comic.id, newProgress)
@@ -181,6 +182,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   }
 
   const handleImageClick = (index: number) => {
+    if (!comic) return
     const newProgress = createComicProgress(index, images.length)
     updateComicProgress(comic.id, newProgress)
 
@@ -220,18 +222,36 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     if (activeTab || !comic) return
 
     switch (e.code) {
-      case 'KeyC':
-        void updateComicTags(comic.id, { deleted: !comic.deleted })
-        break
-      case 'KeyV':
-        void updateComicTags(comic.id, { starred: !comic.starred })
-        break
       case 'KeyP':
         handleContinueReading()
         break
       case 'KeyB':
         toggleViewMode()
         break
+      case 'KeyC':
+        void updateComicTags(comic.id, { deleted: !comic.deleted })
+        break
+      case 'KeyV':
+        void updateComicTags(comic.id, { starred: !comic.starred })
+        break
+      case 'KeyN': {
+        const currentImage =
+          viewMode === 'grid' ? images[previewIndex] : images[currentIndex]
+        if (!currentImage) return
+        void updateComicImageTags(comic.id, currentImage.filename, {
+          deleted: !currentImage.deleted,
+        })
+        break
+      }
+      case 'KeyM': {
+        const currentImage =
+          viewMode === 'grid' ? images[previewIndex] : images[currentIndex]
+        if (!currentImage) return
+        void updateComicImageTags(comic.id, currentImage.filename, {
+          starred: !currentImage.starred,
+        })
+        break
+      }
     }
   })
 
