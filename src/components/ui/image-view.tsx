@@ -81,6 +81,7 @@ export function SingleImage({
         }}
       >
         <img
+          key={image.url}
           src={image.url}
           alt={image.filename}
           decoding="async"
@@ -151,6 +152,7 @@ export function ScrollImage({
       }}
     >
       <img
+        key={image.url}
         src={image.url}
         alt={image.filename}
         decoding="async"
