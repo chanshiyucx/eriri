@@ -1,7 +1,7 @@
 {
   "name": "eriri",
   "private": true,
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "A lovely, high-performance digital library for your favorite comics, books, and videos.",
   "type": "module",
   "author": "Shiyu <chanshiyucx@gmail.com>",
