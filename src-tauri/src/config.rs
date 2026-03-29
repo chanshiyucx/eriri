@@ -16,7 +16,11 @@ fn get_config_path(app: &AppHandle) -> Option<PathBuf> {
 
 fn get_store_dir(app: &AppHandle) -> Option<PathBuf> {
     let config = get(app);
-    config.cache_dir.map(|dir| PathBuf::from(dir).join("store"))
+    let base = config
+        .cache_dir
+        .map(PathBuf::from)
+        .or_else(|| app.path().app_cache_dir().ok())?;
+    Some(base.join("store"))
 }
 
 fn load_from_disk(app: &AppHandle) -> Config {

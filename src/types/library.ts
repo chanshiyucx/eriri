@@ -55,8 +55,7 @@ export interface Author {
   name: string
   path: string
   libraryId: string
-  bookCount: number
-  books?: Book[]
+  books: Book[]
 }
 
 export interface Book {

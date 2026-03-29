@@ -13,7 +13,7 @@ use crate::models::{Comic, ComicImage};
 use crate::tags::get_file_tags;
 use crate::thumbnail::{
     add_stat, convert_file_src, find_cover_image, get_thumbnail_dir, get_thumbnail_hash,
-    is_image_file, process_and_get_dimensions, THUMB_HEIGHT, THUMB_WIDTH,
+    is_image_file, process_and_get_dimensions, THUMB_FALLBACK_HEIGHT, THUMB_WIDTH,
 };
 
 use super::utils::{current_time_millis, generate_uuid, get_created_time, is_hidden};
@@ -67,7 +67,7 @@ pub fn scan_comic_library(
                         let thumb_path = thumb_dir.join(format!("{hash}.jpg"));
 
                         if !thumb_path.exists() {
-                            if let Some(ref mut decompressor) = decompressor_opt.as_mut() {
+                            if let Some(decompressor) = decompressor_opt.as_mut() {
                                 if let Ok((_, _, file_size)) = process_and_get_dimensions(
                                     &cover_path,
                                     &thumb_path,
@@ -174,7 +174,7 @@ pub fn scan_comic_images(app: AppHandle, comic_path: &str) -> Result<Vec<ComicIm
 
                 let thumb_path = thumb_dir.join(format!("{hash}.jpg"));
 
-                let (width, height) = if let Some(ref mut decompressor) = decompressor_opt.as_mut()
+                let (width, height) = if let Some(decompressor) = decompressor_opt.as_mut()
                 {
                     match process_and_get_dimensions(file_path, &thumb_path, decompressor, resizer) {
                         Ok((w, h, file_size)) => {
@@ -186,11 +186,11 @@ pub fn scan_comic_images(app: AppHandle, comic_path: &str) -> Result<Vec<ComicIm
                         }
                         Err(e) => {
                             warn!(error = %e, path = %file_path.display(), "Failed to process image");
-                            (THUMB_WIDTH, THUMB_HEIGHT)
+                            (THUMB_WIDTH, THUMB_FALLBACK_HEIGHT)
                         }
                     }
                 } else {
-                    (THUMB_WIDTH, THUMB_HEIGHT)
+                    (THUMB_WIDTH, THUMB_FALLBACK_HEIGHT)
                 };
 
                 let thumbnail = if thumb_path.exists() {

@@ -1,8 +1,9 @@
 use once_cell::sync::Lazy;
 use std::fs;
 use std::path::Path;
-use std::process::Command;
 use std::time::SystemTime;
+use tauri::AppHandle;
+use tauri_plugin_opener::OpenerExt;
 use tracing::info;
 use uuid::Uuid;
 
@@ -111,11 +112,8 @@ pub fn get_library_type(library_path: &str) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn open_path_native(path: String) -> Result<(), String> {
-    Command::new("open")
-        .arg(&path)
-        .spawn()
-        .map_err(|e| e.to_string())?;
-
-    Ok(())
+pub fn open_path_native(app: AppHandle, path: String) -> Result<(), String> {
+    app.opener()
+        .open_path(&path, None::<&str>)
+        .map_err(|e| e.to_string())
 }
