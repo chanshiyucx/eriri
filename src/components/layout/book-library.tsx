@@ -69,7 +69,7 @@ function AuthorItem({ author, isSelected, onSelect }: AuthorItemProps) {
       <Folder className="h-4 w-4 shrink-0" />
       <div className="flex min-w-0 flex-1 items-center justify-between gap-2">
         <span className="truncate">{author.name}</span>
-        <span className="text-subtle/40 text-xs">{author.books.length}</span>
+        <span className="text-subtle/40 text-xs">{author.bookCount}</span>
       </div>
     </Button>
   )

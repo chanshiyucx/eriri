@@ -23,6 +23,8 @@ pub struct Author {
     pub path: String,
     #[serde(rename = "libraryId")]
     pub library_id: String,
+    #[serde(rename = "bookCount")]
+    pub book_count: u32,
     pub books: Vec<Book>,
 }
 

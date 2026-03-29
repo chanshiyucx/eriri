@@ -108,6 +108,7 @@ pub fn scan_book_library(library_path: &str, library_id: &str) -> Result<Vec<Aut
             name: author_name,
             path: author_path.to_string_lossy().into_owned(),
             library_id: library_id.to_string(),
+            book_count: u32::try_from(books.len()).unwrap_or(u32::MAX),
             books,
         });
     }
