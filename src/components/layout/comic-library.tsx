@@ -6,23 +6,20 @@ import {
   StepForward,
 } from 'lucide-react'
 import {
+  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
   useRef,
   useState,
 } from 'react'
-import { Virtuoso, VirtuosoGrid, type VirtuosoHandle } from 'react-virtuoso'
+import { VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
+import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
 import { GridItem } from '@/components/ui/grid-item'
-import {
-  GridImage,
-  ImagePreview,
-  ScrollImage,
-} from '@/components/ui/image-view'
+import { GridImage, ImagePreview } from '@/components/ui/image-view'
 import { useCollapse } from '@/hooks/use-collapse'
-import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
 import { openPathNative } from '@/lib/scanner'
@@ -81,14 +78,11 @@ interface ComicLibraryProps {
 }
 
 export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
-  const virtuosoRef = useRef<VirtuosoHandle>(null)
+  const stripRef = useRef<ComicStripHandle>(null)
+  const currentIndexRef = useRef(0)
   const { collapsed, setCollapsed } = useCollapse()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [previewIndex, setPreviewIndex] = useState<number>(-1)
-  const sortedIdsCache = useRef<{ libraryId: string; comicIds: string[] }>({
-    libraryId: '',
-    comicIds: [],
-  })
 
   const activeTab = useTabsStore((s) => s.activeTab)
   const addTab = useTabsStore((s) => s.addTab)
@@ -106,60 +100,64 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   )
   const comics = useLibraryStore(
     useShallow((s) => {
-      const comicIds = s.libraryComics[selectedLibrary.id]
-
-      if (sortedIdsCache.current.libraryId !== selectedLibrary.id) {
-        const sortedIds = comicIds.toSorted((idA, idB) => {
-          const a = s.comics[idA]
-          const b = s.comics[idB]
+      const comicIds = s.libraryComics[selectedLibrary.id] ?? []
+      return comicIds
+        .map((id) => s.comics[id])
+        .toSorted((a, b) => {
           if (a.deleted !== b.deleted) return a.deleted ? 1 : -1
           if (a.starred !== b.starred) return a.starred ? -1 : 1
           return 0
         })
-        sortedIdsCache.current = {
-          libraryId: selectedLibrary.id,
-          comicIds: sortedIds,
-        }
-      }
-
-      return sortedIdsCache.current.comicIds.map((id) => s.comics[id])
     }),
   )
 
   const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
   const progress = useProgressStore((s) => s.comics[comicId])
-  const currentIndex = progress?.current ?? 0
-
-  const { isLock, visibleIndices, lockScroll } = useScrollLock()
+  const savedIndex = progress?.current ?? 0
+  const [libraryPosition, setLibraryPosition] = useState({
+    comicId,
+    index: savedIndex,
+  })
   const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
 
-  const jumpTo = useEffectEvent((targetIndex?: number) => {
-    if (!comic) return
-    const index = targetIndex ?? currentIndex
-    const newProgress = createComicProgress(index, images.length)
-    updateComicProgress(comic.id, newProgress)
+  const currentIndex =
+    libraryPosition.comicId === comicId ? libraryPosition.index : savedIndex
 
-    if (viewMode === 'scroll') {
-      lockScroll()
-      virtuosoRef.current?.scrollToIndex({
-        index,
-        align: 'center',
-      })
-    }
-  })
+  useEffect(() => {
+    currentIndexRef.current = currentIndex
+  }, [currentIndex])
+
+  const setCurrentIndex = useCallback(
+    (index: number) => {
+      setLibraryPosition((prev) =>
+        prev.comicId === comicId && prev.index === index
+          ? prev
+          : { comicId, index },
+      )
+    },
+    [comicId],
+  )
 
   useEffect(() => {
     if (images.length) return
     void getComicImages(comicId)
   }, [comicId, images.length, getComicImages])
 
-  useLayoutEffect(() => {
-    lockScroll()
-  }, [lockScroll, comicId, viewMode, collapsed])
+  const syncStripPosition = useCallback(() => {
+    if (viewMode !== 'scroll' || collapsed === 2 || !images.length) return
+    stripRef.current?.jumpTo(currentIndexRef.current)
+  }, [collapsed, images.length, viewMode])
 
   useLayoutEffect(() => {
-    jumpTo()
-  }, [activeTab])
+    syncStripPosition()
+  }, [
+    activeTab,
+    collapsed,
+    comicId,
+    images.length,
+    syncStripPosition,
+    viewMode,
+  ])
 
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
@@ -184,6 +182,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const handleImageClick = (index: number) => {
     if (!comic) return
     const newProgress = createComicProgress(index, images.length)
+    setCurrentIndex(index)
     updateComicProgress(comic.id, newProgress)
 
     addTab({
@@ -193,33 +192,21 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     })
   }
 
-  const handleImageVisible = (index: number, isVisible: boolean) => {
-    if (isLock.current) return
+  const handleStripIndexChange = useCallback(
+    (index: number) => {
+      if (!comic || !images.length || collapsed === 2) return
 
-    if (isVisible) {
-      visibleIndices.current.add(index)
-    } else {
-      visibleIndices.current.delete(index)
-    }
-    if (!visibleIndices.current.size) return
-    const newIndex = Math.min(...visibleIndices.current)
-
-    if (
-      !comic ||
-      !images.length ||
-      currentIndex === newIndex ||
-      collapsed === 2
-    ) {
-      return
-    }
-
-    const newProgress = createComicProgress(newIndex, images.length)
-    throttledUpdateProgress.current(comic.id, newProgress)
-  }
+      setCurrentIndex(index)
+      const newProgress = createComicProgress(index, images.length)
+      throttledUpdateProgress.current(comic.id, newProgress)
+    },
+    [collapsed, comic, images.length, setCurrentIndex, throttledUpdateProgress],
+  )
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
-    if (activeTab || !comic) return
+    if (!comic) return
+    if (activeTab) return
 
     switch (e.code) {
       case 'KeyP':
@@ -279,23 +266,12 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     />
   )
 
-  const renderScrollImage = (_index: number, image: Image) => (
-    <ScrollImage
-      comicId={comicId}
-      image={image}
-      onDoubleClick={setPreviewIndex}
-      onContextMenu={handleImageClick}
-      onTags={updateComicImageTags}
-      onVisible={handleImageVisible}
-    />
-  )
-
   return (
     <div className="flex h-full w-full">
       {/* Left Column: Comic List */}
       <div
         className={cn(
-          'flex shrink-0 flex-col',
+          'flex min-h-0 shrink-0 flex-col',
           collapsed === 0 ? 'hidden' : 'flex-1',
           collapsed === 1 && 'border-r',
         )}
@@ -327,7 +303,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
       {/* Right Column: Comic Detail */}
       <div
         className={cn(
-          'flex shrink-0 flex-col',
+          'flex min-h-0 shrink-0 flex-col',
           collapsed === 2 ? 'hidden' : 'flex-1',
         )}
       >
@@ -381,14 +357,20 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             increaseViewportBy={600}
           />
         ) : (
-          <Virtuoso
+          <ComicStrip
             key={comicId}
-            ref={virtuosoRef}
-            className="flex-1"
-            data={images}
-            initialTopMostItemIndex={currentIndex}
-            itemContent={renderScrollImage}
-            increaseViewportBy={2000}
+            ref={stripRef}
+            className="h-0 flex-auto"
+            comicId={comicId}
+            images={images}
+            initialIndex={currentIndex}
+            orientation="vertical"
+            overscanViewports={4}
+            maxRenderedPages={32}
+            onCurrentIndexChange={handleStripIndexChange}
+            onDoubleClick={setPreviewIndex}
+            onContextMenu={handleImageClick}
+            onTags={updateComicImageTags}
           />
         )}
       </div>

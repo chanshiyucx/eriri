@@ -11,12 +11,10 @@ export function useScrollLock() {
     if (lockTimer.current) {
       clearTimeout(lockTimer.current)
     }
-    visibleIndices.current.clear()
 
-    console.log('滚动锁定')
+    visibleIndices.current.clear()
     isLock.current = true
     lockTimer.current = setTimeout(() => {
-      console.log('解除锁定')
       isLock.current = false
     }, SCROLL_LOCK_TIMEOUT)
   }

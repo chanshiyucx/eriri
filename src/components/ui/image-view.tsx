@@ -1,5 +1,5 @@
 import { CircleChevronLeft, CircleChevronRight } from 'lucide-react'
-import { useEffect, useEffectEvent, useRef } from 'react'
+import { useEffect, useEffectEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { GridItem } from '@/components/ui/grid-item'
 import { TagButtons } from '@/components/ui/tag-buttons'
@@ -13,9 +13,9 @@ interface ImageProps {
   onClick?: (index: number) => void
   onDoubleClick?: (index: number) => void
   onContextMenu?: (index: number) => void
-  onVisible?: (index: number, isVisible: boolean) => void
   isSelected?: boolean
   className?: string
+  loading?: 'eager' | 'lazy'
 }
 
 export function GridImage({
@@ -105,45 +105,22 @@ export function ScrollImage({
   onTags,
   onDoubleClick,
   onContextMenu,
-  onVisible,
   className = 'h-full',
+  loading = 'eager',
 }: ImageProps) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  const onVisibleEvent = useEffectEvent((index: number, isVisible: boolean) => {
-    onVisible?.(index, isVisible)
-  })
-
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-
-    const observer = new IntersectionObserver(
-      ([entry]) => onVisibleEvent(image.index, entry.isIntersecting),
-      { threshold: 0.5 },
-    )
-    observer.observe(el)
-    return () => {
-      observer.disconnect()
-      onVisibleEvent(image.index, false)
-    }
-  }, [image.index])
-
   const handleSetTags = (tags: FileTags) => {
     void onTags(comicId, image.filename, tags)
   }
 
   return (
     <figure
-      ref={ref}
       className={cn(
-        'group relative shrink-0 bg-cover bg-center',
+        'group relative shrink-0',
         image.deleted && 'opacity-40',
         className,
       )}
       style={{
         aspectRatio: `${image.width} / ${image.height}`,
-        contain: 'layout style paint',
       }}
       onDoubleClick={() => onDoubleClick?.(image.index)}
       onContextMenu={(e) => {
@@ -152,11 +129,12 @@ export function ScrollImage({
       }}
     >
       <img
-        key={image.url}
         src={image.url}
         alt={image.filename}
         decoding="async"
-        className="block h-full w-full"
+        draggable={false}
+        loading={loading}
+        className="block h-full w-full object-contain"
       />
       <TagButtons
         title={image.filename}

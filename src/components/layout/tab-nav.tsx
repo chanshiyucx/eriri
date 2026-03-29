@@ -96,7 +96,7 @@ export function TabNav() {
   }, [])
 
   return (
-    <div className="bg-base flex h-8 items-center gap-2 border-b px-2">
+    <div className="bg-base flex h-8 shrink-0 items-center gap-2 border-b px-2">
       <Button className="h-6 w-6" onClick={toggleSidebar}>
         {isSidebarCollapsed ? (
           <PanelLeftOpen className="h-4 w-4" />
