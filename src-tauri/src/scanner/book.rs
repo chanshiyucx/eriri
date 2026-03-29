@@ -1,4 +1,5 @@
-use std::fs;
+use std::fs::{self, File};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 use tracing::info;
 
@@ -6,7 +7,8 @@ use crate::models::{Author, Book, BookContent, Chapter};
 use crate::tags::get_file_tags;
 
 use super::utils::{
-    current_time_millis, generate_uuid, get_created_time, is_book_file, is_hidden, remove_extension,
+    current_time_millis, generate_uuid, get_created_time, is_book_file, is_hidden,
+    remove_extension,
 };
 
 fn extract_chapter_title(line: &str) -> Option<String> {
@@ -106,7 +108,6 @@ pub fn scan_book_library(library_path: &str, library_id: &str) -> Result<Vec<Aut
             name: author_name,
             path: author_path.to_string_lossy().into_owned(),
             library_id: library_id.to_string(),
-            book_count: u32::try_from(books.len()).unwrap_or(u32::MAX),
             books,
         });
     }
@@ -122,23 +123,25 @@ pub fn scan_book_library(library_path: &str, library_id: &str) -> Result<Vec<Aut
 
 #[tauri::command]
 pub fn parse_book(path: &str) -> Result<BookContent, String> {
-    let text = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {e}"))?;
-
-    let lines: Vec<String> = text
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(String::from)
-        .collect();
-
+    let file = File::open(path).map_err(|e| format!("Failed to open file: {e}"))?;
+    let reader = BufReader::new(file);
+    let mut lines = Vec::new();
     let mut chapters = Vec::new();
 
-    for (index, line) in lines.iter().enumerate() {
-        if let Some(title) = extract_chapter_title(line) {
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Failed to read file: {e}"))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        if let Some(title) = extract_chapter_title(&line) {
             chapters.push(Chapter {
                 title,
-                line_index: index,
+                line_index: lines.len(),
             });
         }
+
+        lines.push(line);
     }
 
     Ok(BookContent { lines, chapters })

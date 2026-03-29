@@ -9,7 +9,7 @@ use crate::models::Video;
 use crate::tags::get_file_tags;
 use crate::thumbnail::{
     convert_file_src, generate_video_thumbnail, get_image_dimensions_fast, get_thumbnail_dir,
-    get_thumbnail_hash, THUMB_HEIGHT, THUMB_WIDTH,
+    get_thumbnail_hash, THUMB_FALLBACK_HEIGHT, THUMB_WIDTH,
 };
 
 use super::utils::{
@@ -77,10 +77,10 @@ pub fn scan_video_library(
             let (cover, width, height) = if thumb_path.exists() {
                 let cover = convert_file_src(&thumb_path.to_string_lossy());
                 let (w, h) =
-                    get_image_dimensions_fast(&thumb_path).unwrap_or((THUMB_WIDTH, THUMB_HEIGHT));
+                    get_image_dimensions_fast(&thumb_path).unwrap_or((THUMB_WIDTH, THUMB_FALLBACK_HEIGHT));
                 (cover, w, h)
             } else {
-                (String::new(), THUMB_WIDTH, THUMB_HEIGHT)
+                (String::new(), THUMB_WIDTH, THUMB_FALLBACK_HEIGHT)
             };
 
             let url = convert_file_src(&path_str);

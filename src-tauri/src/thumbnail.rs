@@ -38,6 +38,8 @@ fn save_stats_to_disk(app: &AppHandle, stats: &ThumbnailStats) {
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let stats = load_stats_from_disk(app.handle());
     app.manage(ThumbnailStatsState(Mutex::new(stats)));
+    let thumb_dir = get_thumbnail_dir(app.handle());
+    fs::create_dir_all(&thumb_dir)?;
     Ok(())
 }
 
@@ -71,7 +73,8 @@ pub fn remove_stat(app: &AppHandle, count: usize, size: u64) {
 }
 
 pub const THUMB_WIDTH: u32 = 256;
-pub const THUMB_HEIGHT: u32 = 384;
+/// Fallback height used when image processing fails; actual height is computed from aspect ratio.
+pub const THUMB_FALLBACK_HEIGHT: u32 = 384;
 const THUMB_QUALITY: u8 = 70;
 
 // URL encoding set for asset protocol
@@ -95,16 +98,9 @@ pub fn get_thumbnail_dir(app: &AppHandle) -> PathBuf {
     } else {
         app.path()
             .app_cache_dir()
-            .unwrap_or_else(|_| PathBuf::from("."))
+            .unwrap_or_else(|_| std::env::temp_dir())
     };
-
-    let thumb_dir = base_path.join("thumbnail");
-
-    if !thumb_dir.exists() {
-        let _ = fs::create_dir_all(&thumb_dir);
-    }
-
-    thumb_dir
+    base_path.join("thumbnail")
 }
 
 fn is_jpeg(data: &[u8]) -> bool {
@@ -517,5 +513,7 @@ pub fn get_cache_dir(app: AppHandle) -> Option<String> {
 pub fn set_cache_dir(app: AppHandle, path: String) -> Result<(), String> {
     let mut config = config::get(&app);
     config.cache_dir = Some(path);
-    config::save_config(&app, &config)
+    config::save_config(&app, &config)?;
+    let thumb_dir = get_thumbnail_dir(&app);
+    fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())
 }
