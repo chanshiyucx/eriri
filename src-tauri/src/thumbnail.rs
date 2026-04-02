@@ -38,8 +38,7 @@ fn save_stats_to_disk(app: &AppHandle, stats: &ThumbnailStats) {
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let stats = load_stats_from_disk(app.handle());
     app.manage(ThumbnailStatsState(Mutex::new(stats)));
-    let thumb_dir = get_thumbnail_dir(app.handle());
-    fs::create_dir_all(&thumb_dir)?;
+    let _ = get_thumbnail_dir(app.handle());
     Ok(())
 }
 
@@ -92,15 +91,20 @@ const ENCODE_SET: percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERI
 pub const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png"];
 
 pub fn get_thumbnail_dir(app: &AppHandle) -> PathBuf {
-    let config = config::get(app);
-    let base_path = if let Some(custom_path) = config.cache_dir {
-        PathBuf::from(custom_path)
-    } else {
-        app.path()
-            .app_cache_dir()
-            .unwrap_or_else(|_| std::env::temp_dir())
-    };
-    base_path.join("thumbnail")
+    if let Some(base_path) = config::get_configured_cache_dir(app) {
+        let thumb_dir = base_path.join("thumbnail");
+        if thumb_dir.exists() || fs::create_dir_all(&thumb_dir).is_ok() {
+            return thumb_dir;
+        }
+    }
+
+    let thumb_dir = app
+        .path()
+        .app_cache_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("com.xin.eriri"))
+        .join("thumbnail");
+    let _ = fs::create_dir_all(&thumb_dir);
+    thumb_dir
 }
 
 fn is_jpeg(data: &[u8]) -> bool {
@@ -506,7 +510,7 @@ pub fn get_thumbnail_stats(app: AppHandle, rescan: bool) -> Result<(usize, u64),
 
 #[tauri::command]
 pub fn get_cache_dir(app: AppHandle) -> Option<String> {
-    config::get(&app).cache_dir
+    config::get_configured_cache_dir(&app).map(|path| path.to_string_lossy().into_owned())
 }
 
 #[tauri::command]

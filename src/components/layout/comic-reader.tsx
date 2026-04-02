@@ -1,6 +1,5 @@
 import { Columns2, Square, SquareMenu, Star, Trash2 } from 'lucide-react'
 import {
-  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -123,35 +122,29 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   // eslint-disable-next-line react-hooks/refs
   currentIndexRef.current = currentIndex
 
-  const setCurrentIndex = useCallback(
-    (index: number) => {
-      setReaderPosition((prev) =>
-        prev.comicId === comicId && prev.index === index
-          ? prev
-          : { comicId, index },
-      )
-    },
-    [comicId],
-  )
+  const setCurrentIndex = (index: number) => {
+    setReaderPosition((prev) =>
+      prev.comicId === comicId && prev.index === index
+        ? prev
+        : { comicId, index },
+    )
+  }
 
-  const jumpTo = useCallback(
-    (targetIndex?: number) => {
-      if (!comic || !images.length) return
+  const jumpTo = (targetIndex?: number) => {
+    if (!comic || !images.length) return
 
-      const index = Math.max(
-        0,
-        Math.min(images.length - 1, targetIndex ?? currentIndexRef.current),
-      )
-      const newProgress = createComicProgress(index, images.length)
-      setCurrentIndex(index)
-      updateComicProgress(comic.id, newProgress)
+    const index = Math.max(
+      0,
+      Math.min(images.length - 1, targetIndex ?? currentIndexRef.current),
+    )
+    const newProgress = createComicProgress(index, images.length)
+    setCurrentIndex(index)
+    updateComicProgress(comic.id, newProgress)
 
-      if (viewMode === 'scroll') {
-        stripRef.current?.jumpTo(index)
-      }
-    },
-    [comic, images.length, setCurrentIndex, updateComicProgress, viewMode],
-  )
+    if (viewMode === 'scroll') {
+      stripRef.current?.jumpTo(index)
+    }
+  }
 
   useEffect(() => {
     if (images.length) return
@@ -163,14 +156,12 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     stripRef.current?.jumpTo(currentIndexRef.current)
   }, [activeTab, comicId, images.length, viewMode])
 
-  const handleStripIndexChange = useCallback(
-    (index: number) => {
-      setCurrentIndex(index)
-      const newProgress = createComicProgress(index, images.length)
-      throttledUpdateProgress.current(comic.id, newProgress)
-    },
-    [comic, images.length, setCurrentIndex, throttledUpdateProgress],
-  )
+  const handleStripIndexChange = (index: number) => {
+    if (!comic) return
+    setCurrentIndex(index)
+    const newProgress = createComicProgress(index, images.length)
+    throttledUpdateProgress.current(comic.id, newProgress)
+  }
 
   const handleCloseToc = () => {
     setTocCollapsed(true)
