@@ -6,7 +6,6 @@ import {
   StepForward,
 } from 'lucide-react'
 import {
-  useCallback,
   useEffect,
   useEffectEvent,
   useLayoutEffect,
@@ -127,37 +126,23 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     currentIndexRef.current = currentIndex
   }, [currentIndex])
 
-  const setCurrentIndex = useCallback(
-    (index: number) => {
-      setLibraryPosition((prev) =>
-        prev.comicId === comicId && prev.index === index
-          ? prev
-          : { comicId, index },
-      )
-    },
-    [comicId],
-  )
+  const setCurrentIndex = (index: number) => {
+    setLibraryPosition((prev) =>
+      prev.comicId === comicId && prev.index === index
+        ? prev
+        : { comicId, index },
+    )
+  }
 
   useEffect(() => {
     if (images.length) return
     void getComicImages(comicId)
   }, [comicId, images.length, getComicImages])
 
-  const syncStripPosition = useCallback(() => {
+  useLayoutEffect(() => {
     if (viewMode !== 'scroll' || collapsed === 2 || !images.length) return
     stripRef.current?.jumpTo(currentIndexRef.current)
-  }, [collapsed, images.length, viewMode])
-
-  useLayoutEffect(() => {
-    syncStripPosition()
-  }, [
-    activeTab,
-    collapsed,
-    comicId,
-    images.length,
-    syncStripPosition,
-    viewMode,
-  ])
+  }, [activeTab, collapsed, comicId, images.length, viewMode])
 
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
@@ -192,16 +177,13 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     })
   }
 
-  const handleStripIndexChange = useCallback(
-    (index: number) => {
-      if (!comic || !images.length || collapsed === 2) return
+  const handleStripIndexChange = (index: number) => {
+    if (!comic || !images.length || collapsed === 2) return
 
-      setCurrentIndex(index)
-      const newProgress = createComicProgress(index, images.length)
-      throttledUpdateProgress.current(comic.id, newProgress)
-    },
-    [collapsed, comic, images.length, setCurrentIndex, throttledUpdateProgress],
-  )
+    setCurrentIndex(index)
+    const newProgress = createComicProgress(index, images.length)
+    throttledUpdateProgress.current(comic.id, newProgress)
+  }
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return

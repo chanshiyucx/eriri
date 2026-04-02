@@ -14,13 +14,28 @@ fn get_config_path(app: &AppHandle) -> Option<PathBuf> {
         .map(|dir| dir.join("config.json"))
 }
 
-fn get_store_dir(app: &AppHandle) -> Option<PathBuf> {
-    let config = get(app);
-    let base = config
+fn default_cache_dir(app: &AppHandle) -> PathBuf {
+    app.path()
+        .app_cache_dir()
+        .unwrap_or_else(|_| std::env::temp_dir().join("com.xin.eriri"))
+}
+
+pub fn get_configured_cache_dir(app: &AppHandle) -> Option<PathBuf> {
+    get(app)
         .cache_dir
         .map(PathBuf::from)
-        .or_else(|| app.path().app_cache_dir().ok())?;
-    Some(base.join("store"))
+        .filter(|path| path.is_dir())
+}
+
+fn get_store_dir(app: &AppHandle) -> PathBuf {
+    if let Some(base) = get_configured_cache_dir(app) {
+        let store_dir = base.join("store");
+        if store_dir.exists() || fs::create_dir_all(&store_dir).is_ok() {
+            return store_dir;
+        }
+    }
+
+    default_cache_dir(app).join("store")
 }
 
 fn load_from_disk(app: &AppHandle) -> Config {
@@ -66,7 +81,7 @@ pub fn save_config(app: &AppHandle, config: &Config) -> Result<(), String> {
 
 #[tauri::command]
 pub fn read_store_data(app: AppHandle, key: String) -> Option<String> {
-    let store_dir = get_store_dir(&app)?;
+    let store_dir = get_store_dir(&app);
     let file_path = store_dir.join(format!("{key}.json"));
 
     if file_path.exists() {
@@ -78,7 +93,7 @@ pub fn read_store_data(app: AppHandle, key: String) -> Option<String> {
 
 #[tauri::command]
 pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(), String> {
-    let store_dir = get_store_dir(&app).ok_or("Cache directory not configured")?;
+    let store_dir = get_store_dir(&app);
 
     // Ensure store directory exists
     if !store_dir.exists() {
@@ -97,10 +112,7 @@ pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(),
 
 #[tauri::command]
 pub fn remove_store_data(app: AppHandle, key: String) -> Result<(), String> {
-    let Some(store_dir) = get_store_dir(&app) else {
-        return Ok(());
-    };
-
+    let store_dir = get_store_dir(&app);
     let file_path = store_dir.join(format!("{key}.json"));
     if file_path.exists() {
         fs::remove_file(file_path).map_err(|e| e.to_string())?;

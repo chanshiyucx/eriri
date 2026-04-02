@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { Image } from '@/types/library'
 
 const DEFAULT_OVERSCAN_VIEWPORTS = 2
@@ -245,6 +238,7 @@ export function useComicStrip({
   const pendingScrollOffsetRef = useRef(0)
   const currentIndexRef = useRef(initialIndex)
   const visibleRangeRef = useRef<VisibleRange>({ start: 0, end: 0 })
+  const layoutRef = useRef<ComicStripLayout | null>(null)
   const onCurrentIndexChangeRef =
     useRef<UseComicStripOptions['onCurrentIndexChange']>(onCurrentIndexChange)
 
@@ -265,14 +259,21 @@ export function useComicStrip({
         containerSize.height,
         orientation,
       ),
-    [images, containerSize.height, containerSize.width, orientation],
+    [containerSize.height, containerSize.width, images, orientation],
   )
+  const layoutRestoreKey = `${containerSize.width}x${containerSize.height}:${orientation}:${images
+    .map((image) => `${image.width}x${image.height}`)
+    .join('|')}`
 
   useEffect(() => {
     onCurrentIndexChangeRef.current = onCurrentIndexChange
   }, [onCurrentIndexChange])
 
-  const flushScrollState = useCallback(() => {
+  useEffect(() => {
+    layoutRef.current = layout
+  }, [layout])
+
+  const flushScrollState = () => {
     frameRef.current = null
     const scrollOffset = pendingScrollOffsetRef.current
     if (!layout) return
@@ -293,60 +294,57 @@ export function useComicStrip({
       visibleRangeRef.current = nextRange
       setVisibleRange(nextRange)
     }
-  }, [layout, maxRenderedPages, overscanViewports])
+  }
 
-  const onScroll = useCallback(() => {
+  const onScroll = () => {
     const container = containerRef.current
     if (!container) return
     const scrollOffset = getScrollOffset(container, orientation)
     pendingScrollOffsetRef.current = scrollOffset
     if (frameRef.current !== null) return
     frameRef.current = requestAnimationFrame(flushScrollState)
-  }, [orientation, flushScrollState])
+  }
 
-  const jumpTo = useCallback(
-    (targetIndex?: number) => {
-      if (!images.length) return
+  const jumpTo = (targetIndex?: number) => {
+    if (!images.length) return
 
-      const nextIndex = clamp(
-        targetIndex ?? currentIndexRef.current,
-        0,
-        images.length - 1,
-      )
-      currentIndexRef.current = nextIndex
+    const nextIndex = clamp(
+      targetIndex ?? currentIndexRef.current,
+      0,
+      images.length - 1,
+    )
+    currentIndexRef.current = nextIndex
 
-      const container = containerRef.current
-      if (!container || !layout) {
-        pendingJumpRef.current = nextIndex
-        return
-      }
+    const container = containerRef.current
+    if (!container || !layout) {
+      pendingJumpRef.current = nextIndex
+      return
+    }
 
-      const page = layout.pages[nextIndex]
-      const viewportSize = layout.viewportSize
-      const targetOffset = clamp(
-        page.start - (viewportSize - page.size) / 2,
-        0,
-        Math.max(0, layout.totalSize - viewportSize),
-      )
+    const page = layout.pages[nextIndex]
+    const viewportSize = layout.viewportSize
+    const targetOffset = clamp(
+      page.start - (viewportSize - page.size) / 2,
+      0,
+      Math.max(0, layout.totalSize - viewportSize),
+    )
 
-      pendingJumpRef.current = null
-      if (orientation === 'horizontal') {
-        container.scrollLeft = targetOffset
-      } else {
-        container.scrollTop = targetOffset
-      }
+    pendingJumpRef.current = null
+    if (orientation === 'horizontal') {
+      container.scrollLeft = targetOffset
+    } else {
+      container.scrollTop = targetOffset
+    }
 
-      const nextRange = getVisibleRange(
-        layout,
-        targetOffset,
-        overscanViewports,
-        maxRenderedPages,
-      )
-      visibleRangeRef.current = nextRange
-      setVisibleRange(nextRange)
-    },
-    [images.length, layout, maxRenderedPages, orientation, overscanViewports],
-  )
+    const nextRange = getVisibleRange(
+      layout,
+      targetOffset,
+      overscanViewports,
+      maxRenderedPages,
+    )
+    visibleRangeRef.current = nextRange
+    setVisibleRange(nextRange)
+  }
 
   useLayoutEffect(() => {
     const container = containerRef.current
@@ -378,11 +376,53 @@ export function useComicStrip({
       return
     }
 
-    if (!layout) return
+    const currentLayout = layoutRef.current
+    if (!currentLayout) return
 
     const targetIndex = pendingJumpRef.current ?? currentIndexRef.current
-    jumpTo(targetIndex)
-  }, [images.length, jumpTo, layout])
+    const nextIndex = clamp(targetIndex, 0, images.length - 1)
+    currentIndexRef.current = nextIndex
+
+    const container = containerRef.current
+    if (!container) {
+      pendingJumpRef.current = nextIndex
+      return
+    }
+
+    const page = currentLayout.pages[nextIndex]
+    const viewportSize = currentLayout.viewportSize
+    const targetOffset = clamp(
+      page.start - (viewportSize - page.size) / 2,
+      0,
+      Math.max(0, currentLayout.totalSize - viewportSize),
+    )
+
+    pendingJumpRef.current = null
+    if (orientation === 'horizontal') {
+      container.scrollLeft = targetOffset
+    } else {
+      container.scrollTop = targetOffset
+    }
+
+    const nextRange = getVisibleRange(
+      currentLayout,
+      targetOffset,
+      overscanViewports,
+      maxRenderedPages,
+    )
+    visibleRangeRef.current = nextRange
+    setVisibleRange((prev) =>
+      prev.start === nextRange.start && prev.end === nextRange.end
+        ? prev
+        : nextRange,
+    )
+  }, [
+    images.length,
+    layoutRestoreKey,
+    maxRenderedPages,
+    orientation,
+    overscanViewports,
+  ])
 
   useEffect(
     () => () => {
