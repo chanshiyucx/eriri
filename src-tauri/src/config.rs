@@ -84,10 +84,10 @@ pub fn save_config(app: &AppHandle, config: &Config) -> Result<(), String> {
         fs::write(config_path, content).map_err(|e| e.to_string())?;
 
         // Update in-memory state
-        if let Some(state) = app.try_state::<ConfigState>() {
-            if let Ok(mut state_config) = state.0.lock() {
-                *state_config = config.clone();
-            }
+        if let Some(state) = app.try_state::<ConfigState>()
+            && let Ok(mut state_config) = state.0.lock()
+        {
+            *state_config = config.clone();
         }
 
         Ok(())

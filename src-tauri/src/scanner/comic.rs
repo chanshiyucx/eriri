@@ -11,8 +11,8 @@ use turbojpeg::Decompressor;
 use crate::models::{Comic, ComicImage};
 use crate::tags::get_file_tags;
 use crate::thumbnail::{
-    add_stat, convert_file_src, find_cover_image, get_thumbnail_dir, get_thumbnail_hash,
-    is_image_file, process_and_get_dimensions, THUMB_FALLBACK_HEIGHT, THUMB_WIDTH,
+    THUMB_FALLBACK_HEIGHT, THUMB_WIDTH, add_stat, convert_file_src, find_cover_image,
+    get_thumbnail_dir, get_thumbnail_hash, is_image_file, process_and_get_dimensions,
 };
 
 use super::utils::{current_time_millis, generate_uuid, get_created_time, is_hidden};
@@ -65,20 +65,18 @@ pub fn scan_comic_library(
                         let hash = get_thumbnail_hash(&cover_meta);
                         let thumb_path = thumb_dir.join(format!("{hash}.jpg"));
 
-                        if !thumb_path.exists() {
-                            if let Some(decompressor) = decompressor_opt.as_mut() {
-                                if let Ok((_, _, file_size)) = process_and_get_dimensions(
-                                    &cover_path,
-                                    &thumb_path,
-                                    decompressor,
-                                    resizer,
-                                ) {
-                                    if file_size > 0 {
-                                        new_count.fetch_add(1, Ordering::Relaxed);
-                                        new_bytes.fetch_add(file_size, Ordering::Relaxed);
-                                    }
-                                }
-                            }
+                        if !thumb_path.exists()
+                            && let Some(decompressor) = decompressor_opt.as_mut()
+                            && let Ok((_, _, file_size)) = process_and_get_dimensions(
+                                &cover_path,
+                                &thumb_path,
+                                decompressor,
+                                resizer,
+                            )
+                            && file_size > 0
+                        {
+                            new_count.fetch_add(1, Ordering::Relaxed);
+                            new_bytes.fetch_add(file_size, Ordering::Relaxed);
                         }
 
                         if thumb_path.exists() {

@@ -3,10 +3,10 @@
 //! Uses `objc2` bindings to macOS Foundation framework to create and resolve
 //! security-scoped bookmarks directly in the main process.
 
-use base64::{engine::general_purpose::STANDARD, Engine};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use objc2::runtime::Bool;
 use objc2_foundation::{
-    NSData, NSString, NSURLBookmarkCreationOptions, NSURLBookmarkResolutionOptions, NSURL,
+    NSData, NSString, NSURL, NSURLBookmarkCreationOptions, NSURLBookmarkResolutionOptions,
 };
 use std::path::Path;
 use tauri::{AppHandle, Manager, Runtime};
