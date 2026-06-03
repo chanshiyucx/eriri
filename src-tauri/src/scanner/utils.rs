@@ -1,6 +1,6 @@
-use once_cell::sync::Lazy;
 use std::fs;
 use std::path::Path;
+use std::sync::LazyLock;
 use std::time::SystemTime;
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
@@ -10,8 +10,8 @@ use uuid::Uuid;
 pub const BOOK_EXTENSIONS: &[&str] = &["txt"];
 
 const NAMESPACE_STR: &str = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
-static NAMESPACE_UUID: Lazy<Uuid> =
-    Lazy::new(|| Uuid::parse_str(NAMESPACE_STR).expect("Invalid namespace UUID constant"));
+static NAMESPACE_UUID: LazyLock<Uuid> =
+    LazyLock::new(|| Uuid::parse_str(NAMESPACE_STR).expect("Invalid namespace UUID constant"));
 
 pub fn is_hidden(path: &Path) -> bool {
     path.file_name()
@@ -80,21 +80,21 @@ pub fn get_library_type(library_path: &str) -> Result<String, String> {
             continue;
         }
 
-        if entry_path.is_dir() {
-            if let Ok(sub_entries) = fs::read_dir(&entry_path) {
-                for sub_entry in sub_entries.flatten() {
-                    let p = sub_entry.path();
-                    if is_hidden(&p) {
-                        continue;
-                    }
-
-                    if is_book_file(&p) {
-                        info!(path = %library_path, "Detected book library");
-                        return Ok("book".to_string());
-                    }
-                    info!(path = %library_path, "Detected comic library");
-                    return Ok("comic".to_string());
+        if entry_path.is_dir()
+            && let Ok(sub_entries) = fs::read_dir(&entry_path)
+        {
+            for sub_entry in sub_entries.flatten() {
+                let p = sub_entry.path();
+                if is_hidden(&p) {
+                    continue;
                 }
+
+                if is_book_file(&p) {
+                    info!(path = %library_path, "Detected book library");
+                    return Ok("book".to_string());
+                }
+                info!(path = %library_path, "Detected comic library");
+                return Ok("comic".to_string());
             }
         }
     }

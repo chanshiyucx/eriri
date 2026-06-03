@@ -72,12 +72,12 @@ pub fn get_file_tags(path: &Path) -> (bool, bool) {
 
 pub fn set_file_tag_impl(path: &Path, tags: FileTags) -> Result<(), Box<dyn std::error::Error>> {
     let mut tags_list = Vec::new();
-    if let Ok(Some(value)) = xattr::get(path, TAG_KEY) {
-        if let Ok(plist::Value::Array(existing_tags)) = plist::from_bytes(&value) {
-            for tag in existing_tags {
-                if let Some(s) = tag.as_string() {
-                    tags_list.push(s.to_string());
-                }
+    if let Ok(Some(value)) = xattr::get(path, TAG_KEY)
+        && let Ok(plist::Value::Array(existing_tags)) = plist::from_bytes(&value)
+    {
+        for tag in existing_tags {
+            if let Some(s) = tag.as_string() {
+                tags_list.push(s.to_string());
             }
         }
     }
@@ -97,11 +97,11 @@ pub fn set_file_tag_impl(path: &Path, tags: FileTags) -> Result<(), Box<dyn std:
     value.to_writer_xml(&mut buf)?;
     xattr::set(path, TAG_KEY, &buf)?;
 
-    if let Ok(Some(mut data)) = xattr::get(path, FINDER_INFO_KEY) {
-        if data.len() >= 32 {
-            data[9] &= !0x0E;
-            xattr::set(path, FINDER_INFO_KEY, &data)?;
-        }
+    if let Ok(Some(mut data)) = xattr::get(path, FINDER_INFO_KEY)
+        && data.len() >= 32
+    {
+        data[9] &= !0x0E;
+        xattr::set(path, FINDER_INFO_KEY, &data)?;
     }
 
     Ok(())

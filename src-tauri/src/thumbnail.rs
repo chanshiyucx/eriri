@@ -53,11 +53,11 @@ fn get_stats(app: &AppHandle) -> ThumbnailStats {
 }
 
 fn update_stats(app: &AppHandle, f: impl FnOnce(&mut ThumbnailStats)) {
-    if let Some(state) = app.try_state::<ThumbnailStatsState>() {
-        if let Ok(mut stats) = state.0.lock() {
-            f(&mut stats);
-            save_stats_to_disk(app, &stats);
-        }
+    if let Some(state) = app.try_state::<ThumbnailStatsState>()
+        && let Ok(mut stats) = state.0.lock()
+    {
+        f(&mut stats);
+        save_stats_to_disk(app, &stats);
     }
 }
 
@@ -143,10 +143,10 @@ pub fn process_and_get_dimensions(
     resizer: &mut fr::Resizer,
 ) -> Result<(u32, u32, u64), Box<dyn std::error::Error>> {
     // Return early if thumbnail already exists
-    if thumb_path.exists() {
-        if let Ok((w, h)) = get_image_dimensions_fast(source_path) {
-            return Ok((w, h, 0));
-        }
+    if thumb_path.exists()
+        && let Ok((w, h)) = get_image_dimensions_fast(source_path)
+    {
+        return Ok((w, h, 0));
     }
 
     let file = File::open(source_path)?;
@@ -291,16 +291,15 @@ pub fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
                     }
 
                     // On first image, check if _p0 variant exists
-                    if scanned_count == 1 {
-                        if let Some((prefix, _page_num)) = stem.rsplit_once("_p") {
-                            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                                let p0_name = format!("{prefix}_p0.{ext}");
-                                let p0_path = folder_path.join(p0_name);
+                    if scanned_count == 1
+                        && let Some((prefix, _page_num)) = stem.rsplit_once("_p")
+                        && let Some(ext) = path.extension().and_then(|e| e.to_str())
+                    {
+                        let p0_name = format!("{prefix}_p0.{ext}");
+                        let p0_path = folder_path.join(p0_name);
 
-                                if p0_path.exists() {
-                                    return Some(p0_path);
-                                }
-                            }
+                        if p0_path.exists() {
+                            return Some(p0_path);
                         }
                     }
                 }
@@ -334,11 +333,11 @@ fn scan_thumbnail_stats(thumb_dir: &Path) -> ThumbnailStats {
 
     if let Ok(entries) = fs::read_dir(thumb_dir) {
         for entry in entries.flatten() {
-            if let Ok(metadata) = entry.metadata() {
-                if metadata.is_file() {
-                    stats.count += 1;
-                    stats.size = stats.size.saturating_add(metadata.len());
-                }
+            if let Ok(metadata) = entry.metadata()
+                && metadata.is_file()
+            {
+                stats.count += 1;
+                stats.size = stats.size.saturating_add(metadata.len());
             }
         }
     }

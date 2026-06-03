@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "eriri",
+        "title": "Eriri",
         "width": 800,
         "height": 600
       }
@@ -21,7 +21,7 @@
       "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost blob: data:",
       "assetProtocol": {
         "enable": true,
-        "scope": ["$APPCACHE/**/*", "$APPDATA/**/*", "$RESOURCE/**/*"]
+        "scope": ["$APPCACHE/**/*", "$APPDATA/**/*"]
       }
     }
   },
