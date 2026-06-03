@@ -5,7 +5,7 @@
 <h1 align="center">eriri</h1>
 
 <p align="center">
-  <strong>A lovely, high-performance digital library for your favorite comics, books, and videos.</strong>
+  <strong>A lovely, high-performance digital library for your favorite comics and books.</strong>
 </p>
 
 ## 🛠️ Tech Stack
@@ -54,7 +54,6 @@ pnpm tauri build --bundles app
 
 - `src/`: React frontend source code.
 - `src-tauri/`: Rust backend and Tauri configuration.
-- `src-tauri/swift/`: Native Swift components for macOS.
 - `public/`: Static assets.
 
 ## 📜 License

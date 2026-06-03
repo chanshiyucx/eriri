@@ -20,7 +20,12 @@ fn has_tag(tags_list: &[String], tag_name: &str) -> bool {
         .any(|t| get_tag_name(t).eq_ignore_ascii_case(tag_name))
 }
 
-fn update_tag(tags_list: &mut Vec<String>, tag_name: &str, tag_value: &str, should_have: Option<bool>) {
+fn update_tag(
+    tags_list: &mut Vec<String>,
+    tag_name: &str,
+    tag_value: &str,
+    should_have: Option<bool>,
+) {
     let Some(should_have) = should_have else {
         return;
     };
@@ -78,7 +83,12 @@ pub fn set_file_tag_impl(path: &Path, tags: FileTags) -> Result<(), Box<dyn std:
     }
 
     update_tag(&mut tags_list, STAR_TAG_NAME, STAR_TAG_VALUE, tags.starred);
-    update_tag(&mut tags_list, DELETE_TAG_NAME, DELETE_TAG_VALUE, tags.deleted);
+    update_tag(
+        &mut tags_list,
+        DELETE_TAG_NAME,
+        DELETE_TAG_VALUE,
+        tags.deleted,
+    );
 
     let plist_tags: Vec<plist::Value> = tags_list.into_iter().map(plist::Value::String).collect();
     let value = plist::Value::Array(plist_tags);

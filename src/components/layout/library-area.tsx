@@ -2,7 +2,6 @@ import { useLibraryStore } from '@/store/library'
 import { LibraryType } from '@/types/library'
 import { BookLibrary } from './book-library'
 import { ComicLibrary } from './comic-library'
-import { VideoLibrary } from './video-library'
 
 export function LibraryArea() {
   const selectedLibrary = useLibraryStore((s) =>
@@ -18,10 +17,8 @@ export function LibraryArea() {
     >
       {selectedLibrary.type === LibraryType.book ? (
         <BookLibrary selectedLibrary={selectedLibrary} />
-      ) : selectedLibrary.type === LibraryType.comic ? (
-        <ComicLibrary selectedLibrary={selectedLibrary} />
       ) : (
-        <VideoLibrary selectedLibrary={selectedLibrary} />
+        <ComicLibrary selectedLibrary={selectedLibrary} />
       )}
     </main>
   )

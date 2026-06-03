@@ -1,6 +1,5 @@
 import { BookReader } from '@/components/layout/book-reader'
 import { ComicReader } from '@/components/layout/comic-reader'
-import { VideoPlayer } from '@/components/layout/video-player'
 import { cn } from '@/lib/style'
 import { useTabsStore, type Tab } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
@@ -25,10 +24,8 @@ function TabContent({ tab, isActive, isImmersive }: TabContentProps) {
     >
       {type === LibraryType.book ? (
         <BookReader bookId={id} />
-      ) : type === LibraryType.comic ? (
-        <ComicReader comicId={id} />
       ) : (
-        <VideoPlayer videoId={id} />
+        <ComicReader comicId={id} />
       )}
     </div>
   )

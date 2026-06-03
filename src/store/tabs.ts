@@ -5,6 +5,7 @@ import { createTauriFileStorage } from '@/lib/storage'
 import { LibraryType } from '@/types/library'
 
 const tabsStorage = createTauriFileStorage('tabs')
+const REMOVED_LIBRARY_TYPE = 'video'
 
 export interface Tab {
   type: LibraryType
@@ -19,6 +20,33 @@ interface TabsState {
   removeTab: (tabId: string) => void
   setActiveTab: (tabId: string) => void
   clearAllTabs: () => void
+}
+
+type LegacyTab = Omit<Tab, 'type'> & {
+  type: Tab['type'] | typeof REMOVED_LIBRARY_TYPE
+}
+
+type LegacyTabsState = Omit<Partial<TabsState>, 'tabs'> & {
+  tabs?: LegacyTab[]
+}
+
+function migrateTabsState(persistedState: unknown) {
+  if (!persistedState || typeof persistedState !== 'object') {
+    return persistedState
+  }
+
+  const state = persistedState as LegacyTabsState
+  const tabs = state.tabs?.filter((tab) => tab.type !== REMOVED_LIBRARY_TYPE)
+
+  if (tabs) {
+    state.tabs = tabs
+  }
+
+  if (state.activeTab && !tabs?.some((tab) => tab.id === state.activeTab)) {
+    state.activeTab = tabs?.[0]?.id ?? ''
+  }
+
+  return state
 }
 
 export const useTabsStore = create<TabsState>()(
@@ -59,6 +87,8 @@ export const useTabsStore = create<TabsState>()(
     {
       name: 'tabs',
       storage: createJSONStorage(() => tabsStorage),
+      version: 1,
+      migrate: migrateTabsState,
     },
   ),
 )
