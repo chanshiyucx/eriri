@@ -9,7 +9,6 @@ use std::io::{BufReader, BufWriter};
 use std::num::NonZeroU32;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Mutex;
 use std::time::SystemTime;
 use tauri::{AppHandle, Manager};
@@ -38,8 +37,13 @@ fn save_stats_to_disk(app: &AppHandle, stats: &ThumbnailStats) {
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let stats = load_stats_from_disk(app.handle());
     app.manage(ThumbnailStatsState(Mutex::new(stats)));
-    let _ = get_thumbnail_dir(app.handle());
+    allow_thumbnail_asset_scope(app.handle());
     Ok(())
+}
+
+fn allow_thumbnail_asset_scope(app: &AppHandle) {
+    let thumb_dir = get_thumbnail_dir(app);
+    let _ = app.asset_protocol_scope().allow_directory(&thumb_dir, true);
 }
 
 fn get_stats(app: &AppHandle) -> ThumbnailStats {
@@ -59,15 +63,8 @@ fn update_stats(app: &AppHandle, f: impl FnOnce(&mut ThumbnailStats)) {
 
 pub fn add_stat(app: &AppHandle, count: usize, size: u64) {
     update_stats(app, |stats| {
-        stats.count += count;
-        stats.size += size;
-    });
-}
-
-pub fn remove_stat(app: &AppHandle, count: usize, size: u64) {
-    update_stats(app, |stats| {
-        stats.count = stats.count.saturating_sub(count);
-        stats.size = stats.size.saturating_sub(size);
+        stats.count = stats.count.saturating_add(count);
+        stats.size = stats.size.saturating_add(size);
     });
 }
 
@@ -153,6 +150,7 @@ pub fn process_and_get_dimensions(
     }
 
     let file = File::open(source_path)?;
+    // SAFETY: the mapping is read-only and lives no longer than the open file handle.
     let mmap = unsafe { Mmap::map(&file)? };
 
     if is_jpeg(&mmap) {
@@ -223,7 +221,7 @@ fn resize_and_save(
     resizer: &mut fr::Resizer,
 ) -> Result<(u32, u32, u64), Box<dyn std::error::Error>> {
     let target_width = THUMB_WIDTH;
-    let target_height = (orig_h as f64 * (target_width as f64 / orig_w as f64)) as u32;
+    let target_height = (orig_h as f64 * (target_width as f64 / orig_w as f64)).max(1.0) as u32;
 
     let src_width = NonZeroU32::new(src_w).ok_or("Src width is 0")?;
     let src_height = NonZeroU32::new(src_h).ok_or("Src height is 0")?;
@@ -326,37 +324,39 @@ pub fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
     fallback_first_path
 }
 
-pub fn generate_video_thumbnail(
-    input_path: &Path,
-    output_path: &Path,
-    sidecar_executable: &Path,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let output = Command::new(sidecar_executable)
-        .arg(input_path.to_str().ok_or("Invalid input path")?)
-        .arg(output_path.to_str().ok_or("Invalid output path")?)
-        .output()?;
-
-    if output.status.success() {
-        Ok(())
-    } else {
-        let err = String::from_utf8_lossy(&output.stderr);
-        Err(format!("Thumb gen failed: {err}").into())
-    }
-}
-
 pub fn convert_file_src(path: &str) -> String {
     let encoded_path = utf8_percent_encode(path, &ENCODE_SET).to_string();
     format!("asset://localhost/{encoded_path}")
 }
 
-#[tauri::command]
-pub async fn clean_thumbnail_cache(
+fn scan_thumbnail_stats(thumb_dir: &Path) -> ThumbnailStats {
+    let mut stats = ThumbnailStats::default();
+
+    if let Ok(entries) = fs::read_dir(thumb_dir) {
+        for entry in entries.flatten() {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_file() {
+                    stats.count += 1;
+                    stats.size = stats.size.saturating_add(metadata.len());
+                }
+            }
+        }
+    }
+
+    stats
+}
+
+#[tauri::command(async)]
+pub fn clean_thumbnail_cache(
     app: AppHandle,
     days_old: Option<u64>,
     max_size_mb: Option<u64>,
 ) -> Result<(usize, u64), String> {
     let days = days_old.unwrap_or(30);
-    let max_size = max_size_mb.unwrap_or(1024) * 1024 * 1024;
+    let max_size = max_size_mb
+        .unwrap_or(1024)
+        .saturating_mul(1024)
+        .saturating_mul(1024);
 
     let thumb_dir = get_thumbnail_dir(&app);
 
@@ -369,15 +369,10 @@ pub async fn clean_thumbnail_cache(
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_err(|e| e.to_string())?
         .as_secs()
-        .saturating_sub(days * 24 * 60 * 60);
+        .saturating_sub(days.saturating_mul(24 * 60 * 60));
 
     let mut deleted_count = 0;
     let mut freed_bytes = 0u64;
-
-    // Track pending stats updates to batch writes
-    let mut pending_delete_count = 0;
-    let mut pending_freed_bytes = 0;
-    const BATCH_SIZE: usize = 1000;
 
     struct CacheFile {
         path: PathBuf,
@@ -406,9 +401,6 @@ pub async fn clean_thumbnail_cache(
                     if fs::remove_file(entry.path()).is_ok() {
                         freed_bytes += size;
                         deleted_count += 1;
-
-                        pending_delete_count += 1;
-                        pending_freed_bytes += size;
                     }
                 } else {
                     valid_files.push(CacheFile {
@@ -421,9 +413,9 @@ pub async fn clean_thumbnail_cache(
         }
     }
 
-    // Use cached stats minus freed bytes for current size estimation
-    let cached_stats = get_stats(&app);
-    let mut current_total_size = cached_stats.size.saturating_sub(freed_bytes);
+    let mut current_total_size = valid_files
+        .iter()
+        .fold(0u64, |total, file| total.saturating_add(file.size));
 
     // If still over size limit, batch delete oldest files
     if current_total_size > max_size {
@@ -439,25 +431,12 @@ pub async fn clean_thumbnail_cache(
                 freed_bytes += file.size;
                 deleted_count += 1;
                 current_total_size = current_total_size.saturating_sub(file.size);
-
-                // Update batch trackers
-                pending_delete_count += 1;
-                pending_freed_bytes += file.size;
-            }
-
-            // Batch update stats to disk if threshold reached
-            if pending_delete_count >= BATCH_SIZE {
-                remove_stat(&app, pending_delete_count, pending_freed_bytes);
-                pending_delete_count = 0;
-                pending_freed_bytes = 0;
             }
         }
     }
 
-    // Final batch update for any remaining deletions
-    if pending_delete_count > 0 {
-        remove_stat(&app, pending_delete_count, pending_freed_bytes);
-    }
+    let scanned_stats = scan_thumbnail_stats(&thumb_dir);
+    update_stats(&app, |stats| *stats = scanned_stats);
 
     info!(
         deleted = deleted_count,
@@ -468,7 +447,7 @@ pub async fn clean_thumbnail_cache(
     Ok((deleted_count, freed_bytes))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_thumbnail_stats(app: AppHandle, rescan: bool) -> Result<(usize, u64), String> {
     let thumb_dir = get_thumbnail_dir(&app);
 
@@ -484,26 +463,12 @@ pub fn get_thumbnail_stats(app: AppHandle, rescan: bool) -> Result<(usize, u64),
         }
     }
 
-    // Scan directory
-    let mut count = 0;
-    let mut total_size = 0u64;
-
-    if let Ok(entries) = fs::read_dir(&thumb_dir) {
-        for entry in entries.flatten() {
-            if let Ok(metadata) = entry.metadata() {
-                if metadata.is_file() {
-                    count += 1;
-                    total_size += metadata.len();
-                }
-            }
-        }
-    }
+    let scanned_stats = scan_thumbnail_stats(&thumb_dir);
+    let count = scanned_stats.count;
+    let total_size = scanned_stats.size;
 
     // Update cache and persist
-    update_stats(&app, |stats| {
-        stats.count = count;
-        stats.size = total_size;
-    });
+    update_stats(&app, |stats| *stats = scanned_stats);
 
     Ok((count, total_size))
 }
@@ -519,5 +484,7 @@ pub fn set_cache_dir(app: AppHandle, path: String) -> Result<(), String> {
     config.cache_dir = Some(path);
     config::save_config(&app, &config)?;
     let thumb_dir = get_thumbnail_dir(&app);
-    fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())
+    fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
+    allow_thumbnail_asset_scope(&app);
+    Ok(())
 }

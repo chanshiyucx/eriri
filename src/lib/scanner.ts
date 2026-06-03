@@ -6,7 +6,6 @@ import {
   type Comic,
   type Image,
   type ImageCache,
-  type Video,
 } from '@/types/library'
 
 export async function createBookmark(path: string): Promise<string | null> {
@@ -93,21 +92,6 @@ export async function scanComicLibrary(
     })
   } catch (error) {
     console.error('Failed to scan comic library:', error)
-    return []
-  }
-}
-
-export async function scanVideoLibrary(
-  libraryPath: string,
-  libraryId: string,
-): Promise<Video[]> {
-  try {
-    return await invoke<Video[]>('scan_video_library', {
-      libraryPath,
-      libraryId,
-    })
-  } catch (error) {
-    console.error('Failed to scan video library:', error)
     return []
   }
 }

@@ -7,7 +7,6 @@ use tauri_plugin_opener::OpenerExt;
 use tracing::info;
 use uuid::Uuid;
 
-pub const VIDEO_EXTENSIONS: &[&str] = &["mp4"];
 pub const BOOK_EXTENSIONS: &[&str] = &["txt"];
 
 const NAMESPACE_STR: &str = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
@@ -23,13 +22,11 @@ pub fn is_hidden(path: &Path) -> bool {
 pub fn is_book_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext_str| BOOK_EXTENSIONS.iter().any(|&x| x.eq_ignore_ascii_case(ext_str)))
-}
-
-pub fn is_video_file(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .is_some_and(|ext_str| VIDEO_EXTENSIONS.iter().any(|&x| x.eq_ignore_ascii_case(ext_str)))
+        .is_some_and(|ext_str| {
+            BOOK_EXTENSIONS
+                .iter()
+                .any(|&x| x.eq_ignore_ascii_case(ext_str))
+        })
 }
 
 pub fn remove_extension(filename: &str) -> String {
@@ -72,7 +69,7 @@ pub fn generate_uuid_command(input: &str) -> String {
     generate_uuid(input)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn get_library_type(library_path: &str) -> Result<String, String> {
     let path = Path::new(library_path);
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
@@ -81,11 +78,6 @@ pub fn get_library_type(library_path: &str) -> Result<String, String> {
         let entry_path = entry.path();
         if is_hidden(&entry_path) {
             continue;
-        }
-
-        if entry_path.is_file() && is_video_file(&entry_path) {
-            info!(path = %library_path, "Detected video library");
-            return Ok("video".to_string());
         }
 
         if entry_path.is_dir() {

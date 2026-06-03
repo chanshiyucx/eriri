@@ -9,7 +9,6 @@ import {
   scanBookLibrary,
   scanComicImages,
   scanComicLibrary,
-  scanVideoLibrary,
   setFileTag,
 } from '@/lib/scanner'
 import { createTauriFileStorage } from '@/lib/storage'
@@ -25,12 +24,12 @@ import {
   type Image,
   type Library,
   type ScannedLibrary,
-  type Video,
 } from '@/types/library'
 
 const libraryStorage = createTauriFileStorage('library')
 
 const MAX_CACHE_SIZE = 30
+const REMOVED_LIBRARY_TYPE = 'video'
 
 interface LibraryState {
   isScanning: boolean
@@ -38,10 +37,8 @@ interface LibraryState {
   comics: Record<string, Comic>
   authors: Record<string, Author>
   books: Record<string, Book>
-  videos: Record<string, Video>
   libraryComics: Record<string, string[]>
   libraryAuthors: Record<string, string[]>
-  libraryVideos: Record<string, string[]>
   authorBooks: Record<string, string[]>
   comicImages: Record<string, ComicImage>
   addLibrary: (library: Library, scannedLibrary: ScannedLibrary) => void
@@ -61,12 +58,52 @@ interface LibraryState {
   removeComicImages: (comicId: string) => void
   updateBookTags: (bookId: string, tags: FileTags) => Promise<void>
   updateComicTags: (comicId: string, tags: FileTags) => Promise<void>
-  updateVideoTags: (videoId: string, tags: FileTags) => Promise<void>
   updateComicImageTags: (
     comicId: string,
     filename: string,
     tags: FileTags,
   ) => Promise<void>
+}
+
+type LegacyLibrary = Omit<Library, 'status' | 'type'> & {
+  type: Library['type'] | typeof REMOVED_LIBRARY_TYPE
+  status: Library['status'] & {
+    videoId?: string
+  }
+}
+
+type LegacyLibraryState = Omit<
+  Partial<LibraryState>,
+  'libraries' | 'libraryVideos' | 'videos'
+> & {
+  libraries?: Record<string, LegacyLibrary>
+  videos?: unknown
+  libraryVideos?: unknown
+}
+
+function migrateLibraryState(persistedState: unknown) {
+  if (!persistedState || typeof persistedState !== 'object') {
+    return persistedState
+  }
+
+  const state = persistedState as LegacyLibraryState
+
+  if (state.libraries) {
+    state.libraries = Object.fromEntries(
+      Object.entries(state.libraries)
+        .filter(([, library]) => library.type !== REMOVED_LIBRARY_TYPE)
+        .map(([id, library]) => {
+          const status = { ...library.status }
+          delete status.videoId
+          return [id, { ...library, status }]
+        }),
+    )
+  }
+
+  delete state.videos
+  delete state.libraryVideos
+
+  return state
 }
 
 /**
@@ -77,18 +114,12 @@ function applyScannedLibrary(
   libraryId: string,
   scannedLibrary: ScannedLibrary,
 ) {
-  const { comics = [], authors = [], videos = [] } = scannedLibrary
+  const { comics = [], authors = [] } = scannedLibrary
 
   // Apply comics
   state.libraryComics[libraryId] = comics.map((c) => {
     state.comics[c.id] = c
     return c.id
-  })
-
-  // Apply videos
-  state.libraryVideos[libraryId] = videos.map((v) => {
-    state.videos[v.id] = v
-    return v.id
   })
 
   // Apply authors and their books
@@ -111,10 +142,8 @@ export const useLibraryStore = create<LibraryState>()(
       comics: {},
       authors: {},
       books: {},
-      videos: {},
       libraryComics: {},
       libraryAuthors: {},
-      libraryVideos: {},
       authorBooks: {},
       comicImages: {},
       selectedLibraryId: null,
@@ -140,7 +169,6 @@ export const useLibraryStore = create<LibraryState>()(
         set((state) => {
           const comicIds = state.libraryComics[id] ?? []
           const authorIds = state.libraryAuthors[id] ?? []
-          const videoIds = state.libraryVideos[id] ?? []
           const bookIds = authorIds.flatMap(
             (aId) => state.authorBooks[aId] ?? [],
           )
@@ -169,13 +197,8 @@ export const useLibraryStore = create<LibraryState>()(
             progressStore.removeBookProgress(bId)
           }
 
-          for (const vId of videoIds) {
-            delete state.videos[vId]
-          }
-
           delete state.libraryComics[id]
           delete state.libraryAuthors[id]
-          delete state.libraryVideos[id]
           delete state.libraries[id]
 
           tabsToRemove.forEach((t) => tabsStore.removeTab(t.id))
@@ -209,7 +232,6 @@ export const useLibraryStore = create<LibraryState>()(
             comicId: '',
             authorId: '',
             bookId: '',
-            videoId: '',
           },
         }
 
@@ -217,8 +239,6 @@ export const useLibraryStore = create<LibraryState>()(
         const scannedLibrary: ScannedLibrary = {}
         if (type === LibraryType.book) {
           scannedLibrary.authors = await scanBookLibrary(path, libraryId)
-        } else if (type === LibraryType.video) {
-          scannedLibrary.videos = await scanVideoLibrary(path, libraryId)
         } else {
           scannedLibrary.comics = await scanComicLibrary(path, libraryId)
         }
@@ -234,8 +254,6 @@ export const useLibraryStore = create<LibraryState>()(
         const scannedLibrary: ScannedLibrary = {}
         if (lib.type === LibraryType.book) {
           scannedLibrary.authors = await scanBookLibrary(lib.path, lib.id)
-        } else if (lib.type === LibraryType.video) {
-          scannedLibrary.videos = await scanVideoLibrary(lib.path, lib.id)
         } else {
           scannedLibrary.comics = await scanComicLibrary(lib.path, lib.id)
           const comicIds = scannedLibrary.comics?.map((c) => c.id) ?? []
@@ -286,22 +304,6 @@ export const useLibraryStore = create<LibraryState>()(
             if (c) {
               if (tags.starred !== undefined) c.starred = tags.starred
               if (tags.deleted !== undefined) c.deleted = tags.deleted
-            }
-          })
-        }
-      },
-
-      updateVideoTags: async (videoId, tags) => {
-        const video = get().videos[videoId]
-        if (!video) return
-
-        const isSuccess = await setFileTag(video.path, tags)
-        if (isSuccess) {
-          set((state) => {
-            const v = state.videos[videoId]
-            if (v) {
-              if (tags.starred !== undefined) v.starred = tags.starred
-              if (tags.deleted !== undefined) v.deleted = tags.deleted
             }
           })
         }
@@ -381,16 +383,25 @@ export const useLibraryStore = create<LibraryState>()(
     {
       name: 'library',
       storage: createJSONStorage(() => libraryStorage),
+      version: 1,
+      migrate: migrateLibraryState,
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       partialize: ({ isScanning, comicImages, ...rest }) => rest,
       onRehydrateStorage: () => (state) => {
         if (!state) return
-        const bookmarks = Object.values(state.libraries)
+        const libraries = Object.values(state.libraries)
+        const bookmarks = libraries
           .map((lib) => lib.bookmark)
           .filter((b): b is string => !!b)
         if (bookmarks.length > 0) {
           restoreBookmarks(bookmarks).catch(console.error)
         }
+
+        libraries
+          .filter((lib) => !lib.bookmark)
+          .forEach((lib) => {
+            createBookmark(lib.path).catch(console.error)
+          })
       },
     },
   ),

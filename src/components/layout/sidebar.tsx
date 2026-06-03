@@ -15,7 +15,6 @@ import {
 import { ask, open } from '@tauri-apps/plugin-dialog'
 import {
   BookImage,
-  Film,
   FolderPlus,
   LibraryBig,
   RefreshCw,
@@ -33,7 +32,6 @@ import { LibraryType, type Library } from '@/types/library'
 
 const LibraryIcon = {
   [LibraryType.book]: LibraryBig,
-  [LibraryType.video]: Film,
   [LibraryType.comic]: BookImage,
 }
 

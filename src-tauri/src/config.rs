@@ -1,11 +1,28 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
 use crate::models::Config;
 
 pub struct ConfigState(pub Mutex<Config>);
+
+fn validate_store_key(key: &str) -> Result<(), String> {
+    if !key.is_empty()
+        && key
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'-'))
+    {
+        Ok(())
+    } else {
+        Err("Invalid store key".to_string())
+    }
+}
+
+fn store_file_path(store_dir: &Path, key: &str, extension: &str) -> Result<PathBuf, String> {
+    validate_store_key(key)?;
+    Ok(store_dir.join(format!("{key}.{extension}")))
+}
 
 fn get_config_path(app: &AppHandle) -> Option<PathBuf> {
     app.path()
@@ -82,26 +99,17 @@ pub fn save_config(app: &AppHandle, config: &Config) -> Result<(), String> {
 #[tauri::command]
 pub fn read_store_data(app: AppHandle, key: String) -> Option<String> {
     let store_dir = get_store_dir(&app);
-    let file_path = store_dir.join(format!("{key}.json"));
-
-    if file_path.exists() {
-        fs::read_to_string(file_path).ok()
-    } else {
-        None
-    }
+    let file_path = store_file_path(&store_dir, &key, "json").ok()?;
+    fs::read_to_string(file_path).ok()
 }
 
 #[tauri::command]
 pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(), String> {
     let store_dir = get_store_dir(&app);
+    fs::create_dir_all(&store_dir).map_err(|e| e.to_string())?;
 
-    // Ensure store directory exists
-    if !store_dir.exists() {
-        fs::create_dir_all(&store_dir).map_err(|e| e.to_string())?;
-    }
-
-    let file_path = store_dir.join(format!("{key}.json"));
-    let tmp_path = store_dir.join(format!("{key}.tmp"));
+    let file_path = store_file_path(&store_dir, &key, "json")?;
+    let tmp_path = store_file_path(&store_dir, &key, "tmp")?;
 
     // Write to temp file first
     fs::write(&tmp_path, data).map_err(|e| e.to_string())?;
@@ -113,7 +121,7 @@ pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(),
 #[tauri::command]
 pub fn remove_store_data(app: AppHandle, key: String) -> Result<(), String> {
     let store_dir = get_store_dir(&app);
-    let file_path = store_dir.join(format!("{key}.json"));
+    let file_path = store_file_path(&store_dir, &key, "json")?;
     if file_path.exists() {
         fs::remove_file(file_path).map_err(|e| e.to_string())?;
     }

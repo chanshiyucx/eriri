@@ -22,7 +22,6 @@ pub fn run() {
             scanner::utils::get_library_type,
             scanner::utils::open_path_native,
             scanner::book::scan_book_library,
-            scanner::video::scan_video_library,
             scanner::comic::scan_comic_library,
             scanner::comic::scan_comic_images,
             scanner::book::parse_book,

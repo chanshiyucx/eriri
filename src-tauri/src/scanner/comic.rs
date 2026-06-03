@@ -1,5 +1,4 @@
 use fast_image_resize as fr;
-use natord;
 use rayon::prelude::*;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -18,7 +17,7 @@ use crate::thumbnail::{
 
 use super::utils::{current_time_millis, generate_uuid, get_created_time, is_hidden};
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scan_comic_library(
     app: AppHandle,
     library_path: &str,
@@ -124,7 +123,7 @@ pub fn scan_comic_library(
     Ok(comics)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn scan_comic_images(app: AppHandle, comic_path: &str) -> Result<Vec<ComicImage>, String> {
     let start = std::time::Instant::now();
     let path = Path::new(comic_path);
