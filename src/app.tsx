@@ -1,4 +1,4 @@
-import '@/styles/tailwindcss.css'
+import '@/styles/index.css'
 import { AppLayout } from '@/components/layout/app-layout'
 
 function App() {
