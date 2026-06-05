@@ -195,6 +195,7 @@ export const useLibraryStore = create<LibraryState>()(
           for (const bId of bookIds) {
             delete state.books[bId]
             progressStore.removeBookProgress(bId)
+            progressStore.removeBookChapters(bId)
           }
 
           delete state.libraryComics[id]

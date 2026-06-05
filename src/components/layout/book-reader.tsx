@@ -21,6 +21,7 @@ import { useTabsStore } from '@/store/tabs'
 import { LibraryType, type BookContent, type Chapter } from '@/types/library'
 
 const EMPTY_LINES: string[] = []
+const EMPTY_FAVORITES: number[] = []
 
 const ReaderPadding = {
   Header: () => <div className="h-16" />,
@@ -39,7 +40,9 @@ interface TableOfContentsProps {
   chapters: Chapter[]
   currentChapterTitle: string
   isCollapsed: boolean
+  favorites: number[]
   onSelect: (lineIndex: number) => void
+  onToggleFavorite: (lineIndex: number) => void
   onClose: () => void
 }
 
@@ -47,10 +50,13 @@ function TableOfContents({
   chapters,
   currentChapterTitle,
   isCollapsed,
+  favorites,
   onSelect,
+  onToggleFavorite,
   onClose,
 }: TableOfContentsProps) {
   const tocRef = useRef<HTMLDivElement>(null)
+  const favoriteSet = new Set(favorites)
 
   useClickOutside(tocRef, onClose, !isCollapsed)
 
@@ -63,18 +69,47 @@ function TableOfContents({
       )}
     >
       <ScrollArea viewportClassName="h-full" className="pb-12">
-        {chapters.map((chapter) => (
-          <div
-            key={chapter.lineIndex}
-            className={cn(
-              'hover:bg-overlay w-full cursor-pointer truncate px-4 py-2 text-left text-sm',
-              currentChapterTitle === chapter.title && 'bg-overlay text-love',
-            )}
-            onClick={() => onSelect(chapter.lineIndex)}
-          >
-            {chapter.title}
-          </div>
-        ))}
+        {chapters.map((chapter) => {
+          const isFavorite = favoriteSet.has(chapter.lineIndex)
+          const isActiveLine = currentChapterTitle === chapter.title
+          return (
+            <div
+              key={chapter.lineIndex}
+              className="group hover:bg-overlay flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm"
+              onClick={() => onSelect(chapter.lineIndex)}
+            >
+              <span
+                className={cn(
+                  'min-w-0 flex-1 truncate',
+                  isActiveLine && 'text-love',
+                )}
+              >
+                {chapter.title}
+              </span>
+              <button
+                type="button"
+                className={cn(
+                  'shrink-0 transition-opacity',
+                  isFavorite
+                    ? 'opacity-100'
+                    : 'opacity-0 group-hover:opacity-100',
+                )}
+                title="收藏章节"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onToggleFavorite(chapter.lineIndex)
+                }}
+              >
+                <Star
+                  className={cn(
+                    'h-4 w-4',
+                    isFavorite && 'text-love fill-gold/80',
+                  )}
+                />
+              </button>
+            </div>
+          )
+        })}
       </ScrollArea>
     </div>
   )
@@ -108,6 +143,11 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
   const progress = useProgressStore((s) => s.books[bookId])
   const currentIndex = progress?.current ?? 0
   const currentChapterTitle = progress?.currentChapterTitle ?? ''
+
+  const toggleChapterFavorite = useProgressStore((s) => s.toggleChapterFavorite)
+  const favoriteChapters = useProgressStore(
+    (s) => s.favoriteChapters[bookId] ?? EMPTY_FAVORITES,
+  )
 
   const { isLock, lockScroll } = useScrollLock()
   const throttledUpdateProgress = useThrottledProgress(updateBookProgress)
@@ -220,7 +260,11 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
           chapters={content.chapters}
           currentChapterTitle={currentChapterTitle}
           isCollapsed={isTocCollapsed}
+          favorites={favoriteChapters}
           onSelect={jumpTo}
+          onToggleFavorite={(lineIndex) =>
+            toggleChapterFavorite(bookId, lineIndex)
+          }
           onClose={() => setTocCollapsed(true)}
         />
       )}
