@@ -198,7 +198,7 @@ export function ImagePreview({
 
       {index > 0 && (
         <Button
-          className="hover:text-love transition-color text-subtle/60 absolute top-1/2 left-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
+          className="hover:text-love text-subtle/60 absolute top-1/2 left-4 -translate-y-1/2 bg-transparent transition-colors hover:bg-transparent"
           onClick={() => onIndexChange(index - 1)}
         >
           <CircleChevronLeft className="h-10 w-10" />
@@ -207,7 +207,7 @@ export function ImagePreview({
 
       {index < images.length - 1 && (
         <Button
-          className="hover:text-love transition-color text-subtle/60 absolute top-1/2 right-4 -translate-y-1/2 bg-transparent hover:bg-transparent"
+          className="hover:text-love text-subtle/60 absolute top-1/2 right-4 -translate-y-1/2 bg-transparent transition-colors hover:bg-transparent"
           onClick={() => onIndexChange(index + 1)}
         >
           <CircleChevronRight className="h-10 w-10" />

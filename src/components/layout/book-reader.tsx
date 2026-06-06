@@ -64,7 +64,7 @@ function TableOfContents({
     <div
       ref={tocRef}
       className={cn(
-        'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-all duration-300 ease-in-out',
+        'bg-base absolute top-8 left-0 z-100 h-full w-64 transition-transform duration-300 ease-in-out',
         isCollapsed ? '-translate-x-full' : 'translate-x-0',
       )}
     >

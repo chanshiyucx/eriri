@@ -89,7 +89,7 @@ export function CacheInfo() {
   }
 
   return (
-    <div className="bg-overlay flex h-10 items-center justify-evenly rounded-full text-xs">
+    <div className="bg-overlay flex h-8 items-center justify-evenly rounded-full text-xs">
       <div className="flex gap-2" title={cacheDir ?? 'Default Cache Dir'}>
         <div>{cache.count} 项</div>
         <div>{formatBytes(cache.size)}</div>
