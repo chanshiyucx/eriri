@@ -20,7 +20,7 @@ export function ThemeSwitcher() {
   const setTheme = useUIStore((s) => s.setTheme)
 
   return (
-    <div className="bg-overlay flex h-10 items-center justify-evenly gap-1 rounded-full">
+    <div className="bg-overlay flex h-8 items-center justify-evenly gap-1 rounded-full">
       {themes.map(({ mode, icon: Icon, label }) => {
         const isActive = theme === mode
         return (
@@ -28,8 +28,8 @@ export function ThemeSwitcher() {
             key={mode}
             onClick={() => setTheme(mode)}
             className={cn(
-              'hover:bg-base h-8 w-8 rounded-full transition-all duration-300',
-              isActive ? 'text-love' : 'text-text bg-transparent',
+              'hover:text-love h-6 w-6 bg-transparent p-0 transition-colors',
+              isActive ? 'text-love' : 'text-text',
             )}
             title={label}
           >

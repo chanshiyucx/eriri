@@ -23,8 +23,8 @@ function BookItem({ book, isSelected, onClick }: BookItemProps) {
     <Button
       onClick={() => onClick(book.id)}
       className={cn(
-        'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-sm transition-all',
-        isSelected ? 'bg-overlay' : 'bg-surface',
+        'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-sm',
+        isSelected ? 'bg-overlay text-love' : 'bg-surface',
         book.deleted && 'text-subtle/40',
       )}
     >
@@ -62,8 +62,8 @@ function AuthorItem({ author, isSelected, onSelect }: AuthorItemProps) {
         void openPathNative(author.path)
       }}
       className={cn(
-        'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm transition-colors',
-        isSelected ? 'bg-overlay' : 'bg-surface',
+        'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm',
+        isSelected ? 'bg-overlay text-love' : 'bg-surface',
       )}
     >
       <Folder className="h-4 w-4 shrink-0" />
@@ -131,7 +131,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
   return (
     <div className="flex h-full w-full">
       {/* Column 1: Authors */}
-      <div className="flex w-[300px] shrink-0 flex-col border-r">
+      <div className="flex w-75 shrink-0 flex-col border-r">
         <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
           AUTHORS ({authors.length})
         </div>
@@ -148,7 +148,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
       </div>
 
       {/* Column 2: Books */}
-      <div className="flex w-[300px] shrink-0 flex-col border-r">
+      <div className="flex w-75 shrink-0 flex-col border-r">
         <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
           BOOKS ({books.length})
         </div>

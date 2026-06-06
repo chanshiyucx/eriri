@@ -80,7 +80,7 @@ function SortableLibraryItem({
     >
       <Button
         className={cn(
-          'h-10 w-full justify-start gap-2 rounded-none px-4 transition-all duration-300',
+          'h-8 w-full justify-start gap-2 rounded-none px-4 transition-all duration-300',
           isSelected && 'bg-overlay text-love',
         )}
         onClick={() => onSelect(library)}
@@ -210,7 +210,7 @@ export function Sidebar() {
     >
       <ScrollArea viewportClassName="h-0 flex-1">
         <Button
-          className="h-10 w-full justify-start gap-2 rounded-none px-4"
+          className="h-8 w-full justify-start gap-2 rounded-none px-4"
           disabled={isScanning}
           onClick={() => void handleImport()}
           title="导入资源"
