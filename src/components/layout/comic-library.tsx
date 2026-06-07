@@ -131,10 +131,13 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     )
   }
 
+  // Gate on `comic` so the load retries once the catalog hydrates (see
+  // comic-reader.tsx for the same race).
+  const comicPath = comic?.path
   useEffect(() => {
-    if (images.length) return
+    if (!comicPath || images.length) return
     void getComicImages(comicId)
-  }, [comicId, images.length, getComicImages])
+  }, [comicId, comicPath, images.length, getComicImages])
 
   useLayoutEffect(() => {
     if (viewMode !== 'scroll' || !readerVisible || !images.length) return

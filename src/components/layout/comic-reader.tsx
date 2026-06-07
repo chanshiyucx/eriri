@@ -11,6 +11,7 @@ import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
 import { GridImage, ImagePreview } from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useClickOutside } from '@/hooks/use-click-outside'
+import { useIsPhone } from '@/hooks/use-is-phone'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
 import { cn } from '@/lib/style'
@@ -96,6 +97,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
   const isImmersive = useUIStore((s) => s.isImmersive)
+  const isPhone = useIsPhone()
   const activeTab = useTabsStore((s) => s.activeTab)
 
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
@@ -150,10 +152,13 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     }
   }
 
+  // Gate on `comic`: a tab can mount before the catalog hydrates, where
+  // getComicImages bails. Depending on comic.path retries once it's available.
+  const comicPath = comic?.path
   useEffect(() => {
-    if (images.length) return
+    if (!comicPath || images.length) return
     void getComicImages(comicId)
-  }, [comicId, images.length, getComicImages])
+  }, [comicId, comicPath, images.length, getComicImages])
 
   useLayoutEffect(() => {
     if (viewMode !== 'scroll' || !images.length) return
@@ -289,11 +294,19 @@ export function ComicReader({ comicId }: ComicReaderProps) {
           </Button>
         </div>
 
-        <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
+        <h3
+          className={cn(
+            // Phone: flow inline to the right of the icons, with a gap, and
+            // ellipsis when there isn't enough room.
+            'mx-2 min-w-0 flex-1 truncate text-left',
+            // md+: restore the absolutely-centered title (unchanged).
+            'md:absolute md:top-1/2 md:left-1/2 md:mx-0 md:max-w-[60%] md:flex-none md:-translate-1/2 md:text-center',
+          )}
+        >
           {viewMode === 'single' ? currentImage?.filename : comic.title}
         </h3>
 
-        <span>
+        <span className="shrink-0 whitespace-nowrap">
           {currentIndex + 1} / {images.length}
         </span>
       </div>
@@ -315,7 +328,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             comicId={comicId}
             images={images}
             initialIndex={currentIndex}
-            orientation="horizontal"
+            orientation={isPhone ? 'vertical' : 'horizontal'}
             overscanViewports={4}
             maxRenderedPages={32}
             onCurrentIndexChange={handleStripIndexChange}
