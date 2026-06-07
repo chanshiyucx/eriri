@@ -9,6 +9,7 @@ import {
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Spinner } from '@/components/ui/spinner'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
@@ -129,6 +130,8 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
   const virtuosoRef = useRef<VirtuosoHandle>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [bookData, setBookData] = useState<BookData | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [loadProgress, setLoadProgress] = useState(0)
 
   const book = useLibraryStore((s) => s.books[bookId])
   const updateBookTags = useLibraryStore((s) => s.updateBookTags)
@@ -173,15 +176,25 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
 
   useEffect(() => {
     if (!book?.path) return
+    let cancelled = false
     const load = async () => {
+      setIsLoading(true)
+      setLoadProgress(0)
       try {
-        const data = await parseBook(book.path)
-        setBookData({ bookId, content: data })
+        const data = await parseBook(book.path, (percent) => {
+          if (!cancelled) setLoadProgress(percent)
+        })
+        if (!cancelled) setBookData({ bookId, content: data })
       } catch (e) {
         console.error('Failed to load book', e)
+      } finally {
+        if (!cancelled) setIsLoading(false)
       }
     }
     void load()
+    return () => {
+      cancelled = true
+    }
   }, [bookId, book?.path])
 
   useLayoutEffect(() => {
@@ -251,7 +264,24 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
 
   const renderItem = (_index: number, line: string) => <BookLine line={line} />
 
-  if (!book || !content) return null
+  if (!book) return null
+
+  // While parsing (large books can take a while) show a spinner instead of a
+  // blank pane. `content` is null whenever it doesn't match the current bookId.
+  if (!content) {
+    return (
+      <div className="bg-surface text-subtle flex h-full w-full flex-col items-center justify-center gap-3">
+        {isLoading && (
+          <>
+            <Spinner size="large" />
+            {loadProgress > 0 && (
+              <span className="text-xs tabular-nums">{loadProgress}%</span>
+            )}
+          </>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden">
@@ -319,11 +349,19 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
           </Button>
         </div>
 
-        <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
+        <h3
+          className={cn(
+            // Phone: flow inline to the right of the icons, with a gap, and
+            // ellipsis when there isn't enough room.
+            'mx-2 min-w-0 flex-1 truncate text-left',
+            // md+: restore the absolutely-centered title (unchanged).
+            'md:absolute md:top-1/2 md:left-1/2 md:mx-0 md:max-w-[60%] md:flex-none md:-translate-1/2 md:text-center',
+          )}
+        >
           {currentChapterTitle || book.title}
         </h3>
 
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           {progress?.percent > 0 && (
             <span>{Math.round(progress.percent)}%</span>
           )}

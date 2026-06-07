@@ -57,3 +57,20 @@
   --tw-prose-invert-th-borders: var(--color-overlay);
   --tw-prose-invert-td-borders: var(--color-overlay);
 }
+
+@theme inline {
+  --animate-spinner-scale: spinner-scale var(--duration, 30s) var(--delay, 30s)
+    cubic-bezier(0.2, 0.68, 0.18, 1.08) infinite;
+
+  @keyframes spinner-scale {
+    0% {
+      transform: scaley(1);
+    }
+    50% {
+      transform: scaley(0.4);
+    }
+    100% {
+      transform: scaley(1);
+    }
+  }
+}

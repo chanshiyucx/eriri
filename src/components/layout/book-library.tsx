@@ -138,8 +138,8 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
 
   return (
     <div className="flex h-full w-full">
-      <div className={cn('min-h-0 flex-1 md:flex-none', middleClass)}>
-        <div className="flex w-1/2 shrink-0 flex-col border-r md:w-56">
+      <div className={cn('min-h-0 w-full flex-1 md:flex-none', middleClass)}>
+        <div className="flex min-w-0 flex-1 flex-col border-r md:w-56 md:flex-none">
           <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
             AUTHORS ({authors.length})
           </div>
@@ -155,7 +155,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
           </ScrollArea>
         </div>
 
-        <div className="flex w-1/2 shrink-0 flex-col border-r md:w-56">
+        <div className="flex min-w-0 flex-1 flex-col border-r md:w-56 md:flex-none">
           <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
             BOOKS ({books.length})
           </div>

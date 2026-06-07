@@ -53,6 +53,26 @@ pub struct Catalog {
 // --- Setup ---
 
 pub fn init(app: &AppHandle) -> rusqlite::Result<()> {
+    let conn = open_db(app)?;
+    app.manage(LibraryDb(Mutex::new(conn)));
+    Ok(())
+}
+
+/// Re-open the library DB against the *current* store directory and swap it into
+/// the live `LibraryDb` state. Called after the cache directory changes so the
+/// resource library reflects the new directory's `store/library.db` without a
+/// restart. The frontend re-hydrates on focus.
+pub fn reopen(app: &AppHandle) -> rusqlite::Result<()> {
+    let conn = open_db(app)?;
+    let state = app.state::<LibraryDb>();
+    // A poisoned lock is fine here: we replace the connection wholesale.
+    let mut guard = state.0.lock().unwrap_or_else(|e| e.into_inner());
+    *guard = conn;
+    Ok(())
+}
+
+/// Open (and initialize) the SQLite connection at `<store_dir>/library.db`.
+fn open_db(app: &AppHandle) -> rusqlite::Result<Connection> {
     let store_dir = config::get_store_dir(app);
     let _ = std::fs::create_dir_all(&store_dir);
     let db_path = store_dir.join("library.db");
@@ -111,8 +131,7 @@ pub fn init(app: &AppHandle) -> rusqlite::Result<()> {
 
     migrate_from_json(app, &conn);
 
-    app.manage(LibraryDb(Mutex::new(conn)));
-    Ok(())
+    Ok(conn)
 }
 
 /// One-time import of the legacy `library.json` blob, only when the DB is empty.

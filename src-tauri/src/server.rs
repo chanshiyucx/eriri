@@ -5,24 +5,25 @@
 //! the Wi-Fi at `http://<mac-lan-ip>:1430`. CPU-heavy scans run on the blocking
 //! pool so they don't stall the executor.
 
-use std::net::{IpAddr, UdpSocket};
+use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
 
 use axum::Json;
 use axum::Router;
-use axum::extract::{Path as AxumPath, Query, Request, State};
+use axum::extract::{ConnectInfo, Path as AxumPath, Query, Request, State};
 use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
 use tauri::{AppHandle, Manager};
 use tower::ServiceExt;
+use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::{error, info, warn};
 
 use crate::config;
 use crate::library::{self, Catalog};
-use crate::models::{BookContent, ComicImage, FileTags};
+use crate::models::{ComicImage, FileTags};
 use crate::progress::{self, BookProgress, ComicProgress, ProgressDb, Snapshot};
 
 const PORT: u16 = 1430;
@@ -43,7 +44,8 @@ pub fn init(app: &AppHandle) {
                 info!(url = %lan, "LAN web server listening");
                 // The port is bound; open the reader in the browser on startup.
                 open_in_browser();
-                if let Err(e) = axum::serve(listener, router).await {
+                let service = router.into_make_service_with_connect_info::<SocketAddr>();
+                if let Err(e) = axum::serve(listener, service).await {
                     error!(error = %e, "Web server stopped");
                 }
             }
@@ -90,7 +92,25 @@ fn build_router(app: AppHandle) -> Router {
         .route("/file", get(serve_file))
         .fallback_service(static_files)
         .layer(axum::middleware::from_fn(no_store_dynamic))
+        // Gzip large text/JSON (e.g. parsed books) — compresses ~5-10x, the
+        // dominant cost when loading over the LAN. Loopback opts out below.
+        .layer(CompressionLayer::new())
+        .layer(axum::middleware::from_fn(skip_compression_on_loopback))
         .with_state(app)
+}
+
+/// Strip Accept-Encoding for loopback clients so the CompressionLayer above
+/// sends raw bytes: on localhost transfer is free, so gzip is pure CPU overhead
+/// (compress + decompress) that makes large books slower. LAN clients keep it.
+async fn skip_compression_on_loopback(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    mut req: Request,
+    next: axum::middleware::Next,
+) -> Response {
+    if addr.ip().is_loopback() {
+        req.headers_mut().remove(header::ACCEPT_ENCODING);
+    }
+    next.run(req).await
 }
 
 /// The catalog/progress API and the HTML app shell must never be cached by a
@@ -149,11 +169,24 @@ async fn scan_comic_images(
         .map_err(ApiError)
 }
 
-async fn parse_book(Query(q): Query<PathQuery>) -> Result<Json<BookContent>, ApiError> {
-    blocking(move || crate::scanner::book::parse_book(&q.path))
+async fn parse_book(Query(q): Query<PathQuery>) -> Result<Response, ApiError> {
+    let content = blocking(move || crate::scanner::book::parse_book(&q.path))
         .await?
-        .map(Json)
-        .map_err(ApiError)
+        .map_err(ApiError)?;
+
+    // Serialize manually to advertise the uncompressed length: gzip drops
+    // Content-Length, so the client tracks download progress against this header.
+    let body = serde_json::to_vec(&content).map_err(|e| ApiError(e.to_string()))?;
+    let len = body.len();
+
+    let mut res = Response::new(axum::body::Body::from(body));
+    let headers = res.headers_mut();
+    headers.insert(
+        header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("application/json"),
+    );
+    headers.insert("x-uncompressed-length", axum::http::HeaderValue::from(len));
+    Ok(res)
 }
 
 async fn set_tag(Json(b): Json<TagBody>) -> Result<StatusCode, ApiError> {

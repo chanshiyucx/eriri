@@ -161,8 +161,20 @@ fn spawn_set_cache(app: AppHandle) {
             return;
         };
         let app2 = app.clone();
-        let _ =
-            tokio::task::spawn_blocking(move || crate::thumbnail::set_cache_dir(app2, path)).await;
+        // The cache dir holds both `thumbnail/` and `store/library.db`, so after
+        // repointing it re-open the DB to reflect the new store without a restart.
+        let _ = tokio::task::spawn_blocking(move || {
+            if let Err(e) = crate::thumbnail::set_cache_dir(app2.clone(), path) {
+                error!(error = %e, "Failed to set cache directory");
+                return;
+            }
+            if let Err(e) = crate::library::reopen(&app2) {
+                error!(error = %e, "Failed to re-open library DB after cache dir change");
+            }
+            // Rescan stats from the new dir so the tray footer is accurate.
+            let _ = crate::thumbnail::get_thumbnail_stats(app2, true);
+        })
+        .await;
         rebuild(&app);
     });
 }

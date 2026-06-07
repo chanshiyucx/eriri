@@ -34,7 +34,7 @@ objc2-foundation = "0.3.2"
 objc2-app-kit = { version = "0.3.1", features = ["NSApplication", "NSResponder"] }
 axum = "0.7"
 tower = { version = "0.5", features = ["util"] }
-tower-http = { version = "0.6", features = ["fs"] }
+tower-http = { version = "0.6", features = ["fs", "compression-gzip"] }
 tokio = { version = "1", features = ["net", "rt", "rt-multi-thread", "sync"] }
 rusqlite = { version = "0.32", features = ["bundled"] }
 
