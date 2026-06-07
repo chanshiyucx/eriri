@@ -12,12 +12,13 @@ export interface Library {
   type: LibraryType
   createdAt: number
   sortOrder: number
-  bookmark?: string
-  status: {
-    comicId?: string
-    authorId?: string
-    bookId?: string
-  }
+}
+
+/** Per-library navigation memory (device-local; lives in the UI store). */
+export interface LibraryNavStatus {
+  comicId?: string
+  authorId?: string
+  bookId?: string
 }
 
 export interface Comic {
@@ -75,20 +76,10 @@ export interface Image {
   index: number
 }
 
-export interface ImageCache {
-  count: number
-  size: number
-}
-
 export interface ComicImage {
   comicId: string
   images: Image[]
   timestamp: number
-}
-
-export interface ScannedLibrary {
-  comics?: Comic[]
-  authors?: Author[]
 }
 
 export interface FileTags {

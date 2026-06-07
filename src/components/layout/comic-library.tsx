@@ -1,10 +1,4 @@
-import {
-  Grid2x2,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Rows2,
-  StepForward,
-} from 'lucide-react'
+import { Grid2x2, Rows2, StepForward } from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -18,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
 import { GridItem } from '@/components/ui/grid-item'
 import { GridImage, ImagePreview } from '@/components/ui/image-view'
-import { useCollapse } from '@/hooks/use-collapse'
+import { usePanelNav } from '@/hooks/use-panel-nav'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
 import { openPathNative } from '@/lib/scanner'
@@ -26,6 +20,7 @@ import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
+import { useUIStore } from '@/store/ui'
 import {
   LibraryType,
   type Comic,
@@ -79,7 +74,7 @@ interface ComicLibraryProps {
 export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const stripRef = useRef<ComicStripHandle>(null)
   const currentIndexRef = useRef(0)
-  const { collapsed, setCollapsed } = useCollapse()
+  const { readerVisible, middleClass, readerClass, openReader } = usePanelNav()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [previewIndex, setPreviewIndex] = useState<number>(-1)
 
@@ -87,12 +82,14 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const addTab = useTabsStore((s) => s.addTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  const updateLibrary = useLibraryStore((s) => s.updateLibrary)
+  const setNavStatus = useUIStore((s) => s.setNavStatus)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
   const getComicImages = useLibraryStore((s) => s.getComicImages)
 
-  const { comicId = '' } = selectedLibrary.status
+  const comicId = useUIStore(
+    (s) => s.navStatus[selectedLibrary.id]?.comicId ?? '',
+  )
   const comic = useLibraryStore((s) => s.comics[comicId])
   const images = useLibraryStore(
     (s) => s.comicImages[comicId]?.images ?? EMPTY_ARRAY,
@@ -140,9 +137,9 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   }, [comicId, images.length, getComicImages])
 
   useLayoutEffect(() => {
-    if (viewMode !== 'scroll' || collapsed === 2 || !images.length) return
+    if (viewMode !== 'scroll' || !readerVisible || !images.length) return
     stripRef.current?.jumpTo(currentIndexRef.current)
-  }, [activeTab, collapsed, comicId, images.length, viewMode])
+  }, [activeTab, readerVisible, comicId, images.length, viewMode])
 
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
@@ -160,8 +157,10 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   }
 
   const handleSelectComic = (id: string) => {
-    if (id === comic?.id) return
-    updateLibrary(selectedLibrary.id, { status: { comicId: id } })
+    if (id !== comic?.id) {
+      setNavStatus(selectedLibrary.id, { comicId: id })
+    }
+    openReader()
   }
 
   const handleImageClick = (index: number) => {
@@ -178,7 +177,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   }
 
   const handleStripIndexChange = (index: number) => {
-    if (!comic || !images.length || collapsed === 2) return
+    if (!comic || !images.length || !readerVisible) return
 
     setCurrentIndex(index)
     const newProgress = createComicProgress(index, images.length)
@@ -250,27 +249,8 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
 
   return (
     <div className="flex h-full w-full">
-      {/* Left Column: Comic List */}
-      <div
-        className={cn(
-          'flex min-h-0 shrink-0 flex-col',
-          collapsed === 0 ? 'hidden' : 'flex-1',
-          collapsed === 1 && 'border-r',
-        )}
-      >
-        <div className="bg-base text-subtle flex h-8 items-center justify-between border-b px-3 text-xs">
-          <div className="flex gap-2">
-            <Button
-              className="h-6 w-6"
-              onClick={() => setCollapsed(collapsed === 1 ? 0 : 1)}
-            >
-              {collapsed === 0 ? (
-                <PanelLeftOpen className="h-4 w-4" />
-              ) : (
-                <PanelLeftClose className="h-4 w-4" />
-              )}
-            </Button>
-          </div>
+      <div className={cn('min-h-0 flex-1 flex-col border-r', middleClass)}>
+        <div className="bg-base text-subtle flex h-8 items-center justify-end border-b px-3 text-xs">
           <span>COMICS ({comics.length})</span>
         </div>
         <VirtuosoGrid
@@ -282,25 +262,9 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         />
       </div>
 
-      {/* Right Column: Comic Detail */}
-      <div
-        className={cn(
-          'flex min-h-0 shrink-0 flex-col',
-          collapsed === 2 ? 'hidden' : 'flex-1',
-        )}
-      >
+      <div className={cn('min-h-0 flex-1 flex-col', readerClass)}>
         <div className="bg-base text-subtle relative flex h-8 items-center justify-between border-b px-3 text-xs">
           <div className="flex gap-2">
-            <Button
-              className="h-6 w-6"
-              onClick={() => setCollapsed(collapsed === 1 ? 2 : 1)}
-            >
-              {collapsed === 2 ? (
-                <PanelLeftClose className="h-4 w-4" />
-              ) : (
-                <PanelLeftOpen className="h-4 w-4" />
-              )}
-            </Button>
             <Button
               className="h-6 w-6"
               onClick={toggleViewMode}
@@ -357,7 +321,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         )}
       </div>
 
-      {/* Fullscreen Preview Overlay */}
       <div
         className={cn(
           'bg-base fixed inset-0 z-100 flex items-center justify-center',

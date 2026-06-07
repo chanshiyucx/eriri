@@ -10,20 +10,7 @@
     "frontendDist": "../dist"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Eriri",
-        "width": 800,
-        "height": 600
-      }
-    ],
-    "security": {
-      "csp": "default-src 'self'; img-src 'self' asset: https://asset.localhost blob: data:",
-      "assetProtocol": {
-        "enable": true,
-        "scope": ["$APPCACHE/**/*", "$APPDATA/**/*"]
-      }
-    }
+    "windows": []
   },
   "bundle": {
     "active": true,

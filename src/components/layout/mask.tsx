@@ -1,8 +1,8 @@
 import { cn } from '@/lib/style'
-import { useLibraryStore } from '@/store/library'
+import { useUIStore } from '@/store/ui'
 
 export function Mask() {
-  const isScanning = useLibraryStore((s) => s.isScanning)
+  const isScanning = useUIStore((s) => s.isScanning)
 
   return (
     <div

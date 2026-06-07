@@ -12,19 +12,11 @@ import {
   useSortable,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
-import { ask, open } from '@tauri-apps/plugin-dialog'
-import {
-  BookImage,
-  FolderPlus,
-  LibraryBig,
-  RefreshCw,
-  Trash2,
-} from 'lucide-react'
-import { CacheInfo } from '@/components/layout/cache-info'
+import { BookImage, LibraryBig, RefreshCw, Trash2 } from 'lucide-react'
 import { ThemeSwitcher } from '@/components/layout/theme-switcher'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { getCacheDir } from '@/lib/scanner'
+import { usePanelNav } from '@/hooks/use-panel-nav'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useUIStore } from '@/store/ui'
@@ -118,15 +110,15 @@ function SortableLibraryItem({
 
 export function Sidebar() {
   const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed)
+  const selectedLibraryId = useUIStore((s) => s.selectedLibraryId)
+  const setSelectedLibraryId = useUIStore((s) => s.setSelectedLibraryId)
+  const isScanning = useUIStore((s) => s.isScanning)
+  const { openMiddle } = usePanelNav()
 
   const libraries = useLibraryStore((s) => s.libraries)
   const removeLibrary = useLibraryStore((s) => s.removeLibrary)
-  const importLibrary = useLibraryStore((s) => s.importLibrary)
   const refreshLibrary = useLibraryStore((s) => s.refreshLibrary)
   const reorderLibrary = useLibraryStore((s) => s.reorderLibrary)
-  const selectedLibraryId = useLibraryStore((s) => s.selectedLibraryId)
-  const setSelectedLibraryId = useLibraryStore((s) => s.setSelectedLibraryId)
-  const isScanning = useLibraryStore((s) => s.isScanning)
 
   const librariesList = Object.values(libraries).sort(
     (a, b) => a.sortOrder - b.sortOrder,
@@ -151,37 +143,12 @@ export function Sidebar() {
 
   const handleSelect = (library: Library) => {
     setSelectedLibraryId(library.id)
-  }
-
-  const handleImport = async () => {
-    try {
-      const cacheDir = await getCacheDir()
-      if (!cacheDir) {
-        alert('请先设置缓存目录')
-        return
-      }
-
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        recursive: true,
-        title: '请选择导入库',
-      })
-      if (!selected || typeof selected !== 'string') return
-
-      await importLibrary(selected)
-    } catch (error) {
-      alert('导入库失败: ' + String(error))
-    }
+    openMiddle()
   }
 
   const handleRefresh = async (library: Library) => {
+    if (!window.confirm(`确认刷新库 "${library.name}"?`)) return
     try {
-      const yes = await ask(`确认刷新库 "${library.name}"?`, {
-        title: '刷新库',
-        kind: 'warning',
-      })
-      if (!yes) return
       await refreshLibrary(library.id)
     } catch (error) {
       alert('刷新库失败: ' + String(error))
@@ -189,13 +156,9 @@ export function Sidebar() {
   }
 
   const handleRemove = async (library: Library) => {
+    if (!window.confirm(`确认删除库 "${library.name}"?`)) return
     try {
-      const yes = await ask(`确认删除库 "${library.name}"?`, {
-        title: '删除库',
-        kind: 'warning',
-      })
-      if (!yes) return
-      removeLibrary(library.id)
+      await removeLibrary(library.id)
     } catch (error) {
       alert('删除库失败: ' + String(error))
     }
@@ -204,20 +167,11 @@ export function Sidebar() {
   return (
     <aside
       className={cn(
-        'bg-base flex h-full w-56 flex-col border-r transition-[margin-left] duration-300',
-        isSidebarCollapsed && '-ml-56 border-none',
+        'bg-base h-full w-full flex-col border-r md:w-56',
+        isSidebarCollapsed ? 'hidden' : 'flex',
       )}
     >
       <ScrollArea viewportClassName="h-0 flex-1">
-        <Button
-          className="h-8 w-full justify-start gap-2 rounded-none px-4"
-          disabled={isScanning}
-          onClick={() => void handleImport()}
-          title="导入资源"
-        >
-          <FolderPlus className="h-4 w-4" />
-          <span>导入资源</span>
-        </Button>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}
@@ -243,8 +197,7 @@ export function Sidebar() {
         </DndContext>
       </ScrollArea>
 
-      <div className="space-y-2 p-4">
-        <CacheInfo />
+      <div className="p-4">
         <ThemeSwitcher />
       </div>
     </aside>

@@ -1,10 +1,10 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { createTauriFileStorage } from '@/lib/storage'
+import { createServerStorage } from '@/lib/storage'
 import { LibraryType } from '@/types/library'
 
-const tabsStorage = createTauriFileStorage('tabs')
+const tabsStorage = createServerStorage('tabs')
 const REMOVED_LIBRARY_TYPE = 'video'
 
 export interface Tab {

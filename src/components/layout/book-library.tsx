@@ -3,10 +3,12 @@ import { useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { usePanelNav } from '@/hooks/use-panel-nav'
 import { openPathNative } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
+import { useUIStore } from '@/store/ui'
 import type { Author, Book, Library } from '@/types/library'
 import { BookReader } from './book-reader'
 
@@ -84,13 +86,19 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
     authorId: '',
     bookIds: [],
   })
-  const updateLibrary = useLibraryStore((s) => s.updateLibrary)
+  const setNavStatus = useUIStore((s) => s.setNavStatus)
+  const { middleClass, readerClass, openReader } = usePanelNav()
 
-  const { authorId, bookId } = selectedLibrary.status
+  const authorId = useUIStore(
+    (s) => s.navStatus[selectedLibrary.id]?.authorId ?? '',
+  )
+  const bookId = useUIStore(
+    (s) => s.navStatus[selectedLibrary.id]?.bookId ?? '',
+  )
 
   const authors = useLibraryStore(
     useShallow((s) => {
-      const authorIds = s.libraryAuthors[selectedLibrary.id]
+      const authorIds = s.libraryAuthors[selectedLibrary.id] ?? []
       return authorIds.map((id) => s.authors[id])
     }),
   )
@@ -99,7 +107,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
     useShallow((s) => {
       if (!authorId) return []
 
-      const bookIds = s.authorBooks[authorId]
+      const bookIds = s.authorBooks[authorId] ?? []
 
       if (sortedIdsCache.current.authorId !== authorId) {
         const sortedIds = bookIds.toSorted((idA, idB) => {
@@ -118,54 +126,55 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
 
   const handleSelectAuthor = (id: string) => {
     if (id === authorId) return
-    updateLibrary(selectedLibrary.id, {
-      status: { authorId: id, bookId: '' },
-    })
+    setNavStatus(selectedLibrary.id, { authorId: id, bookId: '' })
   }
 
   const handleSelectBook = (id: string) => {
-    if (id === bookId) return
-    updateLibrary(selectedLibrary.id, { status: { authorId, bookId: id } })
+    if (id !== bookId) {
+      setNavStatus(selectedLibrary.id, { authorId, bookId: id })
+    }
+    openReader()
   }
 
   return (
     <div className="flex h-full w-full">
-      {/* Column 1: Authors */}
-      <div className="flex w-75 shrink-0 flex-col border-r">
-        <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
-          AUTHORS ({authors.length})
+      <div className={cn('min-h-0 flex-1 md:flex-none', middleClass)}>
+        <div className="flex w-1/2 shrink-0 flex-col border-r md:w-56">
+          <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
+            AUTHORS ({authors.length})
+          </div>
+          <ScrollArea viewportClassName="h-0 flex-1">
+            {authors.map((author) => (
+              <AuthorItem
+                key={author.id}
+                author={author}
+                isSelected={authorId === author.id}
+                onSelect={handleSelectAuthor}
+              />
+            ))}
+          </ScrollArea>
         </div>
-        <ScrollArea viewportClassName="h-0 flex-1">
-          {authors.map((author) => (
-            <AuthorItem
-              key={author.id}
-              author={author}
-              isSelected={authorId === author.id}
-              onSelect={handleSelectAuthor}
-            />
-          ))}
-        </ScrollArea>
+
+        <div className="flex w-1/2 shrink-0 flex-col border-r md:w-56">
+          <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
+            BOOKS ({books.length})
+          </div>
+          <ScrollArea viewportClassName="h-0 flex-1">
+            {books.map((book) => (
+              <BookItem
+                key={book.id}
+                book={book}
+                isSelected={bookId === book.id}
+                onClick={handleSelectBook}
+              />
+            ))}
+          </ScrollArea>
+        </div>
       </div>
 
-      {/* Column 2: Books */}
-      <div className="flex w-75 shrink-0 flex-col border-r">
-        <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
-          BOOKS ({books.length})
-        </div>
-        <ScrollArea viewportClassName="h-0 flex-1">
-          {books.map((book) => (
-            <BookItem
-              key={book.id}
-              book={book}
-              isSelected={bookId === book.id}
-              onClick={handleSelectBook}
-            />
-          ))}
-        </ScrollArea>
+      <div className={cn('min-h-0 flex-1', readerClass)}>
+        {bookId && <BookReader bookId={bookId} showReading />}
       </div>
-
-      {/* Column 3: Preview */}
-      {bookId && <BookReader bookId={bookId} showReading />}
     </div>
   )
 }

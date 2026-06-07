@@ -25,6 +25,8 @@ pub struct Author {
     pub library_id: String,
     #[serde(rename = "bookCount")]
     pub book_count: u32,
+    // Default-tolerant: the persisted catalog stores authors without nested books.
+    #[serde(default)]
     pub books: Vec<Book>,
 }
 
@@ -68,7 +70,7 @@ pub struct ComicImage {
     pub index: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone, Copy)]
 pub struct FileTags {
     pub starred: Option<bool>,
     pub deleted: Option<bool>,

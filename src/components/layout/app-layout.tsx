@@ -6,7 +6,7 @@ import { TabNav } from './tab-nav'
 
 export function AppLayout() {
   return (
-    <div className="flex h-screen w-screen flex-col overflow-hidden">
+    <div className="flex h-dvh w-screen flex-col overflow-hidden">
       <TabNav />
 
       <TabArea />

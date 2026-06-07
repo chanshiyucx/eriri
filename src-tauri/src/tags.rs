@@ -107,7 +107,6 @@ pub fn set_file_tag_impl(path: &Path, tags: FileTags) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-#[tauri::command]
 pub fn set_file_tag(path: String, tags: FileTags) -> Result<(), String> {
     set_file_tag_impl(Path::new(&path), tags).map_err(|e| e.to_string())
 }
