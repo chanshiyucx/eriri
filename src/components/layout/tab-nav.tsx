@@ -1,4 +1,10 @@
-import { Home, PanelLeftClose, PanelLeftOpen, X } from 'lucide-react'
+import {
+  Columns2,
+  InspectionPanel,
+  PanelLeftClose,
+  PanelLeftOpen,
+  X,
+} from 'lucide-react'
 import { useEffect, useEffectEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -17,7 +23,7 @@ function TabItem({ tab, isActive, onSelect, onRemove }: TabItemProps) {
   return (
     <div
       className={cn(
-        'bg-surface hover:bg-overlay group flex max-w-[200px] min-w-[150px] cursor-pointer items-center gap-2 rounded-sm px-3 py-1 text-sm',
+        'bg-surface hover:bg-overlay group flex max-w-50 min-w-37.5 cursor-pointer items-center gap-2 rounded-sm px-3 py-1 text-sm',
         isActive && 'bg-overlay text-love',
       )}
       onClick={() => onSelect(tab.id)}
@@ -38,12 +44,17 @@ function TabItem({ tab, isActive, onSelect, onRemove }: TabItemProps) {
 
 export function TabNav() {
   const isSidebarCollapsed = useUIStore((s) => s.isSidebarCollapsed)
+  const isMiddleCollapsed = useUIStore((s) => s.isMiddleCollapsed)
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
+  const toggleMiddle = useUIStore((s) => s.toggleMiddle)
   const toggleImmersive = useUIStore((s) => s.toggleImmersive)
   const tabs = useTabsStore((s) => s.tabs)
   const activeTab = useTabsStore((s) => s.activeTab)
   const removeTab = useTabsStore((s) => s.removeTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
+
+  const handleSidebar = () => (activeTab ? setActiveTab('') : toggleSidebar())
+  const handleMiddle = () => (activeTab ? setActiveTab('') : toggleMiddle())
 
   const navigateTab = (direction: 1 | -1) => {
     if (!tabs.length) return
@@ -83,6 +94,9 @@ export function TabNav() {
       case 'KeyA':
         toggleSidebar()
         break
+      case 'KeyD':
+        toggleMiddle()
+        break
       case 'ArrowUp':
       case 'ArrowDown':
         navigateTab(e.code === 'ArrowUp' ? -1 : 1)
@@ -96,8 +110,12 @@ export function TabNav() {
   }, [])
 
   return (
-    <div className="bg-base flex h-8 shrink-0 items-center gap-2 border-b px-2">
-      <Button className="h-6 w-6" onClick={toggleSidebar}>
+    <div className="bg-base flex h-8 shrink-0 items-center gap-2 border-b px-3">
+      <Button
+        className="h-6 w-6"
+        onClick={handleSidebar}
+        title={activeTab ? '返回主页' : '折叠/展开左边栏'}
+      >
         {isSidebarCollapsed ? (
           <PanelLeftOpen className="h-4 w-4" />
         ) : (
@@ -106,10 +124,15 @@ export function TabNav() {
       </Button>
 
       <Button
-        className={cn('h-6 w-6', !activeTab && 'text-love')}
-        onClick={() => setActiveTab('')}
+        className="h-6 w-6"
+        onClick={handleMiddle}
+        title={activeTab ? '返回主页' : '折叠/展开中间栏'}
       >
-        <Home className="h-4 w-4" />
+        {isMiddleCollapsed ? (
+          <Columns2 className="h-4 w-4" />
+        ) : (
+          <InspectionPanel className="h-4 w-4" />
+        )}
       </Button>
 
       <ScrollArea

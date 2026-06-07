@@ -52,7 +52,6 @@ fn is_chapter_number_char(c: char) -> bool {
         )
 }
 
-#[tauri::command(async)]
 pub fn scan_book_library(library_path: &str, library_id: &str) -> Result<Vec<Author>, String> {
     let start = std::time::Instant::now();
     let path = Path::new(library_path);
@@ -121,7 +120,6 @@ pub fn scan_book_library(library_path: &str, library_id: &str) -> Result<Vec<Aut
     Ok(authors)
 }
 
-#[tauri::command(async)]
 pub fn parse_book(path: &str) -> Result<BookContent, String> {
     let file = File::open(path).map_err(|e| format!("Failed to open file: {e}"))?;
     let reader = BufReader::new(file);

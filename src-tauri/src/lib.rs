@@ -1,41 +1,32 @@
-mod bookmark;
 mod config;
+mod library;
 mod models;
+mod progress;
 mod scanner;
+mod server;
 mod tags;
 mod thumbnail;
+mod tray;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_persisted_scope::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             config::init(app)?;
             thumbnail::init(app)?;
+            progress::init(app.handle())?;
+            library::init(app.handle())?;
+            server::init(app.handle());
+            tray::setup(app)?;
+
+            // Run as a menu-bar accessory: no Dock icon, no window on launch.
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
-            scanner::utils::generate_uuid_command,
-            scanner::utils::get_library_type,
-            scanner::utils::open_path_native,
-            scanner::book::scan_book_library,
-            scanner::comic::scan_comic_library,
-            scanner::comic::scan_comic_images,
-            scanner::book::parse_book,
-            thumbnail::clean_thumbnail_cache,
-            thumbnail::get_thumbnail_stats,
-            thumbnail::get_cache_dir,
-            thumbnail::set_cache_dir,
-            tags::set_file_tag,
-            config::read_store_data,
-            config::write_store_data,
-            config::remove_store_data,
-            bookmark::create_bookmark,
-            bookmark::resolve_bookmark,
-            bookmark::restore_bookmarks,
-        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

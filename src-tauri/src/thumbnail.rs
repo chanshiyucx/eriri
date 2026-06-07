@@ -37,13 +37,7 @@ fn save_stats_to_disk(app: &AppHandle, stats: &ThumbnailStats) {
 pub fn init(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let stats = load_stats_from_disk(app.handle());
     app.manage(ThumbnailStatsState(Mutex::new(stats)));
-    allow_thumbnail_asset_scope(app.handle());
     Ok(())
-}
-
-fn allow_thumbnail_asset_scope(app: &AppHandle) {
-    let thumb_dir = get_thumbnail_dir(app);
-    let _ = app.asset_protocol_scope().allow_directory(&thumb_dir, true);
 }
 
 fn get_stats(app: &AppHandle) -> ThumbnailStats {
@@ -73,7 +67,7 @@ pub const THUMB_WIDTH: u32 = 256;
 pub const THUMB_FALLBACK_HEIGHT: u32 = 384;
 const THUMB_QUALITY: u8 = 70;
 
-// URL encoding set for asset protocol
+// Percent-encoding set for the `/file?path=` query value.
 const ENCODE_SET: percent_encoding::AsciiSet = percent_encoding::NON_ALPHANUMERIC
     .remove(b'-')
     .remove(b'_')
@@ -323,9 +317,10 @@ pub fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
     fallback_first_path
 }
 
-pub fn convert_file_src(path: &str) -> String {
+/// Build the server URL that streams the file at `path`.
+pub fn file_url(path: &str) -> String {
     let encoded_path = utf8_percent_encode(path, &ENCODE_SET).to_string();
-    format!("asset://localhost/{encoded_path}")
+    format!("/file?path={encoded_path}")
 }
 
 fn scan_thumbnail_stats(thumb_dir: &Path) -> ThumbnailStats {
@@ -345,7 +340,6 @@ fn scan_thumbnail_stats(thumb_dir: &Path) -> ThumbnailStats {
     stats
 }
 
-#[tauri::command(async)]
 pub fn clean_thumbnail_cache(
     app: AppHandle,
     days_old: Option<u64>,
@@ -446,7 +440,6 @@ pub fn clean_thumbnail_cache(
     Ok((deleted_count, freed_bytes))
 }
 
-#[tauri::command(async)]
 pub fn get_thumbnail_stats(app: AppHandle, rescan: bool) -> Result<(usize, u64), String> {
     let thumb_dir = get_thumbnail_dir(&app);
 
@@ -472,18 +465,11 @@ pub fn get_thumbnail_stats(app: AppHandle, rescan: bool) -> Result<(usize, u64),
     Ok((count, total_size))
 }
 
-#[tauri::command]
-pub fn get_cache_dir(app: AppHandle) -> Option<String> {
-    config::get_configured_cache_dir(&app).map(|path| path.to_string_lossy().into_owned())
-}
-
-#[tauri::command]
 pub fn set_cache_dir(app: AppHandle, path: String) -> Result<(), String> {
     let mut config = config::get(&app);
     config.cache_dir = Some(path);
     config::save_config(&app, &config)?;
     let thumb_dir = get_thumbnail_dir(&app);
     fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
-    allow_thumbnail_asset_scope(&app);
     Ok(())
 }

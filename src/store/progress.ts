@@ -1,15 +1,13 @@
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import { createDebouncedTauriFileStorage } from '@/lib/storage'
+import * as api from '@/lib/progress-api'
 import type { BookProgress, ComicProgress } from '@/types/library'
-
-const progressStore = createDebouncedTauriFileStorage('progress', 2000)
 
 interface ProgressState {
   comics: Record<string, ComicProgress>
   books: Record<string, BookProgress>
   favoriteChapters: Record<string, number[]>
+  hydrate: () => Promise<void>
   updateComicProgress: (comicId: string, progress: ComicProgress) => void
   updateBookProgress: (bookId: string, progress: BookProgress) => void
   removeComicProgress: (comicId: string) => void
@@ -19,39 +17,59 @@ interface ProgressState {
 }
 
 export const useProgressStore = create<ProgressState>()(
-  persist(
-    immer((set) => ({
-      comics: {},
-      books: {},
-      favoriteChapters: {},
+  immer((set) => ({
+    comics: {},
+    books: {},
+    favoriteChapters: {},
 
-      updateComicProgress: (comicId, progress) =>
+    hydrate: async () => {
+      try {
+        const snapshot = await api.fetchProgress()
         set((state) => {
-          state.comics[comicId] = progress
-        }),
+          state.comics = snapshot.comics
+          state.books = snapshot.books
+          state.favoriteChapters = snapshot.favoriteChapters
+        })
+      } catch (error) {
+        console.error('Failed to fetch progress:', error)
+      }
+    },
 
-      updateBookProgress: (bookId, progress) =>
-        set((state) => {
-          state.books[bookId] = progress
-        }),
+    updateComicProgress: (comicId, progress) => {
+      set((state) => {
+        state.comics[comicId] = progress
+      })
+      void api.saveComicProgress(comicId, progress)
+    },
 
-      removeComicProgress: (comicId) =>
-        set((state) => {
-          delete state.comics[comicId]
-        }),
+    updateBookProgress: (bookId, progress) => {
+      set((state) => {
+        state.books[bookId] = progress
+      })
+      void api.saveBookProgress(bookId, progress)
+    },
 
-      removeBookProgress: (bookId) =>
-        set((state) => {
-          delete state.books[bookId]
-        }),
+    removeComicProgress: (comicId) => {
+      set((state) => {
+        delete state.comics[comicId]
+      })
+      void api.removeComicProgress(comicId)
+    },
 
-      toggleChapterFavorite: (bookId, lineIndex) =>
-        set((state) => {
-          const list = state.favoriteChapters[bookId]
-          if (!list) {
-            state.favoriteChapters[bookId] = [lineIndex]
-            return
-          }
+    removeBookProgress: (bookId) => {
+      set((state) => {
+        delete state.books[bookId]
+      })
+      void api.removeBookProgress(bookId)
+    },
+
+    toggleChapterFavorite: (bookId, lineIndex) => {
+      let next: number[] = []
+      set((state) => {
+        const list = state.favoriteChapters[bookId]
+        if (!list) {
+          state.favoriteChapters[bookId] = [lineIndex]
+        } else {
           const idx = list.indexOf(lineIndex)
           if (idx === -1) {
             list.push(lineIndex)
@@ -59,16 +77,19 @@ export const useProgressStore = create<ProgressState>()(
             list.splice(idx, 1)
             if (list.length === 0) delete state.favoriteChapters[bookId]
           }
-        }),
-
-      removeBookChapters: (bookId) =>
-        set((state) => {
-          delete state.favoriteChapters[bookId]
-        }),
-    })),
-    {
-      name: 'progress',
-      storage: createJSONStorage(() => progressStore),
+        }
+        next = state.favoriteChapters[bookId]
+          ? [...state.favoriteChapters[bookId]]
+          : []
+      })
+      void api.saveBookFavorites(bookId, next)
     },
-  ),
+
+    removeBookChapters: (bookId) => {
+      set((state) => {
+        delete state.favoriteChapters[bookId]
+      })
+      void api.removeBookFavorites(bookId)
+    },
+  })),
 )

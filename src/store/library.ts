@@ -1,21 +1,11 @@
 import { create } from 'zustand'
-import { createJSONStorage, persist } from 'zustand/middleware'
 import { immer } from 'zustand/middleware/immer'
-import {
-  createBookmark,
-  generateUuid,
-  getLibraryType,
-  restoreBookmarks,
-  scanBookLibrary,
-  scanComicImages,
-  scanComicLibrary,
-  setFileTag,
-} from '@/lib/scanner'
-import { createTauriFileStorage } from '@/lib/storage'
+import * as api from '@/lib/library-api'
+import { scanComicImages, setFileTag } from '@/lib/scanner'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
+import { useUIStore } from '@/store/ui'
 import {
-  LibraryType,
   type Author,
   type Book,
   type Comic,
@@ -23,16 +13,17 @@ import {
   type FileTags,
   type Image,
   type Library,
-  type ScannedLibrary,
 } from '@/types/library'
 
-const libraryStorage = createTauriFileStorage('library')
-
 const MAX_CACHE_SIZE = 30
-const REMOVED_LIBRARY_TYPE = 'video'
+
+// Natural ordering (so "10" sorts after "2"), matching the backend scan order.
+const collator = new Intl.Collator(undefined, {
+  numeric: true,
+  sensitivity: 'base',
+})
 
 interface LibraryState {
-  isScanning: boolean
   libraries: Record<string, Library>
   comics: Record<string, Comic>
   authors: Record<string, Author>
@@ -41,21 +32,11 @@ interface LibraryState {
   libraryAuthors: Record<string, string[]>
   authorBooks: Record<string, string[]>
   comicImages: Record<string, ComicImage>
-  addLibrary: (library: Library, scannedLibrary: ScannedLibrary) => void
-  updateLibrary: (
-    id: string,
-    data: Partial<Library>,
-    scannedLibrary?: ScannedLibrary,
-  ) => void
-  removeLibrary: (id: string) => void
-  importLibrary: (path: string) => Promise<void>
+  hydrate: () => Promise<void>
   refreshLibrary: (libraryId: string) => Promise<void>
+  removeLibrary: (id: string) => Promise<void>
   reorderLibrary: (orderedIds: string[]) => void
-  selectedLibraryId: string | null
-  setSelectedLibraryId: (id: string | null) => void
   getComicImages: (comicId: string) => Promise<Image[]>
-  addComicImages: (comicId: string, images: Image[]) => void
-  removeComicImages: (comicId: string) => void
   updateBookTags: (bookId: string, tags: FileTags) => Promise<void>
   updateComicTags: (comicId: string, tags: FileTags) => Promise<void>
   updateComicImageTags: (
@@ -65,345 +46,230 @@ interface LibraryState {
   ) => Promise<void>
 }
 
-type LegacyLibrary = Omit<Library, 'status' | 'type'> & {
-  type: Library['type'] | typeof REMOVED_LIBRARY_TYPE
-  status: Library['status'] & {
-    videoId?: string
-  }
+interface CatalogMaps {
+  libraries: Record<string, Library>
+  comics: Record<string, Comic>
+  authors: Record<string, Author>
+  books: Record<string, Book>
+  libraryComics: Record<string, string[]>
+  libraryAuthors: Record<string, string[]>
+  authorBooks: Record<string, string[]>
 }
 
-type LegacyLibraryState = Omit<
-  Partial<LibraryState>,
-  'libraries' | 'libraryVideos' | 'videos'
-> & {
-  libraries?: Record<string, LegacyLibrary>
-  videos?: unknown
-  libraryVideos?: unknown
-}
+function buildMaps(catalog: api.Catalog): CatalogMaps {
+  const libraries: Record<string, Library> = {}
+  for (const lib of catalog.libraries) libraries[lib.id] = lib
 
-function migrateLibraryState(persistedState: unknown) {
-  if (!persistedState || typeof persistedState !== 'object') {
-    return persistedState
+  const comics: Record<string, Comic> = {}
+  const libraryComics: Record<string, string[]> = {}
+  for (const c of catalog.comics) {
+    comics[c.id] = c
+    ;(libraryComics[c.libraryId] ??= []).push(c.id)
   }
 
-  const state = persistedState as LegacyLibraryState
-
-  if (state.libraries) {
-    state.libraries = Object.fromEntries(
-      Object.entries(state.libraries)
-        .filter(([, library]) => library.type !== REMOVED_LIBRARY_TYPE)
-        .map(([id, library]) => {
-          const status = { ...library.status }
-          delete status.videoId
-          return [id, { ...library, status }]
-        }),
-    )
+  const authors: Record<string, Author> = {}
+  const libraryAuthors: Record<string, string[]> = {}
+  for (const a of catalog.authors) {
+    authors[a.id] = a
+    ;(libraryAuthors[a.libraryId] ??= []).push(a.id)
   }
 
-  delete state.videos
-  delete state.libraryVideos
+  const books: Record<string, Book> = {}
+  const authorBooks: Record<string, string[]> = {}
+  for (const b of catalog.books) {
+    books[b.id] = b
+    ;(authorBooks[b.authorId] ??= []).push(b.id)
+  }
 
-  return state
-}
+  for (const ids of Object.values(libraryComics))
+    ids.sort((x, y) => collator.compare(comics[x].title, comics[y].title))
+  for (const ids of Object.values(libraryAuthors))
+    ids.sort((x, y) => collator.compare(authors[x].name, authors[y].name))
+  for (const ids of Object.values(authorBooks))
+    ids.sort((x, y) => collator.compare(books[x].title, books[y].title))
 
-/**
- * Apply scanned library data to state (DRY helper)
- */
-function applyScannedLibrary(
-  state: LibraryState,
-  libraryId: string,
-  scannedLibrary: ScannedLibrary,
-) {
-  const { comics = [], authors = [] } = scannedLibrary
-
-  // Apply comics
-  state.libraryComics[libraryId] = comics.map((c) => {
-    state.comics[c.id] = c
-    return c.id
-  })
-
-  // Apply authors and their books
-  state.libraryAuthors[libraryId] = authors.map((a) => {
-    const { books = [], ...authorInfo } = a
-    state.authors[a.id] = authorInfo
-    state.authorBooks[a.id] = books.map((b) => {
-      state.books[b.id] = b
-      return b.id
-    })
-    return a.id
-  })
+  return {
+    libraries,
+    comics,
+    authors,
+    books,
+    libraryComics,
+    libraryAuthors,
+    authorBooks,
+  }
 }
 
 export const useLibraryStore = create<LibraryState>()(
-  persist(
-    immer((set, get) => ({
-      isScanning: false,
-      libraries: {},
-      comics: {},
-      authors: {},
-      books: {},
-      libraryComics: {},
-      libraryAuthors: {},
-      authorBooks: {},
-      comicImages: {},
-      selectedLibraryId: null,
+  immer((set, get) => ({
+    libraries: {},
+    comics: {},
+    authors: {},
+    books: {},
+    libraryComics: {},
+    libraryAuthors: {},
+    authorBooks: {},
+    comicImages: {},
 
-      addLibrary: (library, scannedLibrary) =>
+    hydrate: async () => {
+      try {
+        const catalog = await api.fetchCatalog()
+        const maps = buildMaps(catalog)
         set((state) => {
-          state.libraries[library.id] = library
-          applyScannedLibrary(state, library.id, scannedLibrary)
-        }),
+          Object.assign(state, maps)
+        })
+      } catch (error) {
+        console.error('Failed to fetch catalog:', error)
+      }
+    },
 
-      updateLibrary: (id, data, scannedLibrary) =>
+    refreshLibrary: async (id) => {
+      const setScanning = useUIStore.getState().setIsScanning
+      setScanning(true)
+      try {
+        const comicIds = get().libraryComics[id] ?? []
+        await api.refreshLibrary(id)
         set((state) => {
-          const library = state.libraries[id]
-          if (!library) return
-          Object.assign(library, data)
+          for (const comicId of comicIds) delete state.comicImages[comicId]
+        })
+        await get().hydrate()
+      } finally {
+        setScanning(false)
+      }
+    },
 
-          if (scannedLibrary) {
-            applyScannedLibrary(state, id, scannedLibrary)
-          }
-        }),
+    removeLibrary: async (id) => {
+      const state = get()
+      const comicIds = state.libraryComics[id] ?? []
+      const authorIds = state.libraryAuthors[id] ?? []
+      const bookIds = authorIds.flatMap((aId) => state.authorBooks[aId] ?? [])
 
-      removeLibrary: (id) =>
+      await api.removeLibrary(id)
+
+      const progressStore = useProgressStore.getState()
+      const tabsStore = useTabsStore.getState()
+      const uiStore = useUIStore.getState()
+
+      const idsToRemove = new Set([...comicIds, ...bookIds])
+      tabsStore.tabs
+        .filter((t) => idsToRemove.has(t.id))
+        .forEach((t) => tabsStore.removeTab(t.id))
+
+      for (const cId of comicIds) progressStore.removeComicProgress(cId)
+      for (const bId of bookIds) {
+        progressStore.removeBookProgress(bId)
+        progressStore.removeBookChapters(bId)
+      }
+
+      uiStore.clearNavStatus(id)
+      if (uiStore.selectedLibraryId === id) uiStore.setSelectedLibraryId(null)
+
+      await get().hydrate()
+    },
+
+    reorderLibrary: (orderedIds) => {
+      set((state) => {
+        orderedIds.forEach((id, index) => {
+          const lib = state.libraries[id]
+          if (lib) lib.sortOrder = index
+        })
+      })
+      void api.reorderLibraries(orderedIds)
+    },
+
+    updateBookTags: async (bookId, tags) => {
+      const book = get().books[bookId]
+      if (!book) return
+
+      const isSuccess = await api.setBookTags(bookId, tags)
+      if (isSuccess) {
         set((state) => {
-          const comicIds = state.libraryComics[id] ?? []
-          const authorIds = state.libraryAuthors[id] ?? []
-          const bookIds = authorIds.flatMap(
-            (aId) => state.authorBooks[aId] ?? [],
-          )
-
-          const progressStore = useProgressStore.getState()
-          const tabsStore = useTabsStore.getState()
-
-          const idsToRemove = new Set([...comicIds, ...bookIds])
-          const tabsToRemove = tabsStore.tabs.filter((t) =>
-            idsToRemove.has(t.id),
-          )
-
-          for (const cId of comicIds) {
-            delete state.comics[cId]
-            delete state.comicImages[cId]
-            progressStore.removeComicProgress(cId)
+          const b = state.books[bookId]
+          if (b) {
+            if (tags.starred !== undefined) b.starred = tags.starred
+            if (tags.deleted !== undefined) b.deleted = tags.deleted
           }
+        })
+      }
+    },
 
-          for (const aId of authorIds) {
-            delete state.authors[aId]
-            delete state.authorBooks[aId]
-          }
+    updateComicTags: async (comicId, tags) => {
+      const comic = get().comics[comicId]
+      if (!comic) return
 
-          for (const bId of bookIds) {
-            delete state.books[bId]
-            progressStore.removeBookProgress(bId)
-            progressStore.removeBookChapters(bId)
-          }
-
-          delete state.libraryComics[id]
-          delete state.libraryAuthors[id]
-          delete state.libraries[id]
-
-          tabsToRemove.forEach((t) => tabsStore.removeTab(t.id))
-
-          if (state.selectedLibraryId === id) {
-            state.selectedLibraryId = null
-          }
-        }),
-
-      importLibrary: async (path) => {
-        const libraryId = await generateUuid(path)
-        const existingLibrary = get().libraries[libraryId]
-        if (existingLibrary) return
-
-        const bookmark = await createBookmark(path)
-        const type = await getLibraryType(path)
-        const libraryName = path.split('/').pop() ?? 'Untitled Library'
-        const maxSortOrder = Math.max(
-          0,
-          ...Object.values(get().libraries).map((l) => l.sortOrder),
-        )
-        const library: Library = {
-          id: libraryId,
-          name: libraryName,
-          path,
-          type,
-          createdAt: Date.now(),
-          sortOrder: maxSortOrder + 1,
-          bookmark: bookmark ?? undefined,
-          status: {
-            comicId: '',
-            authorId: '',
-            bookId: '',
-          },
-        }
-
-        set({ isScanning: true })
-        const scannedLibrary: ScannedLibrary = {}
-        if (type === LibraryType.book) {
-          scannedLibrary.authors = await scanBookLibrary(path, libraryId)
-        } else {
-          scannedLibrary.comics = await scanComicLibrary(path, libraryId)
-        }
-        get().addLibrary(library, scannedLibrary)
-        set({ isScanning: false })
-      },
-
-      refreshLibrary: async (id) => {
-        const lib = get().libraries[id]
-        if (!lib) return
-
-        set({ isScanning: true })
-        const scannedLibrary: ScannedLibrary = {}
-        if (lib.type === LibraryType.book) {
-          scannedLibrary.authors = await scanBookLibrary(lib.path, lib.id)
-        } else {
-          scannedLibrary.comics = await scanComicLibrary(lib.path, lib.id)
-          const comicIds = scannedLibrary.comics?.map((c) => c.id) ?? []
-          set((state) => {
-            for (const comicId of comicIds) {
-              delete state.comicImages[comicId]
-            }
-          })
-        }
-        get().updateLibrary(id, { createdAt: Date.now() }, scannedLibrary)
-        set({ isScanning: false })
-      },
-
-      setSelectedLibraryId: (id) => set({ selectedLibraryId: id }),
-
-      reorderLibrary: (orderedIds) =>
+      const isSuccess = await api.setComicTags(comicId, tags)
+      if (isSuccess) {
         set((state) => {
-          orderedIds.forEach((id, index) => {
-            const lib = state.libraries[id]
-            if (lib) lib.sortOrder = index
-          })
-        }),
-
-      updateBookTags: async (bookId, tags) => {
-        const book = get().books[bookId]
-        if (!book) return
-
-        const isSuccess = await setFileTag(book.path, tags)
-        if (isSuccess) {
-          set((state) => {
-            const b = state.books[bookId]
-            if (b) {
-              if (tags.starred !== undefined) b.starred = tags.starred
-              if (tags.deleted !== undefined) b.deleted = tags.deleted
-            }
-          })
-        }
-      },
-
-      updateComicTags: async (comicId, tags) => {
-        const comic = get().comics[comicId]
-        if (!comic) return
-
-        const isSuccess = await setFileTag(comic.path, tags)
-        if (isSuccess) {
-          set((state) => {
-            const c = state.comics[comicId]
-            if (c) {
-              if (tags.starred !== undefined) c.starred = tags.starred
-              if (tags.deleted !== undefined) c.deleted = tags.deleted
-            }
-          })
-        }
-      },
-
-      updateComicImageTags: async (comicId, filename, tags) => {
-        const comicImages = get().comicImages[comicId]
-        if (!comicImages) return
-
-        const image = comicImages.images.find((i) => i.filename === filename)
-        if (!image) return
-
-        const isSuccess = await setFileTag(image.path, tags)
-        if (isSuccess) {
-          set((state) => {
-            const ci = state.comicImages[comicId]
-            if (!ci) return
-
-            const img = ci.images.find((i) => i.filename === filename)
-            if (img) {
-              if (tags.starred !== undefined) img.starred = tags.starred
-              if (tags.deleted !== undefined) img.deleted = tags.deleted
-            }
-          })
-        }
-      },
-
-      getComicImages: async (comicId) => {
-        const cache = get().comicImages[comicId]
-
-        if (cache) {
-          set((state) => {
-            const item = state.comicImages[comicId]
-            if (item) {
-              item.timestamp = Date.now()
-            }
-          })
-          return cache.images
-        }
-
-        const comic = get().comics[comicId]
-        if (!comic) return []
-
-        set({ isScanning: true })
-        const images = await scanComicImages(comic.path)
-        set({ isScanning: false })
-        get().addComicImages(comicId, images)
-
-        return images
-      },
-
-      addComicImages: (comicId, images) =>
-        set((state) => {
-          state.comicImages[comicId] = {
-            comicId,
-            images,
-            timestamp: Date.now(),
+          const c = state.comics[comicId]
+          if (c) {
+            if (tags.starred !== undefined) c.starred = tags.starred
+            if (tags.deleted !== undefined) c.deleted = tags.deleted
           }
+        })
+      }
+    },
 
-          const comic = state.comics[comicId]
-          if (comic) comic.pageCount = images.length
+    updateComicImageTags: async (comicId, filename, tags) => {
+      const comicImages = get().comicImages[comicId]
+      if (!comicImages) return
 
-          const entries = Object.values(state.comicImages)
-          if (entries.length <= MAX_CACHE_SIZE) return
+      const image = comicImages.images.find((i) => i.filename === filename)
+      if (!image) return
 
+      const isSuccess = await setFileTag(image.path, tags)
+      if (isSuccess) {
+        set((state) => {
+          const ci = state.comicImages[comicId]
+          if (!ci) return
+
+          const img = ci.images.find((i) => i.filename === filename)
+          if (img) {
+            if (tags.starred !== undefined) img.starred = tags.starred
+            if (tags.deleted !== undefined) img.deleted = tags.deleted
+          }
+        })
+      }
+    },
+
+    getComicImages: async (comicId) => {
+      const cache = get().comicImages[comicId]
+
+      if (cache) {
+        set((state) => {
+          const item = state.comicImages[comicId]
+          if (item) {
+            item.timestamp = Date.now()
+          }
+        })
+        return cache.images
+      }
+
+      const comic = get().comics[comicId]
+      if (!comic) return []
+
+      const setScanning = useUIStore.getState().setIsScanning
+      setScanning(true)
+      let images: Image[] = []
+      try {
+        images = await scanComicImages(comic.path)
+      } finally {
+        setScanning(false)
+      }
+
+      set((state) => {
+        state.comicImages[comicId] = { comicId, images, timestamp: Date.now() }
+        const c = state.comics[comicId]
+        if (c) c.pageCount = images.length
+
+        const entries = Object.values(state.comicImages)
+        if (entries.length > MAX_CACHE_SIZE) {
           entries
             .sort((a, b) => a.timestamp - b.timestamp)
             .slice(0, entries.length - MAX_CACHE_SIZE + 5)
             .forEach((item) => delete state.comicImages[item.comicId])
-        }),
-
-      removeComicImages: (comicId) =>
-        set((state) => {
-          delete state.comicImages[comicId]
-        }),
-    })),
-    {
-      name: 'library',
-      storage: createJSONStorage(() => libraryStorage),
-      version: 1,
-      migrate: migrateLibraryState,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      partialize: ({ isScanning, comicImages, ...rest }) => rest,
-      onRehydrateStorage: () => (state) => {
-        if (!state) return
-        const libraries = Object.values(state.libraries)
-        const bookmarks = libraries
-          .map((lib) => lib.bookmark)
-          .filter((b): b is string => !!b)
-        if (bookmarks.length > 0) {
-          restoreBookmarks(bookmarks).catch(console.error)
         }
+      })
 
-        libraries
-          .filter((lib) => !lib.bookmark)
-          .forEach((lib) => {
-            createBookmark(lib.path).catch(console.error)
-          })
-      },
+      return images
     },
-  ),
+  })),
 )

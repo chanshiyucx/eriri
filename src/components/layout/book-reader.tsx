@@ -30,7 +30,7 @@ const ReaderPadding = {
 
 function BookLine({ line }: { line: string }) {
   return (
-    <p className="text-text mx-auto w-full max-w-3xl px-8 pb-4 font-serif leading-relaxed break-words whitespace-pre-wrap">
+    <p className="text-text mx-auto w-full px-4 pb-4 font-serif leading-relaxed wrap-break-word whitespace-pre-wrap">
       {line}
     </p>
   )
@@ -172,7 +172,7 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
   const jumpToFn = useEffectEvent(jumpTo)
 
   useEffect(() => {
-    if (!book.path) return
+    if (!book?.path) return
     const load = async () => {
       try {
         const data = await parseBook(book.path)
@@ -182,7 +182,7 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
       }
     }
     void load()
-  }, [bookId, book.path])
+  }, [bookId, book?.path])
 
   useLayoutEffect(() => {
     lockScroll()
@@ -272,7 +272,7 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
       <div className="bg-base text-subtle relative flex h-8 items-center justify-between border-b px-3 text-xs">
         <div className="flex gap-2">
           <Button
-            className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
+            className="hover:bg-overlay h-6 w-6 bg-transparent"
             onClick={toggleToc}
             onMouseDown={(e) => e.stopPropagation()}
             title="展开目录"
@@ -327,7 +327,6 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
           {progress?.percent > 0 && (
             <span>{Math.round(progress.percent)}%</span>
           )}
-          <span>{(book.size / 1024).toFixed(1)}k</span>
         </div>
       </div>
 

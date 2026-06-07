@@ -119,8 +119,12 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   const currentIndex =
     readerPosition.comicId === comicId ? readerPosition.index : savedIndex
   const currentIndexRef = useRef(currentIndex)
-  // eslint-disable-next-line react-hooks/refs
-  currentIndexRef.current = currentIndex
+
+  // Layout effect (not passive) + declared before the scroll-jump effect below,
+  // so the ref is current when that effect reads it on comic/tab/view changes.
+  useLayoutEffect(() => {
+    currentIndexRef.current = currentIndex
+  }, [currentIndex])
 
   const setCurrentIndex = (index: number) => {
     setReaderPosition((prev) =>

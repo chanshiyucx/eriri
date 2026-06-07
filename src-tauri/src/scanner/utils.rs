@@ -3,6 +3,7 @@ use std::path::Path;
 use std::sync::LazyLock;
 use std::time::SystemTime;
 use tauri::AppHandle;
+use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_opener::OpenerExt;
 use tracing::info;
 use uuid::Uuid;
@@ -64,12 +65,6 @@ pub fn generate_uuid(input: &str) -> String {
     Uuid::new_v5(&NAMESPACE_UUID, input.as_bytes()).to_string()
 }
 
-#[tauri::command]
-pub fn generate_uuid_command(input: &str) -> String {
-    generate_uuid(input)
-}
-
-#[tauri::command(async)]
 pub fn get_library_type(library_path: &str) -> Result<String, String> {
     let path = Path::new(library_path);
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
@@ -103,9 +98,42 @@ pub fn get_library_type(library_path: &str) -> Result<String, String> {
     Ok("comic".to_string())
 }
 
-#[tauri::command]
 pub fn open_path_native(app: AppHandle, path: String) -> Result<(), String> {
     app.opener()
         .open_path(&path, None::<&str>)
         .map_err(|e| e.to_string())
+}
+
+/// Bring this menu-bar (accessory) app to the foreground so a native panel
+/// opens in front of the browser instead of behind it. Must run on the main
+/// thread. Unlike flipping the activation policy, this does not flash a Dock
+/// icon — the app stays an accessory.
+#[cfg(target_os = "macos")]
+pub fn activate_foreground() {
+    use objc2_app_kit::NSApplication;
+    use objc2_foundation::MainThreadMarker;
+
+    if let Some(mtm) = MainThreadMarker::new() {
+        let ns_app = NSApplication::sharedApplication(mtm);
+        #[allow(deprecated)]
+        ns_app.activateIgnoringOtherApps(true);
+    }
+}
+
+/// Open the native macOS folder picker and return the chosen absolute path.
+pub async fn pick_directory_impl(app: &AppHandle) -> Option<String> {
+    // Surface the app first so the panel appears in front (no Dock-icon flash).
+    #[cfg(target_os = "macos")]
+    let _ = app.run_on_main_thread(activate_foreground);
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folder(move |path| {
+        let _ = tx.send(path);
+    });
+
+    rx.await
+        .ok()
+        .flatten()
+        .and_then(|p| p.into_path().ok())
+        .map(|p| p.to_string_lossy().into_owned())
 }

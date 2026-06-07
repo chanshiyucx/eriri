@@ -44,7 +44,7 @@ pub fn get_configured_cache_dir(app: &AppHandle) -> Option<PathBuf> {
         .filter(|path| path.is_dir())
 }
 
-fn get_store_dir(app: &AppHandle) -> PathBuf {
+pub fn get_store_dir(app: &AppHandle) -> PathBuf {
     if let Some(base) = get_configured_cache_dir(app) {
         let store_dir = base.join("store");
         if store_dir.exists() || fs::create_dir_all(&store_dir).is_ok() {
@@ -96,14 +96,12 @@ pub fn save_config(app: &AppHandle, config: &Config) -> Result<(), String> {
     }
 }
 
-#[tauri::command]
 pub fn read_store_data(app: AppHandle, key: String) -> Option<String> {
     let store_dir = get_store_dir(&app);
     let file_path = store_file_path(&store_dir, &key, "json").ok()?;
     fs::read_to_string(file_path).ok()
 }
 
-#[tauri::command]
 pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(), String> {
     let store_dir = get_store_dir(&app);
     fs::create_dir_all(&store_dir).map_err(|e| e.to_string())?;
@@ -118,7 +116,6 @@ pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(),
     fs::rename(&tmp_path, file_path).map_err(|e| e.to_string())
 }
 
-#[tauri::command]
 pub fn remove_store_data(app: AppHandle, key: String) -> Result<(), String> {
     let store_dir = get_store_dir(&app);
     let file_path = store_file_path(&store_dir, &key, "json")?;

@@ -11,13 +11,12 @@ use turbojpeg::Decompressor;
 use crate::models::{Comic, ComicImage};
 use crate::tags::get_file_tags;
 use crate::thumbnail::{
-    THUMB_FALLBACK_HEIGHT, THUMB_WIDTH, add_stat, convert_file_src, find_cover_image,
-    get_thumbnail_dir, get_thumbnail_hash, is_image_file, process_and_get_dimensions,
+    THUMB_FALLBACK_HEIGHT, THUMB_WIDTH, add_stat, file_url, find_cover_image, get_thumbnail_dir,
+    get_thumbnail_hash, is_image_file, process_and_get_dimensions,
 };
 
 use super::utils::{current_time_millis, generate_uuid, get_created_time, is_hidden};
 
-#[tauri::command(async)]
 pub fn scan_comic_library(
     app: AppHandle,
     library_path: &str,
@@ -80,9 +79,9 @@ pub fn scan_comic_library(
                         }
 
                         if thumb_path.exists() {
-                            convert_file_src(&thumb_path.to_string_lossy())
+                            file_url(&thumb_path.to_string_lossy())
                         } else {
-                            convert_file_src(&cover_path.to_string_lossy())
+                            file_url(&cover_path.to_string_lossy())
                         }
                     })
                     .unwrap_or_default();
@@ -121,7 +120,6 @@ pub fn scan_comic_library(
     Ok(comics)
 }
 
-#[tauri::command(async)]
 pub fn scan_comic_images(app: AppHandle, comic_path: &str) -> Result<Vec<ComicImage>, String> {
     let start = std::time::Instant::now();
     let path = Path::new(comic_path);
@@ -191,13 +189,13 @@ pub fn scan_comic_images(app: AppHandle, comic_path: &str) -> Result<Vec<ComicIm
                 };
 
                 let thumbnail = if thumb_path.exists() {
-                    convert_file_src(&thumb_path.to_string_lossy())
+                    file_url(&thumb_path.to_string_lossy())
                 } else {
-                    convert_file_src(&path_str)
+                    file_url(&path_str)
                 };
 
                 let (starred, deleted) = get_file_tags(file_path);
-                let url = convert_file_src(&path_str);
+                let url = file_url(&path_str);
 
                 ComicImage {
                     path: path_str.into_owned(),
