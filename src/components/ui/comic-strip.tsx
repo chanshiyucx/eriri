@@ -16,8 +16,7 @@ interface ComicStripProps {
   images: Image[]
   initialIndex?: number
   orientation?: ComicStripOrientation
-  overscanViewports?: number
-  maxRenderedPages?: number
+  tagMode?: boolean
   className?: string
   onCurrentIndexChange?: (index: number) => void
   onDoubleClick?: (index: number) => void
@@ -32,6 +31,7 @@ interface StripPageProps {
   start: number
   width: number
   height: number
+  tagMode?: boolean
   onDoubleClick?: (index: number) => void
   onContextMenu?: (index: number) => void
   onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
@@ -44,6 +44,7 @@ const StripPage = memo(function StripPage({
   start,
   width,
   height,
+  tagMode,
   onDoubleClick,
   onContextMenu,
   onTags,
@@ -66,6 +67,7 @@ const StripPage = memo(function StripPage({
         image={image}
         className="h-full w-full"
         loading="eager"
+        tagMode={tagMode}
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
         onTags={onTags}
@@ -81,8 +83,7 @@ export const ComicStrip = forwardRef<ComicStripHandle, ComicStripProps>(
       images,
       initialIndex = 0,
       orientation = 'horizontal',
-      overscanViewports,
-      maxRenderedPages,
+      tagMode,
       className,
       onCurrentIndexChange,
       onDoubleClick,
@@ -96,8 +97,6 @@ export const ComicStrip = forwardRef<ComicStripHandle, ComicStripProps>(
         images,
         initialIndex,
         orientation,
-        overscanViewports,
-        maxRenderedPages,
         onCurrentIndexChange,
       })
 
@@ -141,6 +140,7 @@ export const ComicStrip = forwardRef<ComicStripHandle, ComicStripProps>(
                     start={page.start}
                     width={page.width}
                     height={page.height}
+                    tagMode={tagMode}
                     onDoubleClick={onDoubleClick}
                     onContextMenu={onContextMenu}
                     onTags={onTags}

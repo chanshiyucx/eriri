@@ -1,4 +1,4 @@
-import { Grid2x2, Rows2, StepForward } from 'lucide-react'
+import { Grid2x2, Rows2, StepForward, Tag } from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -16,6 +16,7 @@ import { usePanelNav } from '@/hooks/use-panel-nav'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
 import { openPathNative } from '@/lib/scanner'
+import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -77,6 +78,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const { readerVisible, middleClass, readerClass, openReader } = usePanelNav()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [previewIndex, setPreviewIndex] = useState<number>(-1)
+  const [tagMode, setTagMode] = useState(false)
 
   const activeTab = useTabsStore((s) => s.activeTab)
   const addTab = useTabsStore((s) => s.addTab)
@@ -193,19 +195,22 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     if (activeTab) return
 
     switch (e.code) {
-      case 'KeyP':
+      case SHORTCUTS.continueReading:
         handleContinueReading()
         break
-      case 'KeyB':
+      case SHORTCUTS.toggleViewMode:
         toggleViewMode()
         break
-      case 'KeyC':
+      case SHORTCUTS.toggleTagMode:
+        if (viewMode === 'scroll') setTagMode((prev) => !prev)
+        break
+      case SHORTCUTS.toggleItemDeleted:
         void updateComicTags(comic.id, { deleted: !comic.deleted })
         break
-      case 'KeyV':
+      case SHORTCUTS.toggleItemStarred:
         void updateComicTags(comic.id, { starred: !comic.starred })
         break
-      case 'KeyN': {
+      case SHORTCUTS.toggleImageDeleted: {
         const currentImage =
           viewMode === 'grid' ? images[previewIndex] : images[currentIndex]
         if (!currentImage) return
@@ -214,7 +219,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         })
         break
       }
-      case 'KeyM': {
+      case SHORTCUTS.toggleImageStarred: {
         const currentImage =
           viewMode === 'grid' ? images[previewIndex] : images[currentIndex]
         if (!currentImage) return
@@ -286,6 +291,15 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             >
               <StepForward className="h-4 w-4" />
             </Button>
+            {viewMode === 'scroll' && (
+              <Button
+                className={cn('h-6 w-6', tagMode && 'text-love')}
+                onClick={() => setTagMode((prev) => !prev)}
+                title="标注模式"
+              >
+                <Tag className="h-4 w-4" />
+              </Button>
+            )}
           </div>
 
           <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
@@ -314,8 +328,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             images={images}
             initialIndex={currentIndex}
             orientation="vertical"
-            overscanViewports={4}
-            maxRenderedPages={32}
+            tagMode={tagMode}
             onCurrentIndexChange={handleStripIndexChange}
             onDoubleClick={setPreviewIndex}
             onContextMenu={handleImageClick}

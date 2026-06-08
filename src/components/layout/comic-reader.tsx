@@ -1,4 +1,4 @@
-import { Columns2, Square, SquareMenu, Star, Trash2 } from 'lucide-react'
+import { Columns2, Square, SquareMenu, Star, Tag, Trash2 } from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -14,6 +14,7 @@ import { useClickOutside } from '@/hooks/use-click-outside'
 import { useIsPhone } from '@/hooks/use-is-phone'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
+import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -96,6 +97,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   const stripRef = useRef<ComicStripHandle>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
+  const [tagMode, setTagMode] = useState(false)
   const isImmersive = useUIStore((s) => s.isImmersive)
   const isPhone = useIsPhone()
   const activeTab = useTabsStore((s) => s.activeTab)
@@ -190,27 +192,32 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     if (activeTab !== comic.id) return
 
     switch (e.code) {
-      case 'KeyB':
+      case SHORTCUTS.toggleViewMode:
         toggleViewMode()
         break
-      case 'KeyT':
+      case SHORTCUTS.toggleToc:
         toggleToc()
         break
-      case 'KeyC':
+      case SHORTCUTS.toggleTagMode:
+        if (viewMode === 'scroll') setTagMode((prev) => !prev)
+        break
+      case SHORTCUTS.toggleItemDeleted:
         void updateComicTags(comic.id, { deleted: !comic.deleted })
         break
-      case 'KeyV':
+      case SHORTCUTS.toggleItemStarred:
         void updateComicTags(comic.id, { starred: !comic.starred })
         break
-      case 'KeyN': {
+      case SHORTCUTS.toggleImageDeleted: {
         const currentImage = images[currentIndex]
+        if (!currentImage) return
         void updateComicImageTags(comic.id, currentImage.filename, {
           deleted: !currentImage.deleted,
         })
         break
       }
-      case 'KeyM': {
+      case SHORTCUTS.toggleImageStarred: {
         const currentImage = images[currentIndex]
+        if (!currentImage) return
         void updateComicImageTags(comic.id, currentImage.filename, {
           starred: !currentImage.starred,
         })
@@ -292,6 +299,19 @@ export function ComicReader({ comicId }: ComicReaderProps) {
               )}
             />
           </Button>
+
+          {viewMode === 'scroll' && (
+            <Button
+              className={cn(
+                'hover:bg-overlay mx-1 h-6 w-6 bg-transparent',
+                tagMode && 'text-love',
+              )}
+              onClick={() => setTagMode((prev) => !prev)}
+              title="标注模式"
+            >
+              <Tag className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         <h3
@@ -329,8 +349,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             images={images}
             initialIndex={currentIndex}
             orientation={isPhone ? 'vertical' : 'horizontal'}
-            overscanViewports={4}
-            maxRenderedPages={32}
+            tagMode={tagMode}
             onCurrentIndexChange={handleStripIndexChange}
             onTags={updateComicImageTags}
           />

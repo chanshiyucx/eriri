@@ -1,8 +1,7 @@
-import { CircleChevronLeft, CircleChevronRight } from 'lucide-react'
 import { useEffect, useEffectEvent } from 'react'
-import { Button } from '@/components/ui/button'
 import { GridItem } from '@/components/ui/grid-item'
 import { TagButtons } from '@/components/ui/tag-buttons'
+import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import type { FileTags, Image } from '@/types/library'
 
@@ -16,6 +15,7 @@ interface ImageProps {
   isSelected?: boolean
   className?: string
   loading?: 'eager' | 'lazy'
+  tagMode?: boolean
 }
 
 export function GridImage({
@@ -50,22 +50,16 @@ export function GridImage({
 }
 
 export function SingleImage({
-  comicId,
   image,
-  onTags,
   onDoubleClick,
   onContextMenu,
 }: ImageProps) {
   if (!image) return null
 
-  const handleSetTags = (tags: FileTags) => {
-    void onTags(comicId, image.filename, tags)
-  }
-
   return (
     <figure
       className={cn(
-        'group flex h-full w-full items-center justify-center',
+        'flex h-full w-full items-center justify-center',
         image.deleted && 'opacity-40',
       )}
       onDoubleClick={() => onDoubleClick?.(image.index)}
@@ -75,7 +69,7 @@ export function SingleImage({
       }}
     >
       <div
-        className="relative max-h-full max-w-full"
+        className="max-h-full max-w-full"
         style={{
           aspectRatio: `${image.width} / ${image.height}`,
         }}
@@ -86,13 +80,6 @@ export function SingleImage({
           alt={image.filename}
           decoding="async"
           className="block h-full w-full"
-        />
-        <TagButtons
-          starred={image.starred}
-          deleted={image.deleted}
-          onStar={() => handleSetTags({ starred: !image.starred })}
-          onDelete={() => handleSetTags({ deleted: !image.deleted })}
-          size="md"
         />
       </div>
     </figure>
@@ -107,6 +94,7 @@ export function ScrollImage({
   onContextMenu,
   className = 'h-full',
   loading = 'eager',
+  tagMode = false,
 }: ImageProps) {
   const handleSetTags = (tags: FileTags) => {
     void onTags(comicId, image.filename, tags)
@@ -136,14 +124,16 @@ export function ScrollImage({
         loading={loading}
         className="block h-full w-full object-contain"
       />
-      <TagButtons
-        title={image.filename}
-        starred={image.starred}
-        deleted={image.deleted}
-        onStar={() => handleSetTags({ starred: !image.starred })}
-        onDelete={() => handleSetTags({ deleted: !image.deleted })}
-        size="md"
-      />
+      {tagMode && (
+        <TagButtons
+          title={image.filename}
+          starred={image.starred}
+          deleted={image.deleted}
+          onStar={() => handleSetTags({ starred: !image.starred })}
+          onDelete={() => handleSetTags({ deleted: !image.deleted })}
+          size="md"
+        />
+      )}
     </figure>
   )
 }
@@ -170,10 +160,10 @@ export function ImagePreview({
     if (index < 0) return
 
     switch (e.code) {
-      case 'ArrowLeft':
+      case SHORTCUTS.prevImage:
         if (index > 0) onIndexChange(index - 1)
         break
-      case 'ArrowRight':
+      case SHORTCUTS.nextImage:
         if (index < images.length - 1) onIndexChange(index + 1)
         break
     }
@@ -183,6 +173,17 @@ export function ImagePreview({
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  // Warm the HTTP cache for the adjacent pages so left/right navigation
+  // paints the next image instantly instead of fetching on keypress.
+  useEffect(() => {
+    if (index < 0) return
+    for (const neighbor of [images[index + 1], images[index - 1]]) {
+      if (!neighbor) continue
+      const img = new window.Image()
+      img.src = neighbor.url
+    }
+  }, [index, images])
 
   if (!currentImage) return null
 
@@ -195,24 +196,6 @@ export function ImagePreview({
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
       />
-
-      {index > 0 && (
-        <Button
-          className="hover:text-love text-subtle/60 absolute top-1/2 left-4 -translate-y-1/2 bg-transparent transition-colors hover:bg-transparent"
-          onClick={() => onIndexChange(index - 1)}
-        >
-          <CircleChevronLeft className="h-10 w-10" />
-        </Button>
-      )}
-
-      {index < images.length - 1 && (
-        <Button
-          className="hover:text-love text-subtle/60 absolute top-1/2 right-4 -translate-y-1/2 bg-transparent transition-colors hover:bg-transparent"
-          onClick={() => onIndexChange(index + 1)}
-        >
-          <CircleChevronRight className="h-10 w-10" />
-        </Button>
-      )}
     </div>
   )
 }
