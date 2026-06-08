@@ -10,6 +10,7 @@ interface GridItemProps {
   deleted: boolean
   isSelected?: boolean
   progress?: ComicProgress
+  showTags?: boolean
   onClick: () => void
   onDoubleClick?: () => void
   onContextMenu: () => void
@@ -25,6 +26,7 @@ export function GridItem({
   deleted,
   isSelected,
   progress,
+  showTags = true,
   onClick,
   onDoubleClick,
   onContextMenu,
@@ -53,14 +55,16 @@ export function GridItem({
         decoding="async"
         className="h-full w-full object-cover"
       />
-      <TagButtons
-        title={title}
-        starred={!!starred}
-        deleted={!!deleted}
-        onStar={onStar}
-        onDelete={onDelete}
-        size="sm"
-      />
+      {showTags && (
+        <TagButtons
+          title={title}
+          starred={!!starred}
+          deleted={!!deleted}
+          onStar={onStar}
+          onDelete={onDelete}
+          size="sm"
+        />
+      )}
 
       {progress && progress.total > 0 && (
         <div className="absolute inset-x-0 bottom-0 flex justify-between overflow-hidden bg-gradient-to-t from-black/80 via-black/40 to-transparent p-2 text-xs text-white group-hover:opacity-0">

@@ -20,10 +20,6 @@ export function usePanelNav() {
     'md:flex',
   )
 
-  const openSidebar = () => {
-    if (!isPhone) return
-    setSidebarCollapsed(false)
-  }
   const openMiddle = () => {
     if (!isPhone) return
     setSidebarCollapsed(true)
@@ -39,7 +35,6 @@ export function usePanelNav() {
     readerVisible,
     middleClass,
     readerClass,
-    openSidebar,
     openMiddle,
     openReader,
   }
