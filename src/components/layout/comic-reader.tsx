@@ -125,6 +125,9 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   const currentIndex =
     readerPosition.comicId === comicId ? readerPosition.index : savedIndex
   const currentIndexRef = useRef(currentIndex)
+  // Page under the cursor in scroll mode (null when not hovering any page), so
+  // N/M tag the hovered page; falls back to the centered page otherwise.
+  const hoveredIndexRef = useRef<number | null>(null)
 
   // Layout effect (not passive) + declared before the scroll-jump effect below,
   // so the ref is current when that effect reads it on comic/tab/view changes.
@@ -176,6 +179,20 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     throttledUpdateProgress.current(comic.id, newProgress)
   }
 
+  const handleHover = (index: number | null) => {
+    hoveredIndexRef.current = index
+  }
+
+  // Target of the N/M page-tag shortcuts: the hovered page in scroll mode, else
+  // the centered/current page (single mode never hovers).
+  const getTagTargetImage = () => {
+    const index =
+      viewMode === 'scroll' && hoveredIndexRef.current != null
+        ? hoveredIndexRef.current
+        : currentIndex
+    return images[index]
+  }
+
   const handleCloseToc = () => {
     setTocCollapsed(true)
   }
@@ -210,18 +227,18 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         void updateComicTags(comic.id, { starred: !comic.starred })
         break
       case SHORTCUTS.toggleImageDeleted: {
-        const currentImage = images[currentIndex]
-        if (!currentImage) return
-        void updateComicImageTags(comic.id, currentImage.filename, {
-          deleted: !currentImage.deleted,
+        const targetImage = getTagTargetImage()
+        if (!targetImage) return
+        void updateComicImageTags(comic.id, targetImage.filename, {
+          deleted: !targetImage.deleted,
         })
         break
       }
       case SHORTCUTS.toggleImageStarred: {
-        const currentImage = images[currentIndex]
-        if (!currentImage) return
-        void updateComicImageTags(comic.id, currentImage.filename, {
-          starred: !currentImage.starred,
+        const targetImage = getTagTargetImage()
+        if (!targetImage) return
+        void updateComicImageTags(comic.id, targetImage.filename, {
+          starred: !targetImage.starred,
         })
         break
       }
@@ -302,24 +319,16 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             />
           </Button>
 
-          <Button
-            className={cn(
-              'hover:bg-overlay mx-1 h-6 w-6 bg-transparent',
-              tagMode && 'text-love',
-            )}
-            onClick={toggleTagMode}
-            title="标注模式"
-          >
-            <Tag className="h-4 w-4" />
+          <Button className="h-6 w-6" onClick={toggleTagMode} title="标注模式">
+            <Tag
+              className={cn('h-4 w-4', tagMode && 'text-love fill-gold/80')}
+            />
           </Button>
         </div>
 
         <h3
           className={cn(
-            // Phone: flow inline to the right of the icons, with a gap, and
-            // ellipsis when there isn't enough room.
             'mx-2 min-w-0 flex-1 truncate text-left',
-            // md+: restore the absolutely-centered title (unchanged).
             'md:absolute md:top-1/2 md:left-1/2 md:mx-0 md:max-w-[60%] md:flex-none md:-translate-1/2 md:text-center',
           )}
         >
@@ -352,6 +361,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             orientation={isPhone ? 'vertical' : 'horizontal'}
             tagMode={tagMode}
             onCurrentIndexChange={handleStripIndexChange}
+            onHover={handleHover}
             onTags={updateComicImageTags}
           />
         )}

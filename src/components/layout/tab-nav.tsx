@@ -54,8 +54,6 @@ export function TabNav() {
   const removeTab = useTabsStore((s) => s.removeTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  // From an open tab, just close it — the panel layout underneath keeps its
-  // collapse state, so the previously shown column reappears (same on phone).
   const handleSidebar = () => (activeTab ? setActiveTab('') : toggleSidebar())
   const handleMiddle = () => (activeTab ? setActiveTab('') : toggleMiddle())
 
