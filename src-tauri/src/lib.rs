@@ -18,6 +18,7 @@ pub fn run() {
             thumbnail::init(app)?;
             progress::init(app.handle())?;
             library::init(app.handle())?;
+            server::init_allowed_roots(app.handle());
             server::init(app.handle());
             tray::setup(app)?;
 
