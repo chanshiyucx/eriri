@@ -8,6 +8,8 @@ import {
 import { useEffect, useEffectEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { usePanelNav } from '@/hooks/use-panel-nav'
+import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useTabsStore, type Tab } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
@@ -48,13 +50,24 @@ export function TabNav() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const toggleMiddle = useUIStore((s) => s.toggleMiddle)
   const toggleImmersive = useUIStore((s) => s.toggleImmersive)
+  const { openSidebar, openMiddle } = usePanelNav()
   const tabs = useTabsStore((s) => s.tabs)
   const activeTab = useTabsStore((s) => s.activeTab)
   const removeTab = useTabsStore((s) => s.removeTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  const handleSidebar = () => (activeTab ? setActiveTab('') : toggleSidebar())
-  const handleMiddle = () => (activeTab ? setActiveTab('') : toggleMiddle())
+  // From an open tab, return home; on phone also reveal the target panel (left
+  // sidebar / middle column). The open* helpers no-op on non-phone.
+  const handleSidebar = () => {
+    if (!activeTab) return toggleSidebar()
+    setActiveTab('')
+    openSidebar()
+  }
+  const handleMiddle = () => {
+    if (!activeTab) return toggleMiddle()
+    setActiveTab('')
+    openMiddle()
+  }
 
   const navigateTab = (direction: 1 | -1) => {
     if (!tabs.length) return
@@ -84,22 +97,22 @@ export function TabNav() {
     if (e.metaKey || e.ctrlKey || e.altKey) return
 
     switch (e.code) {
-      case 'Space':
+      case SHORTCUTS.toggleImmersive:
         e.preventDefault() // Prevent page scrolling
         toggleImmersive()
         break
-      case 'KeyX':
+      case SHORTCUTS.closeTab:
         removeTab(activeTab)
         break
-      case 'KeyA':
+      case SHORTCUTS.toggleSidebar:
         toggleSidebar()
         break
-      case 'KeyD':
+      case SHORTCUTS.toggleMiddlePanel:
         toggleMiddle()
         break
-      case 'ArrowUp':
-      case 'ArrowDown':
-        navigateTab(e.code === 'ArrowUp' ? -1 : 1)
+      case SHORTCUTS.prevTab:
+      case SHORTCUTS.nextTab:
+        navigateTab(e.code === SHORTCUTS.prevTab ? -1 : 1)
         break
     }
   })
@@ -114,7 +127,7 @@ export function TabNav() {
       <Button
         className="h-6 w-6"
         onClick={handleSidebar}
-        title={activeTab ? '返回主页' : '折叠/展开左边栏'}
+        title={activeTab ? '返回主页并显示左边栏' : '折叠/展开左边栏'}
       >
         {isSidebarCollapsed ? (
           <PanelLeftOpen className="h-4 w-4" />
@@ -126,7 +139,7 @@ export function TabNav() {
       <Button
         className="h-6 w-6"
         onClick={handleMiddle}
-        title={activeTab ? '返回主页' : '折叠/展开中间栏'}
+        title={activeTab ? '返回主页并显示中间栏' : '折叠/展开中间栏'}
       >
         {isMiddleCollapsed ? (
           <Columns2 className="h-4 w-4" />

@@ -269,7 +269,11 @@ export function useComicStrip({
     onCurrentIndexChangeRef.current = onCurrentIndexChange
   }, [onCurrentIndexChange])
 
-  useEffect(() => {
+  // Layout effect, declared before the scroll-restore effect below: that effect
+  // reads layoutRef.current synchronously in the same commit, so the ref must be
+  // refreshed first (a passive effect lagged a commit behind, leaving the
+  // initial visibleRange at {0,0} until the first scroll).
+  useLayoutEffect(() => {
     layoutRef.current = layout
   }, [layout])
 

@@ -15,6 +15,7 @@ import { useScrollLock } from '@/hooks/use-scroll-lock'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createBookProgress } from '@/lib/progress'
 import { parseBook } from '@/lib/scanner'
+import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -242,16 +243,16 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
     if (activeTab && activeTab !== book.id) return
 
     switch (e.code) {
-      case 'KeyT':
+      case SHORTCUTS.toggleToc:
         toggleToc()
         break
-      case 'KeyC':
+      case SHORTCUTS.toggleItemDeleted:
         void updateBookTags(book.id, { deleted: !book.deleted })
         break
-      case 'KeyV':
+      case SHORTCUTS.toggleItemStarred:
         void updateBookTags(book.id, { starred: !book.starred })
         break
-      case 'KeyP':
+      case SHORTCUTS.continueReading:
         handleContinueReading()
         break
     }
