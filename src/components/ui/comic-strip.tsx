@@ -19,6 +19,7 @@ interface ComicStripProps {
   tagMode?: boolean
   className?: string
   onCurrentIndexChange?: (index: number) => void
+  onHover?: (index: number | null) => void
   onDoubleClick?: (index: number) => void
   onContextMenu?: (index: number) => void
   onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
@@ -32,6 +33,7 @@ interface StripPageProps {
   width: number
   height: number
   tagMode?: boolean
+  onHover?: (index: number | null) => void
   onDoubleClick?: (index: number) => void
   onContextMenu?: (index: number) => void
   onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
@@ -45,6 +47,7 @@ const StripPage = memo(function StripPage({
   width,
   height,
   tagMode,
+  onHover,
   onDoubleClick,
   onContextMenu,
   onTags,
@@ -61,6 +64,8 @@ const StripPage = memo(function StripPage({
         width,
         height,
       }}
+      onMouseEnter={() => onHover?.(image.index)}
+      onMouseLeave={() => onHover?.(null)}
     >
       <ScrollImage
         comicId={comicId}
@@ -86,6 +91,7 @@ export const ComicStrip = forwardRef<ComicStripHandle, ComicStripProps>(
       tagMode,
       className,
       onCurrentIndexChange,
+      onHover,
       onDoubleClick,
       onContextMenu,
       onTags,
@@ -141,6 +147,7 @@ export const ComicStrip = forwardRef<ComicStripHandle, ComicStripProps>(
                     width={page.width}
                     height={page.height}
                     tagMode={tagMode}
+                    onHover={onHover}
                     onDoubleClick={onDoubleClick}
                     onContextMenu={onContextMenu}
                     onTags={onTags}

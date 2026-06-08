@@ -69,7 +69,7 @@ export function SingleImage({
   return (
     <figure
       className={cn(
-        'group flex h-full w-full items-center justify-center',
+        'flex h-full w-full items-center justify-center',
         image.deleted && 'opacity-40',
       )}
       onDoubleClick={() => onDoubleClick?.(image.index)}
@@ -79,7 +79,7 @@ export function SingleImage({
       }}
     >
       <div
-        className="relative max-h-full max-w-full"
+        className="group relative max-h-full max-w-full"
         style={{
           aspectRatio: `${image.width} / ${image.height}`,
         }}

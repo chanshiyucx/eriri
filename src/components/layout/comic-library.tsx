@@ -75,6 +75,8 @@ interface ComicLibraryProps {
 export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const stripRef = useRef<ComicStripHandle>(null)
   const currentIndexRef = useRef(0)
+  // Page under the cursor in scroll mode (null when not hovering any page).
+  const hoveredIndexRef = useRef<number | null>(null)
   const { readerVisible, middleClass, readerClass, openReader } = usePanelNav()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [previewIndex, setPreviewIndex] = useState<number>(-1)
@@ -190,6 +192,17 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     throttledUpdateProgress.current(comic.id, newProgress)
   }
 
+  const handleHover = (index: number | null) => {
+    hoveredIndexRef.current = index
+  }
+
+  // Target of the N/M page-tag shortcuts: the previewed image in grid mode, the
+  // hovered page in scroll mode, else the centered/current page.
+  const getTagTargetImage = () => {
+    if (viewMode === 'grid') return images[previewIndex]
+    return images[hoveredIndexRef.current ?? currentIndex]
+  }
+
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
     if (!comic) return
@@ -212,20 +225,18 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         void updateComicTags(comic.id, { starred: !comic.starred })
         break
       case SHORTCUTS.toggleImageDeleted: {
-        const currentImage =
-          viewMode === 'grid' ? images[previewIndex] : images[currentIndex]
-        if (!currentImage) return
-        void updateComicImageTags(comic.id, currentImage.filename, {
-          deleted: !currentImage.deleted,
+        const targetImage = getTagTargetImage()
+        if (!targetImage) return
+        void updateComicImageTags(comic.id, targetImage.filename, {
+          deleted: !targetImage.deleted,
         })
         break
       }
       case SHORTCUTS.toggleImageStarred: {
-        const currentImage =
-          viewMode === 'grid' ? images[previewIndex] : images[currentIndex]
-        if (!currentImage) return
-        void updateComicImageTags(comic.id, currentImage.filename, {
-          starred: !currentImage.starred,
+        const targetImage = getTagTargetImage()
+        if (!targetImage) return
+        void updateComicImageTags(comic.id, targetImage.filename, {
+          starred: !targetImage.starred,
         })
         break
       }
@@ -294,11 +305,13 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
               <StepForward className="h-4 w-4" />
             </Button>
             <Button
-              className={cn('h-6 w-6', tagMode && 'text-love')}
+              className="h-6 w-6"
               onClick={toggleTagMode}
               title="标注模式"
             >
-              <Tag className="h-4 w-4" />
+              <Tag
+                className={cn('h-4 w-4', tagMode && 'text-love fill-gold/80')}
+              />
             </Button>
           </div>
 
@@ -330,6 +343,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             orientation="vertical"
             tagMode={tagMode}
             onCurrentIndexChange={handleStripIndexChange}
+            onHover={handleHover}
             onDoubleClick={setPreviewIndex}
             onContextMenu={handleImageClick}
             onTags={updateComicImageTags}
