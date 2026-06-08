@@ -148,7 +148,10 @@ fn spawn_import(app: AppHandle) {
         };
         let app2 = app.clone();
         match tokio::task::spawn_blocking(move || crate::library::import(&app2, &path)).await {
-            Ok(Ok(_)) => rebuild(&app),
+            Ok(Ok(_)) => {
+                crate::server::rebuild_allowed_roots(&app);
+                rebuild(&app);
+            }
             Ok(Err(e)) => error!(error = %e, "Import failed"),
             Err(e) => error!(error = %e, "Import task panicked"),
         }
@@ -161,21 +164,28 @@ fn spawn_set_cache(app: AppHandle) {
             return;
         };
         let app2 = app.clone();
-        // The cache dir holds both `thumbnail/` and `store/library.db`, so after
-        // repointing it re-open the DB to reflect the new store without a restart.
-        let _ = tokio::task::spawn_blocking(move || {
+        let updated = tokio::task::spawn_blocking(move || {
             if let Err(e) = crate::thumbnail::set_cache_dir(app2.clone(), path) {
                 error!(error = %e, "Failed to set cache directory");
-                return;
+                return false;
             }
             if let Err(e) = crate::library::reopen(&app2) {
                 error!(error = %e, "Failed to re-open library DB after cache dir change");
+                return false;
             }
-            // Rescan stats from the new dir so the tray footer is accurate.
             let _ = crate::thumbnail::get_thumbnail_stats(app2, true);
+            true
         })
-        .await;
-        rebuild(&app);
+        .await
+        .unwrap_or_else(|e| {
+            error!(error = %e, "Set cache task panicked");
+            false
+        });
+
+        if updated {
+            crate::server::rebuild_allowed_roots(&app);
+            rebuild(&app);
+        }
     });
 }
 

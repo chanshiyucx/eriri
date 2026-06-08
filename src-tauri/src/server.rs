@@ -7,6 +7,7 @@
 
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
+use std::sync::RwLock;
 
 use axum::Json;
 use axum::Router;
@@ -268,11 +269,13 @@ async fn remove_library(
     State(app): State<AppHandle>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<StatusCode, ApiError> {
-    let state = app.state::<library::LibraryDb>();
-    let conn = state.0.lock().map_err(|e| ApiError(e.to_string()))?;
-    library::remove(&conn, &id)
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(|e| ApiError(e.to_string()))
+    {
+        let state = app.state::<library::LibraryDb>();
+        let conn = state.0.lock().map_err(|e| ApiError(e.to_string()))?;
+        library::remove(&conn, &id).map_err(|e| ApiError(e.to_string()))?;
+    }
+    rebuild_allowed_roots(&app);
+    Ok(StatusCode::NO_CONTENT)
 }
 
 async fn reorder_libraries(
@@ -376,39 +379,84 @@ async fn serve_file(
     req: Request,
 ) -> Response {
     let path = PathBuf::from(&q.path);
-    if !is_allowed(&app, &path) {
+    let Ok(canon) = path.canonicalize() else {
         return (StatusCode::FORBIDDEN, "forbidden").into_response();
-    }
-
-    // ServeFile handles Range, Content-Type and conditional requests.
-    match ServeFile::new(&path).oneshot(req).await {
-        Ok(res) => res.map(axum::body::Body::new),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
-}
-
-/// Only allow files inside the thumbnail cache or an imported library root,
-/// so the LAN endpoint can't be used to read arbitrary files off the Mac.
-fn is_allowed(app: &AppHandle, requested: &Path) -> bool {
-    let Ok(canon) = requested.canonicalize() else {
-        return false;
+    };
+    let roots = app.state::<AllowedRoots>();
+    let Some(is_thumbnail) = roots.classify(&canon) else {
+        return (StatusCode::FORBIDDEN, "forbidden").into_response();
     };
 
-    let thumb_dir = crate::thumbnail::get_thumbnail_dir(app);
-    if thumb_dir
-        .canonicalize()
-        .is_ok_and(|t| canon.starts_with(&t))
-    {
-        return true;
+    // ServeFile handles Range, Content-Type and conditional requests.
+    match ServeFile::new(&canon).oneshot(req).await {
+        Ok(res) => {
+            let mut res = res.map(axum::body::Body::new);
+            if is_thumbnail {
+                res.headers_mut().insert(
+                    header::CACHE_CONTROL,
+                    axum::http::HeaderValue::from_static("public, max-age=31536000, immutable"),
+                );
+            }
+            res
+        }
+        Err(e) => {
+            warn!(error = %e, path = %canon.display(), "Failed to serve file");
+            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+        }
     }
-
-    library_roots(app)
-        .iter()
-        .filter_map(|root| Path::new(root).canonicalize().ok())
-        .any(|root| canon.starts_with(&root))
 }
 
-/// Imported library paths — the roots whose files may be served over `/file`.
+// --- File allowlist ---
+
+struct AllowedRoots(RwLock<RootsSnapshot>);
+
+#[derive(Default)]
+struct RootsSnapshot {
+    thumb_dir: Option<PathBuf>,
+    roots: Vec<PathBuf>,
+}
+
+impl AllowedRoots {
+    fn classify(&self, canon: &Path) -> Option<bool> {
+        let Ok(s) = self.0.read() else {
+            return None;
+        };
+        if !s.roots.iter().any(|root| canon.starts_with(root)) {
+            return None;
+        }
+        Some(s.thumb_dir.as_ref().is_some_and(|t| canon.starts_with(t)))
+    }
+}
+
+pub(crate) fn init_allowed_roots(app: &AppHandle) {
+    app.manage(AllowedRoots(RwLock::new(RootsSnapshot::default())));
+    rebuild_allowed_roots(app);
+}
+
+pub(crate) fn rebuild_allowed_roots(app: &AppHandle) {
+    let thumb_dir = crate::thumbnail::get_thumbnail_dir(app).canonicalize().ok();
+
+    let mut roots: Vec<PathBuf> = thumb_dir
+        .as_ref()
+        .into_iter()
+        .cloned()
+        .chain(
+            library_roots(app)
+                .into_iter()
+                .filter_map(|root| Path::new(&root).canonicalize().ok()),
+        )
+        .collect();
+    roots.sort_unstable();
+    roots.dedup();
+
+    let snapshot = RootsSnapshot { thumb_dir, roots };
+    if let Some(state) = app.try_state::<AllowedRoots>()
+        && let Ok(mut w) = state.0.write()
+    {
+        *w = snapshot;
+    }
+}
+
 fn library_roots(app: &AppHandle) -> Vec<String> {
     // The catalog lives in SQLite now; read imported library paths from there.
     crate::library::list_for_menu(app)
