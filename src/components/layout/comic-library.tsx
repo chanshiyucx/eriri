@@ -78,13 +78,14 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const { readerVisible, middleClass, readerClass, openReader } = usePanelNav()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const [previewIndex, setPreviewIndex] = useState<number>(-1)
-  const [tagMode, setTagMode] = useState(false)
 
   const activeTab = useTabsStore((s) => s.activeTab)
   const addTab = useTabsStore((s) => s.addTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
   const setNavStatus = useUIStore((s) => s.setNavStatus)
+  const tagMode = useUIStore((s) => s.tagMode)
+  const toggleTagMode = useUIStore((s) => s.toggleTagMode)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
   const getComicImages = useLibraryStore((s) => s.getComicImages)
@@ -202,7 +203,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         toggleViewMode()
         break
       case SHORTCUTS.toggleTagMode:
-        if (viewMode === 'scroll') setTagMode((prev) => !prev)
+        toggleTagMode()
         break
       case SHORTCUTS.toggleItemDeleted:
         void updateComicTags(comic.id, { deleted: !comic.deleted })
@@ -249,6 +250,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     <GridImage
       comicId={comicId}
       image={img}
+      showTags={tagMode}
       onDoubleClick={setPreviewIndex}
       onContextMenu={handleImageClick}
       onTags={updateComicImageTags}
@@ -291,15 +293,13 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             >
               <StepForward className="h-4 w-4" />
             </Button>
-            {viewMode === 'scroll' && (
-              <Button
-                className={cn('h-6 w-6', tagMode && 'text-love')}
-                onClick={() => setTagMode((prev) => !prev)}
-                title="标注模式"
-              >
-                <Tag className="h-4 w-4" />
-              </Button>
-            )}
+            <Button
+              className={cn('h-6 w-6', tagMode && 'text-love')}
+              onClick={toggleTagMode}
+              title="标注模式"
+            >
+              <Tag className="h-4 w-4" />
+            </Button>
           </div>
 
           <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
@@ -349,6 +349,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
           index={previewIndex}
           onIndexChange={setPreviewIndex}
           onTags={updateComicImageTags}
+          tagMode={tagMode}
           onDoubleClick={() => setPreviewIndex(-1)}
           onContextMenu={(idx: number) => {
             setPreviewIndex(-1)

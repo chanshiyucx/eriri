@@ -80,6 +80,7 @@ function TableOfContents({
             comicId={comicId}
             image={img}
             isSelected={currentIndex === img.index}
+            showTags={false}
             onClick={() => onSelect(img.index)}
             onTags={onTags}
           />
@@ -97,8 +98,9 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   const stripRef = useRef<ComicStripHandle>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('scroll')
-  const [tagMode, setTagMode] = useState(false)
   const isImmersive = useUIStore((s) => s.isImmersive)
+  const tagMode = useUIStore((s) => s.tagMode)
+  const toggleTagMode = useUIStore((s) => s.toggleTagMode)
   const isPhone = useIsPhone()
   const activeTab = useTabsStore((s) => s.activeTab)
 
@@ -199,7 +201,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         toggleToc()
         break
       case SHORTCUTS.toggleTagMode:
-        if (viewMode === 'scroll') setTagMode((prev) => !prev)
+        toggleTagMode()
         break
       case SHORTCUTS.toggleItemDeleted:
         void updateComicTags(comic.id, { deleted: !comic.deleted })
@@ -300,18 +302,16 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             />
           </Button>
 
-          {viewMode === 'scroll' && (
-            <Button
-              className={cn(
-                'hover:bg-overlay mx-1 h-6 w-6 bg-transparent',
-                tagMode && 'text-love',
-              )}
-              onClick={() => setTagMode((prev) => !prev)}
-              title="标注模式"
-            >
-              <Tag className="h-4 w-4" />
-            </Button>
-          )}
+          <Button
+            className={cn(
+              'hover:bg-overlay mx-1 h-6 w-6 bg-transparent',
+              tagMode && 'text-love',
+            )}
+            onClick={toggleTagMode}
+            title="标注模式"
+          >
+            <Tag className="h-4 w-4" />
+          </Button>
         </div>
 
         <h3
@@ -339,6 +339,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             index={currentIndex}
             onIndexChange={jumpTo}
             onTags={updateComicImageTags}
+            tagMode={tagMode}
           />
         ) : (
           <ComicStrip

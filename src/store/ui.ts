@@ -16,6 +16,7 @@ interface UIState {
   isSidebarCollapsed: boolean
   isMiddleCollapsed: boolean
   isImmersive: boolean
+  tagMode: boolean
   theme: ThemeMode
   isScanning: boolean
   selectedLibraryId: string | null
@@ -25,6 +26,7 @@ interface UIState {
   setSidebarCollapsed: (value: boolean) => void
   setMiddleCollapsed: (value: boolean) => void
   toggleImmersive: () => void
+  toggleTagMode: () => void
   setTheme: (theme: ThemeMode) => void
   setIsScanning: (value: boolean) => void
   setSelectedLibraryId: (id: string | null) => void
@@ -50,6 +52,7 @@ export const useUIStore = create<UIState>()(
         isSidebarCollapsed: false,
         isMiddleCollapsed: false,
         isImmersive: false,
+        tagMode: false,
         theme: 'system',
         isScanning: false,
         selectedLibraryId: null,
@@ -72,6 +75,11 @@ export const useUIStore = create<UIState>()(
         toggleImmersive: () =>
           set((state) => {
             state.isImmersive = !state.isImmersive
+          }),
+
+        toggleTagMode: () =>
+          set((state) => {
+            state.tagMode = !state.tagMode
           }),
 
         setTheme: (theme) => set({ theme }),
@@ -99,6 +107,7 @@ export const useUIStore = create<UIState>()(
         partialize: (state) => ({
           isSidebarCollapsed: state.isSidebarCollapsed,
           isImmersive: state.isImmersive,
+          tagMode: state.tagMode,
           theme: state.theme,
           selectedLibraryId: state.selectedLibraryId,
           navStatus: state.navStatus,

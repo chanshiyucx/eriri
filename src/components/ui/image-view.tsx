@@ -16,6 +16,7 @@ interface ImageProps {
   className?: string
   loading?: 'eager' | 'lazy'
   tagMode?: boolean
+  showTags?: boolean
 }
 
 export function GridImage({
@@ -27,6 +28,7 @@ export function GridImage({
   onTags,
   isSelected,
   className,
+  showTags,
 }: ImageProps) {
   return (
     <GridItem
@@ -36,6 +38,7 @@ export function GridImage({
       starred={image.starred}
       deleted={image.deleted}
       isSelected={isSelected}
+      showTags={showTags}
       onClick={() => onClick?.(image.index)}
       onDoubleClick={() => onDoubleClick?.(image.index)}
       onContextMenu={() => onContextMenu?.(image.index)}
@@ -50,16 +53,23 @@ export function GridImage({
 }
 
 export function SingleImage({
+  comicId,
   image,
+  onTags,
   onDoubleClick,
   onContextMenu,
+  tagMode = false,
 }: ImageProps) {
   if (!image) return null
+
+  const handleSetTags = (tags: FileTags) => {
+    void onTags(comicId, image.filename, tags)
+  }
 
   return (
     <figure
       className={cn(
-        'flex h-full w-full items-center justify-center',
+        'group flex h-full w-full items-center justify-center',
         image.deleted && 'opacity-40',
       )}
       onDoubleClick={() => onDoubleClick?.(image.index)}
@@ -69,7 +79,7 @@ export function SingleImage({
       }}
     >
       <div
-        className="max-h-full max-w-full"
+        className="relative max-h-full max-w-full"
         style={{
           aspectRatio: `${image.width} / ${image.height}`,
         }}
@@ -81,6 +91,15 @@ export function SingleImage({
           decoding="async"
           className="block h-full w-full"
         />
+        {tagMode && (
+          <TagButtons
+            starred={image.starred}
+            deleted={image.deleted}
+            onStar={() => handleSetTags({ starred: !image.starred })}
+            onDelete={() => handleSetTags({ deleted: !image.deleted })}
+            size="md"
+          />
+        )}
       </div>
     </figure>
   )
@@ -152,6 +171,7 @@ export function ImagePreview({
   onTags,
   onDoubleClick,
   onContextMenu,
+  tagMode,
 }: ImagePreviewProps) {
   const currentImage = images[index]
 
@@ -195,6 +215,7 @@ export function ImagePreview({
         onTags={onTags}
         onDoubleClick={onDoubleClick}
         onContextMenu={onContextMenu}
+        tagMode={tagMode}
       />
     </div>
   )

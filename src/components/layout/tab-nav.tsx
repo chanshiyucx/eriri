@@ -1,14 +1,13 @@
 import {
   Columns2,
   InspectionPanel,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelLeft,
+  PanelLeftDashed,
   X,
 } from 'lucide-react'
 import { useEffect, useEffectEvent } from 'react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { usePanelNav } from '@/hooks/use-panel-nav'
 import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useTabsStore, type Tab } from '@/store/tabs'
@@ -50,24 +49,15 @@ export function TabNav() {
   const toggleSidebar = useUIStore((s) => s.toggleSidebar)
   const toggleMiddle = useUIStore((s) => s.toggleMiddle)
   const toggleImmersive = useUIStore((s) => s.toggleImmersive)
-  const { openSidebar, openMiddle } = usePanelNav()
   const tabs = useTabsStore((s) => s.tabs)
   const activeTab = useTabsStore((s) => s.activeTab)
   const removeTab = useTabsStore((s) => s.removeTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  // From an open tab, return home; on phone also reveal the target panel (left
-  // sidebar / middle column). The open* helpers no-op on non-phone.
-  const handleSidebar = () => {
-    if (!activeTab) return toggleSidebar()
-    setActiveTab('')
-    openSidebar()
-  }
-  const handleMiddle = () => {
-    if (!activeTab) return toggleMiddle()
-    setActiveTab('')
-    openMiddle()
-  }
+  // From an open tab, just close it — the panel layout underneath keeps its
+  // collapse state, so the previously shown column reappears (same on phone).
+  const handleSidebar = () => (activeTab ? setActiveTab('') : toggleSidebar())
+  const handleMiddle = () => (activeTab ? setActiveTab('') : toggleMiddle())
 
   const navigateTab = (direction: 1 | -1) => {
     if (!tabs.length) return
@@ -127,24 +117,24 @@ export function TabNav() {
       <Button
         className="h-6 w-6"
         onClick={handleSidebar}
-        title={activeTab ? '返回主页并显示左边栏' : '折叠/展开左边栏'}
+        title={activeTab ? '返回主页' : '折叠/展开左边栏'}
       >
         {isSidebarCollapsed ? (
-          <PanelLeftOpen className="h-4 w-4" />
+          <PanelLeftDashed className="h-4 w-4" />
         ) : (
-          <PanelLeftClose className="h-4 w-4" />
+          <PanelLeft className="h-4 w-4" />
         )}
       </Button>
 
       <Button
         className="h-6 w-6"
         onClick={handleMiddle}
-        title={activeTab ? '返回主页并显示中间栏' : '折叠/展开中间栏'}
+        title={activeTab ? '返回主页' : '折叠/展开中间栏'}
       >
         {isMiddleCollapsed ? (
-          <Columns2 className="h-4 w-4" />
-        ) : (
           <InspectionPanel className="h-4 w-4" />
+        ) : (
+          <Columns2 className="h-4 w-4" />
         )}
       </Button>
 
