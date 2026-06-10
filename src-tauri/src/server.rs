@@ -7,7 +7,10 @@
 
 use std::net::{IpAddr, SocketAddr, UdpSocket};
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::sync::RwLock;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use axum::Json;
 use axum::Router;
@@ -29,20 +32,30 @@ use crate::progress::{self, BookProgress, ComicProgress, ProgressDb, Snapshot};
 
 const PORT: u16 = 1430;
 
+/// Release the keep-awake assertion after this many seconds without any HTTP
+/// request, letting the Mac sleep normally. Once asleep the server is down and
+/// a LAN client can no longer reach it — the Mac must be woken manually, after
+/// which the next request re-arms the assertion.
+const IDLE_SLEEP_TIMEOUT_SECS: u64 = 2 * 60 * 60;
+
 // Built frontend, resolved relative to this crate (requires `pnpm build`).
 // A bundled .app would instead embed these assets.
 const DIST_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../dist");
 
 pub fn init(app: &AppHandle) {
+    let activity = Activity::new();
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        let router = build_router(handle);
+        let router = build_router(handle, activity.clone());
         match tokio::net::TcpListener::bind(("0.0.0.0", PORT)).await {
             Ok(listener) => {
                 let lan = lan_ip()
                     .map(|ip| format!("http://{ip}:{PORT}"))
                     .unwrap_or_else(|| format!("http://<mac-lan-ip>:{PORT}"));
                 info!(url = %lan, "LAN web server listening");
+                // Only keep the Mac awake once the port is actually bound: a
+                // failed bind means there's no server to stay reachable for.
+                spawn_idle_sleep_manager(activity);
                 // The port is bound; open the reader in the browser on startup.
                 open_in_browser();
                 let service = router.into_make_service_with_connect_info::<SocketAddr>();
@@ -55,7 +68,7 @@ pub fn init(app: &AppHandle) {
     });
 }
 
-fn build_router(app: AppHandle) -> Router {
+fn build_router(app: AppHandle, activity: Activity) -> Router {
     let index = format!("{DIST_DIR}/index.html");
     let static_files = ServeDir::new(DIST_DIR).not_found_service(ServeFile::new(index));
 
@@ -92,6 +105,12 @@ fn build_router(app: AppHandle) -> Router {
         )
         .route("/file", get(serve_file))
         .fallback_service(static_files)
+        // Stamp every request as activity so the idle-sleep manager keeps the
+        // Mac awake while clients are using it, and lets it sleep once they stop.
+        .layer(axum::middleware::from_fn_with_state(
+            activity,
+            track_activity,
+        ))
         .layer(axum::middleware::from_fn(no_store_dynamic))
         // Gzip large text/JSON (e.g. parsed books) — compresses ~5-10x, the
         // dominant cost when loading over the LAN. Loopback opts out below.
@@ -463,6 +482,171 @@ fn library_roots(app: &AppHandle) -> Vec<String> {
         .into_iter()
         .map(|(_, _, path)| path)
         .collect()
+}
+
+// --- Idle-aware keep-awake ---
+
+/// Wall-clock seconds since the Unix epoch (saturating to 0 on the impossible
+/// pre-epoch case), used to measure how long the server has been idle.
+fn now_secs() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
+}
+
+/// Shared "last request seen" timestamp. Cloneable handle over one atomic, so
+/// the request middleware and the keep-awake manager observe the same value.
+#[derive(Clone)]
+struct Activity(Arc<AtomicU64>);
+
+impl Activity {
+    /// Start the idle window now, so a freshly launched server stays awake for
+    /// a full timeout even before the first client connects.
+    fn new() -> Self {
+        Activity(Arc::new(AtomicU64::new(now_secs())))
+    }
+
+    fn touch(&self) {
+        self.0.store(now_secs(), Ordering::Relaxed);
+    }
+
+    fn idle_secs(&self) -> u64 {
+        now_secs().saturating_sub(self.0.load(Ordering::Relaxed))
+    }
+}
+
+/// Mark the arrival of any HTTP request as activity.
+async fn track_activity(
+    State(activity): State<Activity>,
+    req: Request,
+    next: axum::middleware::Next,
+) -> Response {
+    activity.touch();
+    next.run(req).await
+}
+
+// macOS display/session state. Used to anchor the idle window to the moment the
+// user leaves: while the screen is on and unlocked the Mac is in use (and won't
+// idle-sleep anyway), so we treat it as continuously active; the countdown only
+// begins once the display sleeps or the session locks.
+#[link(name = "CoreGraphics", kind = "framework")]
+unsafe extern "C" {
+    fn CGMainDisplayID() -> u32;
+    fn CGDisplayIsAsleep(display: u32) -> i32;
+    fn CGSessionCopyCurrentDictionary() -> *const std::ffi::c_void;
+}
+
+#[link(name = "CoreFoundation", kind = "framework")]
+unsafe extern "C" {
+    fn CFRelease(cf: *const std::ffi::c_void);
+    fn CFDictionaryGetValue(
+        dict: *const std::ffi::c_void,
+        key: *const std::ffi::c_void,
+    ) -> *const std::ffi::c_void;
+    fn CFBooleanGetValue(boolean: *const std::ffi::c_void) -> u8;
+    fn CFStringCreateWithCString(
+        alloc: *const std::ffi::c_void,
+        c_str: *const std::ffi::c_char,
+        encoding: u32,
+    ) -> *const std::ffi::c_void;
+}
+
+/// True while someone is at the Mac — the main display is awake and the session
+/// is unlocked. Returns false once the screen turns off or locks, which is when
+/// the idle-sleep countdown should start.
+fn user_is_present() -> bool {
+    !display_asleep() && !session_locked()
+}
+
+fn display_asleep() -> bool {
+    // Safety: a plain CoreGraphics query, callable from any thread.
+    unsafe { CGDisplayIsAsleep(CGMainDisplayID()) != 0 }
+}
+
+fn session_locked() -> bool {
+    const UTF8: u32 = 0x0800_0100; // kCFStringEncodingUTF8
+    // Safety: we own the copied dictionary and the created key, and release both
+    // before returning; every borrowed value is checked for null first.
+    unsafe {
+        let dict = CGSessionCopyCurrentDictionary();
+        if dict.is_null() {
+            return false;
+        }
+        let key = CFStringCreateWithCString(
+            std::ptr::null(),
+            c"CGSSessionScreenIsLocked".as_ptr(),
+            UTF8,
+        );
+        let mut locked = false;
+        if !key.is_null() {
+            let value = CFDictionaryGetValue(dict, key);
+            if !value.is_null() {
+                locked = CFBooleanGetValue(value) != 0;
+            }
+            CFRelease(key);
+        }
+        CFRelease(dict);
+        locked
+    }
+}
+
+/// Keep the Mac reachable while clients are using the server, and let it sleep
+/// once they stop.
+///
+/// macOS normally follows display-off with system (idle) sleep, which suspends
+/// this process — the axum server stops responding and LAN connections drop.
+/// While requests are recent we hold a `caffeinate -i` "prevent idle system
+/// sleep" assertion (the display still sleeps, so the screen turns off as
+/// usual). After `IDLE_SLEEP_TIMEOUT_SECS` with no request we drop it, so the
+/// Mac sleeps normally to save power. `-w <pid>` ties the helper to our process
+/// so it never outlives the app; `-s` also blocks forced sleep, but only on AC.
+///
+/// The countdown is anchored to the moment the user leaves: while the screen is
+/// on and unlocked we refresh the activity stamp every tick, so the timer only
+/// starts running once the display sleeps or the session locks. A LAN request
+/// after that still extends the window like any other access.
+fn spawn_idle_sleep_manager(activity: Activity) {
+    tauri::async_runtime::spawn(async move {
+        let pid = std::process::id().to_string();
+        let mut guard: Option<std::process::Child> = None;
+        loop {
+            if user_is_present() {
+                activity.touch();
+            }
+            // Reap a caffeinate that died on its own (killed externally, crashed)
+            // so the next active tick re-arms the assertion instead of assuming
+            // the long-gone child still holds it.
+            if let Some(child) = guard.as_mut()
+                && matches!(child.try_wait(), Ok(Some(_)) | Err(_))
+            {
+                warn!("caffeinate exited unexpectedly; will re-arm if still active");
+                guard = None;
+            }
+            let idle = activity.idle_secs();
+            if idle < IDLE_SLEEP_TIMEOUT_SECS {
+                if guard.is_none() {
+                    match std::process::Command::new("caffeinate")
+                        .args(["-i", "-s", "-w", &pid])
+                        .spawn()
+                    {
+                        Ok(child) => {
+                            info!("Active client; holding idle-sleep assertion (display may still sleep)");
+                            guard = Some(child);
+                        }
+                        Err(e) => {
+                            warn!(error = %e, "Failed to start caffeinate; server may drop when the Mac sleeps")
+                        }
+                    }
+                }
+            } else if let Some(mut child) = guard.take() {
+                let _ = child.kill();
+                let _ = child.wait();
+                info!(idle_secs = idle, "Idle past the timeout; releasing assertion so the Mac can sleep");
+            }
+            tokio::time::sleep(Duration::from_secs(30)).await;
+        }
+    });
 }
 
 // --- Helpers ---
