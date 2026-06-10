@@ -1,5 +1,6 @@
 import { Star, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useIsPhone } from '@/hooks/use-is-phone'
 import { cn } from '@/lib/style'
 
 interface TagButtonsProps {
@@ -35,6 +36,10 @@ export function TagButtons({
   size = 'sm',
 }: TagButtonsProps) {
   const styles = STYLES[size]
+  // Phones have no hover, so reveal the controls permanently; on pointer
+  // devices keep the hover-to-reveal behavior.
+  const isPhone = useIsPhone()
+  const reveal = isPhone ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
 
   return (
     <div
@@ -54,7 +59,7 @@ export function TagButtons({
           className={cn(
             'stroke-white drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]',
             styles.icon,
-            deleted ? 'text-subtle/40' : 'opacity-0 group-hover:opacity-100',
+            deleted ? 'text-subtle/40' : reveal,
           )}
           strokeWidth={2.5}
         />
@@ -70,9 +75,7 @@ export function TagButtons({
           className={cn(
             'stroke-white drop-shadow-[0_0_1px_rgba(0,0,0,0.8)]',
             styles.icon,
-            starred
-              ? 'fill-gold/80 stroke-love'
-              : 'opacity-0 group-hover:opacity-100',
+            starred ? 'fill-gold/80 stroke-love' : reveal,
           )}
           strokeWidth={2.5}
         />
@@ -81,7 +84,8 @@ export function TagButtons({
       {title && (
         <span
           className={cn(
-            'absolute left-1/2 w-full -translate-x-1/2 truncate px-2 text-center font-bold text-white opacity-0 text-shadow-md group-hover:opacity-100',
+            'absolute left-1/2 w-full -translate-x-1/2 truncate px-2 text-center font-bold text-white text-shadow-md',
+            reveal,
             styles.font,
           )}
         >
