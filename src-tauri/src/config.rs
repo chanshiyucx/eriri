@@ -1,5 +1,6 @@
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 
@@ -102,18 +103,32 @@ pub fn read_store_data(app: AppHandle, key: String) -> Option<String> {
     fs::read_to_string(file_path).ok()
 }
 
+/// Monotonic counter giving each in-flight write its own temp file, so
+/// concurrent writes to the same key can't clobber each other's `.tmp`.
+static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
+
 pub fn write_store_data(app: AppHandle, key: String, data: String) -> Result<(), String> {
     let store_dir = get_store_dir(&app);
     fs::create_dir_all(&store_dir).map_err(|e| e.to_string())?;
 
     let file_path = store_file_path(&store_dir, &key, "json")?;
-    let tmp_path = store_file_path(&store_dir, &key, "tmp")?;
 
-    // Write to temp file first
-    fs::write(&tmp_path, data).map_err(|e| e.to_string())?;
+    // Unique temp name per write (pid + sequence) avoids the race where two
+    // concurrent PUTs share one `key.tmp` and the loser's rename hits ENOENT.
+    validate_store_key(&key)?;
+    let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp_path = store_dir.join(format!("{key}.{}.{seq}.tmp", std::process::id()));
 
-    // Atomic rename
-    fs::rename(&tmp_path, file_path).map_err(|e| e.to_string())
+    // Write to temp file first, then atomically rename into place. On any
+    // failure, remove the temp file so failed writes don't accumulate.
+    if let Err(e) = fs::write(&tmp_path, data) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(e.to_string());
+    }
+    fs::rename(&tmp_path, file_path).map_err(|e| {
+        let _ = fs::remove_file(&tmp_path);
+        e.to_string()
+    })
 }
 
 pub fn remove_store_data(app: AppHandle, key: String) -> Result<(), String> {
