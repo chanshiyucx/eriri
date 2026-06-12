@@ -66,12 +66,13 @@ export function SingleImage({
   onTags,
   onDoubleClick,
 }: ImageProps) {
-  const { gestures, controls } = useImageTags(comicId, image, onTags, () =>
+  const { ref, gestures, controls } = useImageTags(comicId, image, onTags, () =>
     onDoubleClick?.(image.index),
   )
 
   return (
     <figure
+      ref={ref}
       className="flex h-full w-full touch-manipulation items-center justify-center"
       {...gestures}
     >
@@ -102,12 +103,13 @@ export function ScrollImage({
   className = 'h-full',
   loading = 'eager',
 }: ImageProps) {
-  const { gestures, controls } = useImageTags(comicId, image, onTags, () =>
+  const { ref, gestures, controls } = useImageTags(comicId, image, onTags, () =>
     onDoubleClick?.(image.index),
   )
 
   return (
     <figure
+      ref={ref}
       className={cn('group relative shrink-0 touch-manipulation', className)}
       style={{
         aspectRatio: `${image.width} / ${image.height}`,

@@ -14,11 +14,12 @@ export function useImageTags(
   onTags: TagWriter | undefined,
   onDoubleTap: () => void,
 ) {
-  const { open, gestures, close } = useTagReveal(onDoubleTap)
+  const { ref, open, gestures, close } = useTagReveal(onDoubleTap)
   const setTag = (tags: FileTags) =>
     void onTags?.(comicId, image.filename, tags)
 
   return {
+    ref,
     gestures,
     controls: {
       open,
