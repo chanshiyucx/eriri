@@ -38,13 +38,14 @@ export function GridItem({
   onStar,
   onDelete,
 }: GridItemProps) {
-  const { open, gestures, close } = useTagReveal(
+  const { ref, open, gestures, close } = useTagReveal(
     () => onDoubleClick?.(),
     tagOnTap,
   )
 
   return (
     <figure
+      ref={ref}
       className={cn(
         'group relative flex aspect-2/3 w-full shrink-0 cursor-pointer touch-manipulation flex-col overflow-hidden transition-all',
         isSelected &&
