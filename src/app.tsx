@@ -16,9 +16,17 @@ function App() {
     }
     window.addEventListener('focus', refreshCatalog)
     document.addEventListener('visibilitychange', refreshCatalog)
+
+    // Swallow the browser's default right-click menu app-wide for a native
+    // feel; elements with their own onContextMenu (e.g. open-in-folder) still
+    // run.
+    const blockContextMenu = (e: MouseEvent) => e.preventDefault()
+    document.addEventListener('contextmenu', blockContextMenu)
+
     return () => {
       window.removeEventListener('focus', refreshCatalog)
       document.removeEventListener('visibilitychange', refreshCatalog)
+      document.removeEventListener('contextmenu', blockContextMenu)
     }
   }, [])
 
