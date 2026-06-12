@@ -1,4 +1,4 @@
-import { Grid2x2, Rows2, StepForward, Tag } from 'lucide-react'
+import { Grid2x2, Rows2, Star, StepForward, Trash2 } from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -11,11 +11,11 @@ import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
 import { GridItem } from '@/components/ui/grid-item'
-import { GridImage, ImagePreview } from '@/components/ui/image-view'
+import { GridImage, ImagePreviewOverlay } from '@/components/ui/image-view'
+import { useNativeOpen } from '@/hooks/use-native-open'
 import { usePanelNav } from '@/hooks/use-panel-nav'
 import { useThrottledProgress } from '@/hooks/use-throttled-progress'
 import { createComicProgress } from '@/lib/progress'
-import { openPathNative } from '@/lib/scanner'
 import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -25,7 +25,6 @@ import { useUIStore } from '@/store/ui'
 import {
   LibraryType,
   type Comic,
-  type FileTags,
   type Image,
   type Library,
 } from '@/types/library'
@@ -39,7 +38,6 @@ interface ComicItemProps {
   isSelected: boolean
   onClick: (id: string) => void
   onDoubleClick?: (id: string) => void
-  onTags: (id: string, tags: FileTags) => Promise<void>
 }
 
 function ComicItem({
@@ -47,10 +45,13 @@ function ComicItem({
   isSelected,
   onClick,
   onDoubleClick,
-  onTags,
 }: ComicItemProps) {
   const progress = useProgressStore((s) => s.comics[comic.id])
 
+  // Covers don't tag inline — selecting a comic exposes its delete/star in the
+  // reader toolbar (mirrors the book library). A starred cover shows a badge and
+  // a deleted one greys out (handled by GridItem). Right-click opens the comic's
+  // folder natively (desktop only).
   return (
     <GridItem
       title={comic.title}
@@ -61,9 +62,7 @@ function ComicItem({
       progress={progress}
       onClick={() => onClick(comic.id)}
       onDoubleClick={() => onDoubleClick?.(comic.id)}
-      onContextMenu={() => void openPathNative(comic.path)}
-      onStar={() => void onTags(comic.id, { starred: !comic.starred })}
-      onDelete={() => void onTags(comic.id, { deleted: !comic.deleted })}
+      onContextMenu={useNativeOpen(comic.path)}
     />
   )
 }
@@ -86,8 +85,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
   const setNavStatus = useUIStore((s) => s.setNavStatus)
-  const tagMode = useUIStore((s) => s.tagMode)
-  const toggleTagMode = useUIStore((s) => s.toggleTagMode)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
   const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
   const getComicImages = useLibraryStore((s) => s.getComicImages)
@@ -171,19 +168,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     openReader()
   }
 
-  const handleImageClick = (index: number) => {
-    if (!comic) return
-    const newProgress = createComicProgress(index, images.length)
-    setCurrentIndex(index)
-    updateComicProgress(comic.id, newProgress)
-
-    addTab({
-      type: LibraryType.comic,
-      id: comic.id,
-      title: comic.title,
-    })
-  }
-
   const handleStripIndexChange = (index: number) => {
     if (!comic || !images.length || !readerVisible) return
 
@@ -194,6 +178,20 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
 
   const handleHover = (index: number | null) => {
     hoveredIndexRef.current = index
+  }
+
+  // Closing the preview syncs the reading position to the page the user flipped
+  // to, scrolling the strip there when scroll mode is showing.
+  const handlePreviewClose = () => {
+    if (comic && previewIndex >= 0) {
+      setCurrentIndex(previewIndex)
+      updateComicProgress(
+        comic.id,
+        createComicProgress(previewIndex, images.length),
+      )
+      if (viewMode === 'scroll') stripRef.current?.jumpTo(previewIndex)
+    }
+    setPreviewIndex(-1)
   }
 
   // Target of the N/M page-tag shortcuts: the previewed image in grid mode, the
@@ -214,9 +212,6 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         break
       case SHORTCUTS.toggleViewMode:
         toggleViewMode()
-        break
-      case SHORTCUTS.toggleTagMode:
-        toggleTagMode()
         break
       case SHORTCUTS.toggleItemDeleted:
         void updateComicTags(comic.id, { deleted: !comic.deleted })
@@ -253,19 +248,11 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
       comic={comic}
       isSelected={comicId === comic.id}
       onClick={handleSelectComic}
-      onTags={updateComicTags}
     />
   )
 
   const renderGridImage = (_index: number, img: Image) => (
-    <GridImage
-      comicId={comicId}
-      image={img}
-      showTags={tagMode}
-      onDoubleClick={setPreviewIndex}
-      onContextMenu={handleImageClick}
-      onTags={updateComicImageTags}
-    />
+    <GridImage comicId={comicId} image={img} onDoubleClick={setPreviewIndex} />
   )
 
   return (
@@ -304,15 +291,35 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             >
               <StepForward className="h-4 w-4" />
             </Button>
-            <Button
-              className="h-6 w-6"
-              onClick={toggleTagMode}
-              title="标注模式"
-            >
-              <Tag
-                className={cn('h-4 w-4', tagMode && 'text-love fill-gold/80')}
-              />
-            </Button>
+            {comic && (
+              <>
+                <Button
+                  className="h-6 w-6"
+                  onClick={() =>
+                    void updateComicTags(comic.id, { deleted: !comic.deleted })
+                  }
+                  title="标记删除"
+                >
+                  <Trash2
+                    className={cn('h-4 w-4', comic.deleted && 'text-subtle/40')}
+                  />
+                </Button>
+                <Button
+                  className="h-6 w-6"
+                  onClick={() =>
+                    void updateComicTags(comic.id, { starred: !comic.starred })
+                  }
+                  title="标记收藏"
+                >
+                  <Star
+                    className={cn(
+                      'h-4 w-4',
+                      comic.starred && 'text-love fill-gold/80',
+                    )}
+                  />
+                </Button>
+              </>
+            )}
           </div>
 
           <h3 className="absolute top-1/2 left-1/2 max-w-[60%] -translate-1/2 truncate text-center">
@@ -341,36 +348,21 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             images={images}
             initialIndex={currentIndex}
             orientation="vertical"
-            tagMode={tagMode}
             onCurrentIndexChange={handleStripIndexChange}
             onHover={handleHover}
             onDoubleClick={setPreviewIndex}
-            onContextMenu={handleImageClick}
-            onTags={updateComicImageTags}
           />
         )}
       </div>
 
-      <div
-        className={cn(
-          'bg-base fixed inset-0 z-100 flex items-center justify-center',
-          previewIndex >= 0 ? 'visible' : 'hidden',
-        )}
-      >
-        <ImagePreview
-          comicId={comicId}
-          images={images}
-          index={previewIndex}
-          onIndexChange={setPreviewIndex}
-          onTags={updateComicImageTags}
-          tagMode={tagMode}
-          onDoubleClick={() => setPreviewIndex(-1)}
-          onContextMenu={(idx: number) => {
-            setPreviewIndex(-1)
-            handleImageClick(idx)
-          }}
-        />
-      </div>
+      <ImagePreviewOverlay
+        comicId={comicId}
+        images={images}
+        index={previewIndex}
+        onIndexChange={setPreviewIndex}
+        onClose={handlePreviewClose}
+        onTags={updateComicImageTags}
+      />
     </div>
   )
 }

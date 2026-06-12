@@ -6,7 +6,11 @@
   *,
   ::after,
   ::before {
-    @apply border-overlay;
+    @apply border-overlay select-none!;
+    /* Drop the grey highlight mobile browsers flash over tapped elements and
+     * the iOS tap-and-hold save/callout menu, for a native-app feel. */
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
   }
 
   html,

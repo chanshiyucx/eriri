@@ -1,34 +1,36 @@
-import { useEffect, useEffectEvent } from 'react'
+import { Star } from 'lucide-react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { GridItem } from '@/components/ui/grid-item'
-import { TagButtons } from '@/components/ui/tag-buttons'
+import { TagPopover } from '@/components/ui/tag-popover'
+import { usePressGestures } from '@/hooks/use-press-gestures'
 import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import type { FileTags, Image } from '@/types/library'
 
+// Min horizontal travel (px) for a touch drag to count as a prev/next swipe.
+const SWIPE_THRESHOLD = 50
+
+// Gold star overlaid on a starred page/cover (matches the book library's icon).
+const STAR_BADGE =
+  'text-love fill-gold/80 absolute top-2 right-2 h-6 w-6 drop-shadow-[0_0_2px_rgba(0,0,0,0.9)]'
+
 interface ImageProps {
   comicId: string
   image: Image
-  onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
+  onTags?: (id: string, filename: string, tags: FileTags) => Promise<void>
   onClick?: (index: number) => void
   onDoubleClick?: (index: number) => void
-  onContextMenu?: (index: number) => void
   isSelected?: boolean
   className?: string
   loading?: 'eager' | 'lazy'
-  tagMode?: boolean
-  showTags?: boolean
 }
 
 export function GridImage({
-  comicId,
   image,
   onClick,
   onDoubleClick,
-  onContextMenu,
-  onTags,
   isSelected,
   className,
-  showTags,
 }: ImageProps) {
   return (
     <GridItem
@@ -38,16 +40,8 @@ export function GridImage({
       starred={image.starred}
       deleted={image.deleted}
       isSelected={isSelected}
-      showTags={showTags}
       onClick={() => onClick?.(image.index)}
       onDoubleClick={() => onDoubleClick?.(image.index)}
-      onContextMenu={() => onContextMenu?.(image.index)}
-      onStar={() =>
-        void onTags(comicId, image.filename, { starred: !image.starred })
-      }
-      onDelete={() =>
-        void onTags(comicId, image.filename, { deleted: !image.deleted })
-      }
     />
   )
 }
@@ -57,26 +51,23 @@ export function SingleImage({
   image,
   onTags,
   onDoubleClick,
-  onContextMenu,
-  tagMode = false,
 }: ImageProps) {
+  const [tagOpen, setTagOpen] = useState(false)
+  const gestures = usePressGestures({
+    onTap: () => setTagOpen((v) => !v),
+    onDoubleTap: () => onDoubleClick?.(image?.index ?? -1),
+  })
+
   if (!image) return null
 
   const handleSetTags = (tags: FileTags) => {
-    void onTags(comicId, image.filename, tags)
+    void onTags?.(comicId, image.filename, tags)
   }
 
   return (
     <figure
-      className={cn(
-        'flex h-full w-full items-center justify-center',
-        image.deleted && 'opacity-40',
-      )}
-      onDoubleClick={() => onDoubleClick?.(image.index)}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        onContextMenu?.(image.index)
-      }}
+      className="flex h-full w-full touch-manipulation items-center justify-center"
+      {...gestures}
     >
       <div
         className="group relative max-h-full max-w-full"
@@ -89,51 +80,41 @@ export function SingleImage({
           src={image.url}
           alt={image.filename}
           decoding="async"
-          className="block h-full w-full"
+          className={cn('block h-full w-full', image.deleted && 'grayscale')}
         />
-        {tagMode && (
-          <TagButtons
-            starred={image.starred}
-            deleted={image.deleted}
-            onStar={() => handleSetTags({ starred: !image.starred })}
-            onDelete={() => handleSetTags({ deleted: !image.deleted })}
-            size="md"
-          />
+        {image.starred && !tagOpen && (
+          <Star className={STAR_BADGE} strokeWidth={2.5} />
         )}
+        <TagPopover
+          open={tagOpen}
+          title={image.filename}
+          starred={image.starred}
+          deleted={image.deleted}
+          onStar={() => handleSetTags({ starred: !image.starred })}
+          onDelete={() => handleSetTags({ deleted: !image.deleted })}
+        />
       </div>
     </figure>
   )
 }
 
 export function ScrollImage({
-  comicId,
   image,
-  onTags,
   onDoubleClick,
-  onContextMenu,
   className = 'h-full',
   loading = 'eager',
-  tagMode = false,
 }: ImageProps) {
-  const handleSetTags = (tags: FileTags) => {
-    void onTags(comicId, image.filename, tags)
-  }
+  const gestures = usePressGestures({
+    onDoubleTap: () => onDoubleClick?.(image.index),
+  })
 
   return (
     <figure
-      className={cn(
-        'group relative shrink-0',
-        image.deleted && 'opacity-40',
-        className,
-      )}
+      className={cn('group relative shrink-0 touch-manipulation', className)}
       style={{
         aspectRatio: `${image.width} / ${image.height}`,
       }}
-      onDoubleClick={() => onDoubleClick?.(image.index)}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        onContextMenu?.(image.index)
-      }}
+      {...gestures}
     >
       <img
         src={image.url}
@@ -141,18 +122,12 @@ export function ScrollImage({
         decoding="async"
         draggable={false}
         loading={loading}
-        className="block h-full w-full object-contain"
+        className={cn(
+          'block h-full w-full object-contain',
+          image.deleted && 'grayscale',
+        )}
       />
-      {tagMode && (
-        <TagButtons
-          title={image.filename}
-          starred={image.starred}
-          deleted={image.deleted}
-          onStar={() => handleSetTags({ starred: !image.starred })}
-          onDelete={() => handleSetTags({ deleted: !image.deleted })}
-          size="md"
-        />
-      )}
+      {image.starred && <Star className={STAR_BADGE} strokeWidth={2.5} />}
     </figure>
   )
 }
@@ -170,10 +145,16 @@ export function ImagePreview({
   onIndexChange,
   onTags,
   onDoubleClick,
-  onContextMenu,
-  tagMode,
 }: ImagePreviewProps) {
   const currentImage = images[index]
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+
+  const goPrev = () => {
+    if (index > 0) onIndexChange(index - 1)
+  }
+  const goNext = () => {
+    if (index < images.length - 1) onIndexChange(index + 1)
+  }
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -181,10 +162,10 @@ export function ImagePreview({
 
     switch (e.code) {
       case SHORTCUTS.prevImage:
-        if (index > 0) onIndexChange(index - 1)
+        goPrev()
         break
       case SHORTCUTS.nextImage:
-        if (index < images.length - 1) onIndexChange(index + 1)
+        goNext()
         break
     }
   })
@@ -205,17 +186,77 @@ export function ImagePreview({
     }
   }, [index, images])
 
+  // Mobile has no arrow keys: a horizontal swipe flips pages. Ignore mostly
+  // vertical drags so they don't fight the double-tap-to-close gesture.
+  const handleTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY }
+  }
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStartRef.current
+    touchStartRef.current = null
+    if (!start) return
+
+    const t = e.changedTouches[0]
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) < SWIPE_THRESHOLD || Math.abs(dx) <= Math.abs(dy)) return
+
+    if (dx < 0) goNext()
+    else goPrev()
+  }
+
   if (!currentImage) return null
 
   return (
-    <div className="relative flex h-full w-full flex-col">
+    <div
+      className="relative flex h-full w-full flex-col"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       <SingleImage
         comicId={comicId}
         image={currentImage}
         onTags={onTags}
         onDoubleClick={onDoubleClick}
-        onContextMenu={onContextMenu}
-        tagMode={tagMode}
+      />
+    </div>
+  )
+}
+
+interface ImagePreviewOverlayProps {
+  comicId: string
+  images: Image[]
+  // Index of the previewed page; < 0 keeps the overlay hidden (but mounted).
+  index: number
+  onIndexChange: (index: number) => void
+  // Double-tap / double-click anywhere closes the overlay.
+  onClose: () => void
+  onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
+}
+
+export function ImagePreviewOverlay({
+  comicId,
+  images,
+  index,
+  onIndexChange,
+  onClose,
+  onTags,
+}: ImagePreviewOverlayProps) {
+  return (
+    <div
+      className={cn(
+        'bg-base fixed inset-0 z-100 flex items-center justify-center',
+        index >= 0 ? 'visible' : 'hidden',
+      )}
+    >
+      <ImagePreview
+        comicId={comicId}
+        images={images}
+        index={index}
+        onIndexChange={onIndexChange}
+        onTags={onTags}
+        onDoubleClick={onClose}
       />
     </div>
   )

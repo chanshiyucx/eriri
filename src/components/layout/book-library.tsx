@@ -3,8 +3,8 @@ import { useRef } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useNativeOpen } from '@/hooks/use-native-open'
 import { usePanelNav } from '@/hooks/use-panel-nav'
-import { openPathNative } from '@/lib/scanner'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
@@ -59,10 +59,7 @@ function AuthorItem({ author, isSelected, onSelect }: AuthorItemProps) {
   return (
     <Button
       onClick={() => onSelect(author.id)}
-      onContextMenu={(e) => {
-        e.preventDefault()
-        void openPathNative(author.path)
-      }}
+      onContextMenu={useNativeOpen(author.path)}
       className={cn(
         'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm',
         isSelected ? 'bg-overlay text-love' : 'bg-surface',
@@ -177,7 +174,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
         </div>
       </div>
 
-      <div className={cn('min-h-0 flex-1', readerClass)}>
+      <div className={cn('min-h-0 min-w-0 flex-1', readerClass)}>
         {bookId && <BookReader bookId={bookId} showReading />}
       </div>
     </div>

@@ -14,7 +14,6 @@ export const SHORTCUTS = {
   continueReading: 'KeyP',
   toggleViewMode: 'KeyB',
   toggleToc: 'KeyT',
-  toggleTagMode: 'KeyG',
   toggleItemDeleted: 'KeyC',
   toggleItemStarred: 'KeyV',
   toggleImageDeleted: 'KeyN',

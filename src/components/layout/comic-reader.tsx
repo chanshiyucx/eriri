@@ -1,4 +1,4 @@
-import { Columns2, Square, SquareMenu, Star, Tag, Trash2 } from 'lucide-react'
+import { SquareMenu, Star, Trash2 } from 'lucide-react'
 import {
   useEffect,
   useEffectEvent,
@@ -8,7 +8,7 @@ import {
 } from 'react'
 import { Button } from '@/components/ui/button'
 import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
-import { GridImage, ImagePreview } from '@/components/ui/image-view'
+import { GridImage, ImagePreviewOverlay } from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useClickOutside } from '@/hooks/use-click-outside'
 import { useIsPhone } from '@/hooks/use-is-phone'
@@ -20,9 +20,7 @@ import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
-import type { FileTags, Image } from '@/types/library'
-
-type ViewMode = 'single' | 'scroll'
+import type { Image } from '@/types/library'
 
 const EMPTY_ARRAY: Image[] = []
 
@@ -32,7 +30,6 @@ interface TableOfContentsProps {
   currentIndex: number
   isCollapsed: boolean
   onSelect: (index: number) => void
-  onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
   onClose: () => void
 }
 
@@ -42,7 +39,6 @@ function TableOfContents({
   currentIndex,
   isCollapsed,
   onSelect,
-  onTags,
   onClose,
 }: TableOfContentsProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -80,9 +76,7 @@ function TableOfContents({
             comicId={comicId}
             image={img}
             isSelected={currentIndex === img.index}
-            showTags={false}
             onClick={() => onSelect(img.index)}
-            onTags={onTags}
           />
         ))}
       </ScrollArea>
@@ -97,10 +91,9 @@ interface ComicReaderProps {
 export function ComicReader({ comicId }: ComicReaderProps) {
   const stripRef = useRef<ComicStripHandle>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
-  const [viewMode, setViewMode] = useState<ViewMode>('scroll')
+  // Index of the page shown in the full-screen preview; -1 = closed.
+  const [previewIndex, setPreviewIndex] = useState(-1)
   const isImmersive = useUIStore((s) => s.isImmersive)
-  const tagMode = useUIStore((s) => s.tagMode)
-  const toggleTagMode = useUIStore((s) => s.toggleTagMode)
   const isPhone = useIsPhone()
   const activeTab = useTabsStore((s) => s.activeTab)
 
@@ -153,10 +146,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     const newProgress = createComicProgress(index, images.length)
     setCurrentIndex(index)
     updateComicProgress(comic.id, newProgress)
-
-    if (viewMode === 'scroll') {
-      stripRef.current?.jumpTo(index)
-    }
+    stripRef.current?.jumpTo(index)
   }
 
   // Gate on `comic`: a tab can mount before the catalog hydrates, where
@@ -168,9 +158,9 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   }, [comicId, comicPath, images.length, getComicImages])
 
   useLayoutEffect(() => {
-    if (viewMode !== 'scroll' || !images.length) return
+    if (!images.length) return
     stripRef.current?.jumpTo(currentIndexRef.current)
-  }, [activeTab, comicId, images.length, viewMode])
+  }, [activeTab, comicId, images.length])
 
   const handleStripIndexChange = (index: number) => {
     if (!comic) return
@@ -183,14 +173,11 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     hoveredIndexRef.current = index
   }
 
-  // Target of the N/M page-tag shortcuts: the hovered page in scroll mode, else
-  // the centered/current page (single mode never hovers).
+  // Target of the N/M page-tag shortcuts: the previewed page when the overlay is
+  // open, else the hovered page, else the centered/current page.
   const getTagTargetImage = () => {
-    const index =
-      viewMode === 'scroll' && hoveredIndexRef.current != null
-        ? hoveredIndexRef.current
-        : currentIndex
-    return images[index]
+    if (previewIndex >= 0) return images[previewIndex]
+    return images[hoveredIndexRef.current ?? currentIndex]
   }
 
   const handleCloseToc = () => {
@@ -201,8 +188,11 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     setTocCollapsed((prev) => !prev)
   }
 
-  const toggleViewMode = () => {
-    setViewMode((prev) => (prev === 'single' ? 'scroll' : 'single'))
+  // Closing the preview syncs the scroll position to whatever page the user
+  // flipped to, so the strip lands where they left off.
+  const handlePreviewClose = () => {
+    if (previewIndex >= 0) jumpTo(previewIndex)
+    setPreviewIndex(-1)
   }
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
@@ -211,14 +201,8 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     if (activeTab !== comic.id) return
 
     switch (e.code) {
-      case SHORTCUTS.toggleViewMode:
-        toggleViewMode()
-        break
       case SHORTCUTS.toggleToc:
         toggleToc()
-        break
-      case SHORTCUTS.toggleTagMode:
-        toggleTagMode()
         break
       case SHORTCUTS.toggleItemDeleted:
         void updateComicTags(comic.id, { deleted: !comic.deleted })
@@ -250,8 +234,6 @@ export function ComicReader({ comicId }: ComicReaderProps) {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
 
-  const currentImage = images[currentIndex]
-
   if (!comic || !images.length) return null
 
   return (
@@ -262,7 +244,6 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         currentIndex={currentIndex}
         isCollapsed={isTocCollapsed}
         onSelect={jumpTo}
-        onTags={updateComicImageTags}
         onClose={handleCloseToc}
       />
       <div
@@ -278,18 +259,6 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             onMouseDown={(e) => e.stopPropagation()}
           >
             <SquareMenu className="h-4 w-4" />
-          </Button>
-
-          <Button
-            className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
-            onClick={toggleViewMode}
-            title={`切换到 ${viewMode === 'single' ? '滚动' : '单页'}`}
-          >
-            {viewMode === 'single' ? (
-              <Square className="h-4 w-4" />
-            ) : (
-              <Columns2 className="h-4 w-4" />
-            )}
           </Button>
 
           <Button
@@ -318,12 +287,6 @@ export function ComicReader({ comicId }: ComicReaderProps) {
               )}
             />
           </Button>
-
-          <Button className="h-6 w-6" onClick={toggleTagMode} title="标注模式">
-            <Tag
-              className={cn('h-4 w-4', tagMode && 'text-love fill-gold/80')}
-            />
-          </Button>
         </div>
 
         <h3
@@ -332,7 +295,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
             'md:absolute md:top-1/2 md:left-1/2 md:mx-0 md:max-w-[60%] md:flex-none md:-translate-1/2 md:text-center',
           )}
         >
-          {viewMode === 'single' ? currentImage?.filename : comic.title}
+          {comic.title}
         </h3>
 
         <span className="shrink-0 whitespace-nowrap">
@@ -341,31 +304,28 @@ export function ComicReader({ comicId }: ComicReaderProps) {
       </div>
 
       <div className="bg-surface flex h-0 flex-1 items-center justify-center overflow-hidden">
-        {viewMode === 'single' ? (
-          <ImagePreview
-            comicId={comicId}
-            images={images}
-            index={currentIndex}
-            onIndexChange={jumpTo}
-            onTags={updateComicImageTags}
-            tagMode={tagMode}
-          />
-        ) : (
-          <ComicStrip
-            key={comicId}
-            ref={stripRef}
-            className="h-full w-full"
-            comicId={comicId}
-            images={images}
-            initialIndex={currentIndex}
-            orientation={isPhone ? 'vertical' : 'horizontal'}
-            tagMode={tagMode}
-            onCurrentIndexChange={handleStripIndexChange}
-            onHover={handleHover}
-            onTags={updateComicImageTags}
-          />
-        )}
+        <ComicStrip
+          key={comicId}
+          ref={stripRef}
+          className="h-full w-full"
+          comicId={comicId}
+          images={images}
+          initialIndex={currentIndex}
+          orientation={isPhone ? 'vertical' : 'horizontal'}
+          onCurrentIndexChange={handleStripIndexChange}
+          onHover={handleHover}
+          onDoubleClick={setPreviewIndex}
+        />
       </div>
+
+      <ImagePreviewOverlay
+        comicId={comicId}
+        images={images}
+        index={previewIndex}
+        onIndexChange={setPreviewIndex}
+        onClose={handlePreviewClose}
+        onTags={updateComicImageTags}
+      />
     </div>
   )
 }

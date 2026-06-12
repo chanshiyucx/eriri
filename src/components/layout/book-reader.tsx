@@ -32,7 +32,7 @@ const ReaderPadding = {
 
 function BookLine({ line }: { line: string }) {
   return (
-    <p className="text-text mx-auto w-full px-4 pb-4 font-serif leading-relaxed wrap-break-word whitespace-pre-wrap">
+    <p className="text-text mx-auto w-full px-4 pb-4 font-serif leading-relaxed wrap-break-word whitespace-pre-wrap select-text!">
       {line}
     </p>
   )
@@ -267,8 +267,6 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
 
   if (!book) return null
 
-  // While parsing (large books can take a while) show a spinner instead of a
-  // blank pane. `content` is null whenever it doesn't match the current bookId.
   if (!content) {
     return (
       <div className="bg-surface text-subtle flex h-full w-full flex-col items-center justify-center gap-3">
@@ -352,10 +350,7 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
 
         <h3
           className={cn(
-            // Phone: flow inline to the right of the icons, with a gap, and
-            // ellipsis when there isn't enough room.
             'mx-2 min-w-0 flex-1 truncate text-left',
-            // md+: restore the absolutely-centered title (unchanged).
             'md:absolute md:top-1/2 md:left-1/2 md:mx-0 md:max-w-[60%] md:flex-none md:-translate-1/2 md:text-center',
           )}
         >
