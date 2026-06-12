@@ -1,6 +1,6 @@
-import { Star } from 'lucide-react'
 import { type MouseEvent } from 'react'
-import { usePressGestures } from '@/hooks/use-press-gestures'
+import { TagOverlay } from '@/components/ui/tag-overlay'
+import { useTagReveal } from '@/hooks/use-tag-reveal'
 import { cn } from '@/lib/style'
 import type { ComicProgress } from '@/types/library'
 
@@ -12,9 +12,15 @@ interface GridItemProps {
   deleted: boolean
   isSelected?: boolean
   progress?: ComicProgress
+  // When set, a tap reveals both tag buttons and the title (centred at the
+  // bottom) instead of running onClick; tapping again hides them. Active tags
+  // stay shown either way. Used for page thumbnails; covers/TOC select on tap.
+  tagOnTap?: boolean
   onClick: () => void
   onDoubleClick?: () => void
   onContextMenu?: (e: MouseEvent) => void
+  onStar?: () => void
+  onDelete?: () => void
 }
 
 export function GridItem({
@@ -25,13 +31,17 @@ export function GridItem({
   deleted,
   isSelected,
   progress,
+  tagOnTap,
   onClick,
   onDoubleClick,
   onContextMenu,
+  onStar,
+  onDelete,
 }: GridItemProps) {
-  const gestures = usePressGestures({
-    onDoubleTap: () => onDoubleClick?.(),
-  })
+  const { open, gestures, close } = useTagReveal(
+    () => onDoubleClick?.(),
+    tagOnTap,
+  )
 
   return (
     <figure
@@ -41,7 +51,7 @@ export function GridItem({
           'after:inset-ring-love after:pointer-events-none after:absolute after:inset-0 after:inset-ring-3',
         className,
       )}
-      onClick={onClick}
+      onClick={tagOnTap ? undefined : onClick}
       onContextMenu={onContextMenu}
       {...gestures}
     >
@@ -51,12 +61,16 @@ export function GridItem({
         decoding="async"
         className={cn('h-full w-full object-cover', deleted && 'grayscale')}
       />
-      {starred && (
-        <Star
-          className="text-love fill-gold/80 absolute top-1 right-1 h-5 w-5 drop-shadow-[0_0_2px_rgba(0,0,0,0.9)]"
-          strokeWidth={2.5}
-        />
-      )}
+      <TagOverlay
+        layout="card"
+        open={open}
+        title={title}
+        starred={starred}
+        deleted={deleted}
+        onStar={onStar}
+        onDelete={onDelete}
+        onClose={close}
+      />
 
       {progress && progress.total > 0 && (
         <div className="absolute inset-x-0 bottom-0 flex justify-between overflow-hidden bg-linear-to-t from-black/80 via-black/40 to-transparent p-2 text-xs text-white">

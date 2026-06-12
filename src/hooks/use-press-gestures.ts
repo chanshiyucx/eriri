@@ -9,6 +9,13 @@ interface PressGestures {
   onDoubleTap?: () => void
 }
 
+// Spread onto a child (e.g. an overlaid button) that handles its own tap and
+// must not let the parent's press gestures, which ride these events, also fire.
+export const stopPointerProps = {
+  onPointerDown: (e: PointerEvent) => e.stopPropagation(),
+  onPointerUp: (e: PointerEvent) => e.stopPropagation(),
+}
+
 /**
  * Tap and double-tap from one pointer handler, for mouse and touch alike. When
  * both are wanted a single tap is held back by `DOUBLE_MS` to see whether a
