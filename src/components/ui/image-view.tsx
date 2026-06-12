@@ -1,18 +1,13 @@
-import { Star } from 'lucide-react'
-import { useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useRef } from 'react'
 import { GridItem } from '@/components/ui/grid-item'
-import { TagPopover } from '@/components/ui/tag-popover'
-import { usePressGestures } from '@/hooks/use-press-gestures'
+import { TagOverlay } from '@/components/ui/tag-overlay'
+import { useImageTags } from '@/hooks/use-image-tags'
 import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import type { FileTags, Image } from '@/types/library'
 
 // Min horizontal travel (px) for a touch drag to count as a prev/next swipe.
 const SWIPE_THRESHOLD = 50
-
-// Gold star overlaid on a starred page/cover (matches the book library's icon).
-const STAR_BADGE =
-  'text-love fill-gold/80 absolute top-2 right-2 h-6 w-6 drop-shadow-[0_0_2px_rgba(0,0,0,0.9)]'
 
 interface ImageProps {
   comicId: string
@@ -25,13 +20,21 @@ interface ImageProps {
   loading?: 'eager' | 'lazy'
 }
 
+interface GridImageProps extends ImageProps {
+  // Tap reveals the tag buttons and filename instead of selecting (page grid).
+  tagOnTap?: boolean
+}
+
 export function GridImage({
+  comicId,
   image,
   onClick,
   onDoubleClick,
   isSelected,
   className,
-}: ImageProps) {
+  onTags,
+  tagOnTap,
+}: GridImageProps) {
   return (
     <GridItem
       className={className}
@@ -40,8 +43,19 @@ export function GridImage({
       starred={image.starred}
       deleted={image.deleted}
       isSelected={isSelected}
+      tagOnTap={tagOnTap}
       onClick={() => onClick?.(image.index)}
       onDoubleClick={() => onDoubleClick?.(image.index)}
+      onStar={
+        onTags &&
+        (() =>
+          void onTags(comicId, image.filename, { starred: !image.starred }))
+      }
+      onDelete={
+        onTags &&
+        (() =>
+          void onTags(comicId, image.filename, { deleted: !image.deleted }))
+      }
     />
   )
 }
@@ -52,17 +66,9 @@ export function SingleImage({
   onTags,
   onDoubleClick,
 }: ImageProps) {
-  const [tagOpen, setTagOpen] = useState(false)
-  const gestures = usePressGestures({
-    onTap: () => setTagOpen((v) => !v),
-    onDoubleTap: () => onDoubleClick?.(image?.index ?? -1),
-  })
-
-  if (!image) return null
-
-  const handleSetTags = (tags: FileTags) => {
-    void onTags?.(comicId, image.filename, tags)
-  }
+  const { gestures, controls } = useImageTags(comicId, image, onTags, () =>
+    onDoubleClick?.(image.index),
+  )
 
   return (
     <figure
@@ -82,31 +88,23 @@ export function SingleImage({
           decoding="async"
           className={cn('block h-full w-full', image.deleted && 'grayscale')}
         />
-        {image.starred && !tagOpen && (
-          <Star className={STAR_BADGE} strokeWidth={2.5} />
-        )}
-        <TagPopover
-          open={tagOpen}
-          title={image.filename}
-          starred={image.starred}
-          deleted={image.deleted}
-          onStar={() => handleSetTags({ starred: !image.starred })}
-          onDelete={() => handleSetTags({ deleted: !image.deleted })}
-        />
+        <TagOverlay layout="bar" {...controls} />
       </div>
     </figure>
   )
 }
 
 export function ScrollImage({
+  comicId,
   image,
+  onTags,
   onDoubleClick,
   className = 'h-full',
   loading = 'eager',
 }: ImageProps) {
-  const gestures = usePressGestures({
-    onDoubleTap: () => onDoubleClick?.(image.index),
-  })
+  const { gestures, controls } = useImageTags(comicId, image, onTags, () =>
+    onDoubleClick?.(image.index),
+  )
 
   return (
     <figure
@@ -127,7 +125,7 @@ export function ScrollImage({
           image.deleted && 'grayscale',
         )}
       />
-      {image.starred && <Star className={STAR_BADGE} strokeWidth={2.5} />}
+      <TagOverlay layout="bar" {...controls} />
     </figure>
   )
 }
@@ -215,6 +213,8 @@ export function ImagePreview({
       onTouchEnd={handleTouchEnd}
     >
       <SingleImage
+        // Re-key per page so the tag bar resets to closed when flipping pages.
+        key={currentImage.filename}
         comicId={comicId}
         image={currentImage}
         onTags={onTags}

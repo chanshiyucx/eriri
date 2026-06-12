@@ -5,7 +5,7 @@ import {
   type ComicStripOrientation,
 } from '@/hooks/use-comic-strip'
 import { cn } from '@/lib/style'
-import type { Image } from '@/types/library'
+import type { FileTags, Image } from '@/types/library'
 
 export interface ComicStripHandle {
   jumpTo: (index?: number) => void
@@ -20,6 +20,7 @@ interface ComicStripProps {
   onCurrentIndexChange?: (index: number) => void
   onHover?: (index: number | null) => void
   onDoubleClick?: (index: number) => void
+  onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
 }
 
 interface StripPageProps {
@@ -31,6 +32,7 @@ interface StripPageProps {
   height: number
   onHover?: (index: number | null) => void
   onDoubleClick?: (index: number) => void
+  onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
 }
 
 const StripPage = memo(function StripPage({
@@ -42,6 +44,7 @@ const StripPage = memo(function StripPage({
   height,
   onHover,
   onDoubleClick,
+  onTags,
 }: StripPageProps) {
   return (
     <div
@@ -64,6 +67,7 @@ const StripPage = memo(function StripPage({
         className="h-full w-full"
         loading="eager"
         onDoubleClick={onDoubleClick}
+        onTags={onTags}
       />
     </div>
   )
@@ -80,6 +84,7 @@ export const ComicStrip = forwardRef<ComicStripHandle, ComicStripProps>(
       onCurrentIndexChange,
       onHover,
       onDoubleClick,
+      onTags,
     },
     ref,
   ) {
@@ -133,6 +138,7 @@ export const ComicStrip = forwardRef<ComicStripHandle, ComicStripProps>(
                     height={page.height}
                     onHover={onHover}
                     onDoubleClick={onDoubleClick}
+                    onTags={onTags}
                   />
                 )
               })}

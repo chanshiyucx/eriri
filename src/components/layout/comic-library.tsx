@@ -25,6 +25,7 @@ import { useUIStore } from '@/store/ui'
 import {
   LibraryType,
   type Comic,
+  type FileTags,
   type Image,
   type Library,
 } from '@/types/library'
@@ -38,6 +39,7 @@ interface ComicItemProps {
   isSelected: boolean
   onClick: (id: string) => void
   onDoubleClick?: (id: string) => void
+  onTags: (id: string, tags: FileTags) => Promise<void>
 }
 
 function ComicItem({
@@ -45,13 +47,13 @@ function ComicItem({
   isSelected,
   onClick,
   onDoubleClick,
+  onTags,
 }: ComicItemProps) {
   const progress = useProgressStore((s) => s.comics[comic.id])
 
-  // Covers don't tag inline — selecting a comic exposes its delete/star in the
-  // reader toolbar (mirrors the book library). A starred cover shows a badge and
-  // a deleted one greys out (handled by GridItem). Right-click opens the comic's
-  // folder natively (desktop only).
+  // A starred cover shows a star badge, a deleted one greys out and shows a
+  // trash badge; tapping either badge toggles that tag. Right-click opens the
+  // comic's folder natively (desktop only).
   return (
     <GridItem
       title={comic.title}
@@ -63,6 +65,8 @@ function ComicItem({
       onClick={() => onClick(comic.id)}
       onDoubleClick={() => onDoubleClick?.(comic.id)}
       onContextMenu={useNativeOpen(comic.path)}
+      onStar={() => void onTags(comic.id, { starred: !comic.starred })}
+      onDelete={() => void onTags(comic.id, { deleted: !comic.deleted })}
     />
   )
 }
@@ -248,11 +252,18 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
       comic={comic}
       isSelected={comicId === comic.id}
       onClick={handleSelectComic}
+      onTags={updateComicTags}
     />
   )
 
   const renderGridImage = (_index: number, img: Image) => (
-    <GridImage comicId={comicId} image={img} onDoubleClick={setPreviewIndex} />
+    <GridImage
+      comicId={comicId}
+      image={img}
+      tagOnTap
+      onDoubleClick={setPreviewIndex}
+      onTags={updateComicImageTags}
+    />
   )
 
   return (
@@ -351,6 +362,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             onCurrentIndexChange={handleStripIndexChange}
             onHover={handleHover}
             onDoubleClick={setPreviewIndex}
+            onTags={updateComicImageTags}
           />
         )}
       </div>

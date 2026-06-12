@@ -20,7 +20,7 @@ import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
-import type { Image } from '@/types/library'
+import type { FileTags, Image } from '@/types/library'
 
 const EMPTY_ARRAY: Image[] = []
 
@@ -30,6 +30,7 @@ interface TableOfContentsProps {
   currentIndex: number
   isCollapsed: boolean
   onSelect: (index: number) => void
+  onTags: (id: string, filename: string, tags: FileTags) => Promise<void>
   onClose: () => void
 }
 
@@ -39,6 +40,7 @@ function TableOfContents({
   currentIndex,
   isCollapsed,
   onSelect,
+  onTags,
   onClose,
 }: TableOfContentsProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -77,6 +79,7 @@ function TableOfContents({
             image={img}
             isSelected={currentIndex === img.index}
             onClick={() => onSelect(img.index)}
+            onTags={onTags}
           />
         ))}
       </ScrollArea>
@@ -244,6 +247,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         currentIndex={currentIndex}
         isCollapsed={isTocCollapsed}
         onSelect={jumpTo}
+        onTags={updateComicImageTags}
         onClose={handleCloseToc}
       />
       <div
@@ -315,6 +319,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
           onCurrentIndexChange={handleStripIndexChange}
           onHover={handleHover}
           onDoubleClick={setPreviewIndex}
+          onTags={updateComicImageTags}
         />
       </div>
 
