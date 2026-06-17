@@ -369,7 +369,9 @@ export function useComicStrip({
     const observer = new ResizeObserver(updateSize)
     observer.observe(container)
 
-    return () => observer.disconnect()
+    return () => {
+      observer.disconnect()
+    }
   }, [])
 
   useLayoutEffect(() => {

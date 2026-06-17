@@ -62,7 +62,9 @@ function ComicItem({
       deleted={comic.deleted}
       isSelected={isSelected}
       progress={progress}
-      onClick={() => onClick(comic.id)}
+      onClick={() => {
+        onClick(comic.id)
+      }}
       onDoubleClick={() => onDoubleClick?.(comic.id)}
       onContextMenu={useNativeOpen(comic.path)}
       onStar={() => void onTags(comic.id, { starred: !comic.starred })}
@@ -244,7 +246,9 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   const renderComicItem = (_index: number, comic: Comic) => (

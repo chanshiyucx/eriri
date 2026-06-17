@@ -1,15 +1,10 @@
 import path from 'path'
-import react from '@vitejs/plugin-react'
+import babel from '@rolldown/plugin-babel'
+import react, { reactCompilerPreset } from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  plugins: [
-    react({
-      babel: {
-        plugins: [['babel-plugin-react-compiler', { target: '19' }]],
-      },
-    }),
-  ],
+  plugins: [react(), babel({ presets: [reactCompilerPreset()] })],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

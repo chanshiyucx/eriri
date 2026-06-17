@@ -163,7 +163,7 @@ pub fn scan_comic_images(app: AppHandle, comic_path: &str) -> Result<Vec<ComicIm
                     Err(_) => {
                         let mut hasher = Sha256::new();
                         hasher.update(path_str.as_bytes());
-                        format!("{:x}", hasher.finalize())
+                        hex::encode(hasher.finalize())
                     }
                 };
 

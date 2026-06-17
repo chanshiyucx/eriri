@@ -107,7 +107,7 @@ pub fn get_thumbnail_hash(metadata: &fs::Metadata) -> String {
     hasher.update(metadata.ino().to_le_bytes());
     hasher.update(metadata.len().to_le_bytes());
     hasher.update(metadata.mtime().to_le_bytes());
-    format!("{:x}", hasher.finalize())
+    hex::encode(hasher.finalize())
 }
 
 pub fn is_image_file(path: &Path) -> bool {

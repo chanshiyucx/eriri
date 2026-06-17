@@ -172,7 +172,9 @@ export function ImagePreview({
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   // Warm the HTTP cache for the adjacent pages so left/right navigation

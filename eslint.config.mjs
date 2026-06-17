@@ -24,10 +24,20 @@ export default [
     ...conf,
     files: ['**/*.{ts,tsx}'],
   })),
-  reactPlugin.configs.flat.recommended,
-  reactPlugin.configs.flat['jsx-runtime'],
-  reactHooksPlugin.configs.flat.recommended,
   {
+    ...reactPlugin.configs.flat.recommended,
+    files: ['src/**/*.tsx'],
+  },
+  {
+    ...reactPlugin.configs.flat['jsx-runtime'],
+    files: ['src/**/*.tsx'],
+  },
+  {
+    ...reactHooksPlugin.configs.flat.recommended,
+    files: ['src/**/*.{ts,tsx}'],
+  },
+  {
+    files: ['src/**/*.tsx'],
     settings: {
       react: {
         version: 'detect',
@@ -42,9 +52,12 @@ export default [
         tsconfigRootDir: import.meta.dirname,
       },
     },
+    rules: {
+      '@typescript-eslint/no-confusing-void-expression': 'error',
+    },
   },
   {
-    files: ['**/*.config.{js,ts,mjs}', 'eslint.config.ts'],
+    files: ['**/*.config.{js,ts,mjs}'],
     ...tseslint.configs.disableTypeChecked,
   },
   prettierConfig,

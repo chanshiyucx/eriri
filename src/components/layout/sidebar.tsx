@@ -75,13 +75,17 @@ function SortableLibraryItem({
           'h-8 w-full justify-start gap-2 rounded-none px-4 transition-all duration-300',
           isSelected && 'bg-overlay text-love',
         )}
-        onClick={() => onSelect(library)}
+        onClick={() => {
+          onSelect(library)
+        }}
       >
         <span
           {...attributes}
           {...listeners}
           className="cursor-grab"
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation()
+          }}
         >
           <Icon className="h-4 w-4" />
         </span>

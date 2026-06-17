@@ -115,7 +115,9 @@ export const useUIStore = create<UIState>()(
 
 useUIStore.subscribe(
   (state) => state.theme,
-  (theme) => applyTheme(theme),
+  (theme) => {
+    applyTheme(theme)
+  },
 )
 
 window

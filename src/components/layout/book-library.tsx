@@ -23,7 +23,9 @@ function BookItem({ book, isSelected, onClick }: BookItemProps) {
 
   return (
     <Button
-      onClick={() => onClick(book.id)}
+      onClick={() => {
+        onClick(book.id)
+      }}
       className={cn(
         'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-sm',
         isSelected ? 'bg-overlay text-love' : 'bg-surface',
@@ -58,7 +60,9 @@ interface AuthorItemProps {
 function AuthorItem({ author, isSelected, onSelect }: AuthorItemProps) {
   return (
     <Button
-      onClick={() => onSelect(author.id)}
+      onClick={() => {
+        onSelect(author.id)
+      }}
       onContextMenu={useNativeOpen(author.path)}
       className={cn(
         'hover:bg-overlay flex h-8 w-full items-center gap-2 rounded-none px-3 text-left text-sm',

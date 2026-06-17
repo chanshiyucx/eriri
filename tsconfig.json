@@ -1,10 +1,11 @@
 {
   "compilerOptions": {
-    "target": "ES2023",
+    "target": "ES2025",
     "useDefineForClassFields": true,
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": ["ES2025", "DOM"],
     "module": "ESNext",
     "skipLibCheck": true,
+    "types": ["vite/client"],
     "paths": {
       "@/*": ["./src/*"]
     },
@@ -14,15 +15,20 @@
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+    "moduleDetection": "force",
     "noEmit": true,
     "jsx": "react-jsx",
 
     /* Linting */
     "strict": true,
+    "noImplicitOverride": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"]
 }

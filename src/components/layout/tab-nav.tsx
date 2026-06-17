@@ -27,7 +27,9 @@ function TabItem({ tab, isActive, onSelect, onRemove }: TabItemProps) {
         'bg-surface hover:bg-overlay group flex max-w-50 min-w-37.5 cursor-pointer items-center gap-2 rounded-sm px-3 py-1 text-sm',
         isActive && 'bg-overlay text-love',
       )}
-      onClick={() => onSelect(tab.id)}
+      onClick={() => {
+        onSelect(tab.id)
+      }}
     >
       <span className="flex-1 truncate">{tab.title}</span>
       <Button
@@ -54,8 +56,14 @@ export function TabNav() {
   const removeTab = useTabsStore((s) => s.removeTab)
   const setActiveTab = useTabsStore((s) => s.setActiveTab)
 
-  const handleSidebar = () => (activeTab ? setActiveTab('') : toggleSidebar())
-  const handleMiddle = () => (activeTab ? setActiveTab('') : toggleMiddle())
+  const handleSidebar = () => {
+    if (activeTab) setActiveTab('')
+    else toggleSidebar()
+  }
+  const handleMiddle = () => {
+    if (activeTab) setActiveTab('')
+    else toggleMiddle()
+  }
 
   const navigateTab = (direction: 1 | -1) => {
     if (!tabs.length) return
@@ -107,7 +115,9 @@ export function TabNav() {
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   return (

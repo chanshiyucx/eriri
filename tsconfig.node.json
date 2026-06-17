@@ -1,10 +1,15 @@
 {
   "compilerOptions": {
-    "composite": true,
+    "target": "ES2023",
     "skipLibCheck": true,
+    "types": ["node"],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "allowSyntheticDefaultImports": true
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "strict": true,
+    "noEmit": true,
+    "forceConsistentCasingInFileNames": true
   },
   "include": ["vite.config.ts", "vitest.config.ts"]
 }

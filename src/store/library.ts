@@ -152,7 +152,9 @@ export const useLibraryStore = create<LibraryState>()(
       const idsToRemove = new Set([...comicIds, ...bookIds])
       tabsStore.tabs
         .filter((t) => idsToRemove.has(t.id))
-        .forEach((t) => tabsStore.removeTab(t.id))
+        .forEach((t) => {
+          tabsStore.removeTab(t.id)
+        })
 
       for (const cId of comicIds) progressStore.removeComicProgress(cId)
       for (const bId of bookIds) {

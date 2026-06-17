@@ -20,7 +20,9 @@ function App() {
     // Swallow the browser's default right-click menu app-wide for a native
     // feel; elements with their own onContextMenu (e.g. open-in-folder) still
     // run.
-    const blockContextMenu = (e: MouseEvent) => e.preventDefault()
+    const blockContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+    }
     document.addEventListener('contextmenu', blockContextMenu)
 
     return () => {

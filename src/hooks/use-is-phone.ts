@@ -7,7 +7,9 @@ const PHONE_QUERY = '(max-width: 767.98px)'
 function subscribe(callback: () => void) {
   const mql = window.matchMedia(PHONE_QUERY)
   mql.addEventListener('change', callback)
-  return () => mql.removeEventListener('change', callback)
+  return () => {
+    mql.removeEventListener('change', callback)
+  }
 }
 
 export function useIsPhone() {

@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from 'react'
-import { Virtuoso, VirtuosoHandle } from 'react-virtuoso'
+import { Virtuoso, type VirtuosoHandle } from 'react-virtuoso'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Spinner } from '@/components/ui/spinner'
@@ -78,7 +78,9 @@ function TableOfContents({
             <div
               key={chapter.lineIndex}
               className="group hover:bg-overlay flex w-full cursor-pointer items-center gap-2 px-4 py-2 text-left text-sm"
-              onClick={() => onSelect(chapter.lineIndex)}
+              onClick={() => {
+                onSelect(chapter.lineIndex)
+              }}
             >
               <span
                 className={cn(
@@ -260,7 +262,9 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   const renderItem = (_index: number, line: string) => <BookLine line={line} />
@@ -291,10 +295,12 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
           isCollapsed={isTocCollapsed}
           favorites={favoriteChapters}
           onSelect={jumpTo}
-          onToggleFavorite={(lineIndex) =>
+          onToggleFavorite={(lineIndex) => {
             toggleChapterFavorite(bookId, lineIndex)
-          }
-          onClose={() => setTocCollapsed(true)}
+          }}
+          onClose={() => {
+            setTocCollapsed(true)
+          }}
         />
       )}
 
@@ -303,7 +309,9 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
           <Button
             className="hover:bg-overlay h-6 w-6 bg-transparent"
             onClick={toggleToc}
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+            }}
             title="展开目录"
             disabled={!content.chapters.length}
           >

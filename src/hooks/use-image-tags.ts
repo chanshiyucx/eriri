@@ -26,8 +26,12 @@ export function useImageTags(
       title: image.filename,
       starred: image.starred,
       deleted: image.deleted,
-      onStar: () => setTag({ starred: !image.starred }),
-      onDelete: () => setTag({ deleted: !image.deleted }),
+      onStar: () => {
+        setTag({ starred: !image.starred })
+      },
+      onDelete: () => {
+        setTag({ deleted: !image.deleted })
+      },
       onClose: close,
     },
   }

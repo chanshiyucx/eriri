@@ -78,7 +78,9 @@ function TableOfContents({
             comicId={comicId}
             image={img}
             isSelected={currentIndex === img.index}
-            onClick={() => onSelect(img.index)}
+            onClick={() => {
+              onSelect(img.index)
+            }}
             onTags={onTags}
           />
         ))}
@@ -234,7 +236,9 @@ export function ComicReader({ comicId }: ComicReaderProps) {
 
   useEffect(() => {
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+    }
   }, [])
 
   if (!comic || !images.length) return null
@@ -260,7 +264,9 @@ export function ComicReader({ comicId }: ComicReaderProps) {
           <Button
             className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
             onClick={toggleToc}
-            onMouseDown={(e) => e.stopPropagation()}
+            onMouseDown={(e) => {
+              e.stopPropagation()
+            }}
           >
             <SquareMenu className="h-4 w-4" />
           </Button>

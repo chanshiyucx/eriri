@@ -26,7 +26,9 @@ export function ThemeSwitcher() {
         return (
           <Button
             key={mode}
-            onClick={() => setTheme(mode)}
+            onClick={() => {
+              setTheme(mode)
+            }}
             className={cn(
               'hover:text-love h-6 w-6 bg-transparent p-0 transition-colors',
               isActive ? 'text-love' : 'text-text',

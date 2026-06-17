@@ -14,12 +14,18 @@ import { usePressGestures } from '@/hooks/use-press-gestures'
 export function useTagReveal(onDoubleTap: () => void, enabled = true) {
   const ref = useRef<HTMLElement>(null)
   const [open, setOpen] = useState(false)
-  const close = () => setOpen(false)
+  const close = () => {
+    setOpen(false)
+  }
 
   useClickOutside(ref, close, open)
 
   const gestures = usePressGestures({
-    onTap: enabled ? () => setOpen((v) => !v) : undefined,
+    onTap: enabled
+      ? () => {
+          setOpen((v) => !v)
+        }
+      : undefined,
     onDoubleTap,
   })
   return { ref, open, gestures, close }

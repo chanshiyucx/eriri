@@ -18,9 +18,9 @@
 
 ### Prerequisites
 
-- [Node.js](https://nodejs.org/) (v18+)
-- [Rust](https://www.rust-lang.org/tools/install)
-- [pnpm](https://pnpm.io/installation)
+- [Node.js](https://nodejs.org/) 20.19 or newer
+- [Rustup](https://rustup.rs/) (the repository installs/pins Rust 1.96.0)
+- [Corepack](https://nodejs.org/api/corepack.html) with pnpm 11.7.0
 
 ### Development
 
@@ -34,6 +34,7 @@
 2.  **Install dependencies**:
 
     ```shell
+    corepack enable
     pnpm install
     ```
 
