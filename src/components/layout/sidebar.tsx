@@ -29,6 +29,23 @@ const LibraryIcon = {
 
 const POINTER_SENSOR_OPTIONS = { activationConstraint: { distance: 8 } }
 
+export function reorderLibraryIdsAfterDrag(
+  libraryIds: string[],
+  activeId: string,
+  overId: string | null | undefined,
+) {
+  if (!overId || activeId === overId) return null
+
+  const oldIndex = libraryIds.indexOf(activeId)
+  const newIndex = libraryIds.indexOf(overId)
+  if (oldIndex === -1 || newIndex === -1) return null
+
+  const newOrder = [...libraryIds]
+  newOrder.splice(oldIndex, 1)
+  newOrder.splice(newIndex, 0, activeId)
+  return newOrder
+}
+
 interface SortableLibraryItemProps {
   library: Library
   isSelected: boolean
@@ -96,6 +113,7 @@ function SortableLibraryItem({
           className="text-subtle bg-overlay hover:text-love h-6 w-6"
           onClick={() => void onRefresh(library)}
           disabled={isScanning}
+          aria-label={`刷新库 ${library.name}`}
           title="刷新库"
         >
           <RefreshCw className="h-4 w-4" />
@@ -103,6 +121,7 @@ function SortableLibraryItem({
         <Button
           className="text-subtle bg-overlay hover:text-love h-6 w-6"
           onClick={() => void onRemove(library)}
+          aria-label={`删除库 ${library.name}`}
           title="删除库"
         >
           <Trash2 className="h-4 w-4" />
@@ -133,16 +152,12 @@ export function Sidebar() {
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event
-    if (!over || active.id === over.id) return
-
-    const oldIndex = libraryIds.indexOf(active.id as string)
-    const newIndex = libraryIds.indexOf(over.id as string)
-    if (oldIndex === -1 || newIndex === -1) return
-
-    const newOrder = [...libraryIds]
-    newOrder.splice(oldIndex, 1)
-    newOrder.splice(newIndex, 0, active.id as string)
-    reorderLibrary(newOrder)
+    const newOrder = reorderLibraryIdsAfterDrag(
+      libraryIds,
+      active.id as string,
+      over?.id as string | null | undefined,
+    )
+    if (newOrder) reorderLibrary(newOrder)
   }
 
   const handleSelect = (library: Library) => {
@@ -170,12 +185,13 @@ export function Sidebar() {
 
   return (
     <aside
+      aria-label="库侧边栏"
       className={cn(
         'bg-base h-full w-full flex-col border-r md:w-56',
         isSidebarCollapsed ? 'hidden' : 'flex',
       )}
     >
-      <ScrollArea viewportClassName="h-0 flex-1">
+      <ScrollArea aria-label="库列表" viewportClassName="h-0 flex-1">
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

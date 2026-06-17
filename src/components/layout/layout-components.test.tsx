@@ -33,10 +33,6 @@ vi.mock('@/components/layout/comic-reader', () => ({
 
 describe('layout components', () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
     useLibraryStore.setState(useLibraryStore.getInitialState(), true)
     useTabsStore.setState(useTabsStore.getInitialState(), true)
     useUIStore.setState(useUIStore.getInitialState(), true)

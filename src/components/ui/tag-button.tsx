@@ -4,6 +4,7 @@ import { stopPointerProps } from '@/hooks/use-press-gestures'
 import { cn } from '@/lib/style'
 
 interface TagButtonProps {
+  'aria-label'?: string
   className?: string
   onClick: () => void
   children: ReactNode
@@ -14,11 +15,17 @@ interface TagButtonProps {
  * pointer/click events its tap rides on so the image's own tap and double-tap
  * gestures (and select-on-click) don't also fire.
  */
-export function TagButton({ className, onClick, children }: TagButtonProps) {
+export function TagButton({
+  className,
+  onClick,
+  children,
+  ...props
+}: TagButtonProps) {
   return (
     <Button
       className={cn('bg-transparent hover:bg-transparent', className)}
       {...stopPointerProps}
+      {...props}
       onClick={(e) => {
         e.stopPropagation()
         onClick()

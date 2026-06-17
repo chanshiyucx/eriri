@@ -30,6 +30,12 @@ export default defineConfig({
           lines: 100,
           statements: 100,
         },
+        'src/components/layout/**/*.{ts,tsx}': {
+          branches: 70,
+          functions: 85,
+          lines: 80,
+          statements: 80,
+        },
       },
     },
   },

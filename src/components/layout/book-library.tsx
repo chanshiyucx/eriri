@@ -149,7 +149,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
           <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
             AUTHORS ({authors.length})
           </div>
-          <ScrollArea viewportClassName="h-0 flex-1">
+          <ScrollArea aria-label="作者列表" viewportClassName="h-0 flex-1">
             {authors.map((author) => (
               <AuthorItem
                 key={author.id}
@@ -165,7 +165,7 @@ export function BookLibrary({ selectedLibrary }: BookLibraryProps) {
           <div className="bg-base text-subtle border-b px-3 py-2 text-xs">
             BOOKS ({books.length})
           </div>
-          <ScrollArea viewportClassName="h-0 flex-1">
+          <ScrollArea aria-label="书籍列表" viewportClassName="h-0 flex-1">
             {books.map((book) => (
               <BookItem
                 key={book.id}

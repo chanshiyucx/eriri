@@ -1,13 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { migrateTabsState, useTabsStore } from '@/store/tabs'
 import { LibraryType } from '@/types/library'
 
 describe('tabs store', () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
     useTabsStore.setState(useTabsStore.getInitialState(), true)
   })
 

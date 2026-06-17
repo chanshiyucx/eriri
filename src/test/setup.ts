@@ -1,6 +1,6 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
-import { afterEach, vi } from 'vitest'
+import { afterEach, beforeEach, vi } from 'vitest'
 
 if (!window.matchMedia) {
   Object.defineProperty(window, 'matchMedia', {
@@ -17,6 +17,13 @@ if (!window.matchMedia) {
     })),
   })
 }
+
+beforeEach(() => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
+  )
+})
 
 afterEach(() => {
   cleanup()

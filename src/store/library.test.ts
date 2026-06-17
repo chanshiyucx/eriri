@@ -33,10 +33,6 @@ const emptyCatalog = {
 
 describe('library store', () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
     mockedApi.fetchCatalog.mockResolvedValue(emptyCatalog)
     mockedApi.setBookTags.mockResolvedValue(true)
     mockedApi.setComicTags.mockResolvedValue(true)

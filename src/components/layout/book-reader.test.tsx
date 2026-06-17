@@ -76,10 +76,6 @@ describe('BookReader', () => {
   const toggleChapterFavorite = vi.fn()
 
   beforeEach(() => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
     useLibraryStore.setState(useLibraryStore.getInitialState(), true)
     useProgressStore.setState(useProgressStore.getInitialState(), true)
     useTabsStore.setState(useTabsStore.getInitialState(), true)

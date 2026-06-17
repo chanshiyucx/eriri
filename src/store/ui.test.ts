@@ -3,10 +3,6 @@ import { useUIStore } from '@/store/ui'
 
 describe('UI store', () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
     useUIStore.setState(useUIStore.getInitialState(), true)
     document.documentElement.removeAttribute('data-theme')
   })
@@ -100,11 +96,6 @@ describe('UI store', () => {
         dispatchEvent: vi.fn(),
       })),
     )
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
-
     const { useUIStore: freshUIStore } = await import('@/store/ui')
     freshUIStore.setState(freshUIStore.getInitialState(), true)
     document.documentElement.setAttribute('data-theme', 'light')

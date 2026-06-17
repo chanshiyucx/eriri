@@ -17,10 +17,6 @@ describe('navigation hooks', () => {
   beforeEach(() => {
     mockUseIsPhone.mockReturnValue(false)
     mockOpenPathNative.mockResolvedValue(undefined)
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
     useUIStore.setState(useUIStore.getInitialState(), true)
   })
 

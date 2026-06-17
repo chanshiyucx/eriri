@@ -149,12 +149,30 @@ mod tests {
     use super::*;
     use crate::models::Config;
 
+    static CONFIG_FILE_LOCK: std::sync::LazyLock<std::sync::Mutex<()>> =
+        std::sync::LazyLock::new(|| std::sync::Mutex::new(()));
+
     fn app_with_cache_dir(cache_dir: &Path) -> tauri::App<tauri::test::MockRuntime> {
         let app = tauri::test::mock_app();
         app.manage(ConfigState(Mutex::new(Config {
             cache_dir: Some(cache_dir.to_string_lossy().into_owned()),
         })));
         app
+    }
+
+    fn app_with_config(config: Config) -> tauri::App<tauri::test::MockRuntime> {
+        let app = tauri::test::mock_app();
+        app.manage(ConfigState(Mutex::new(config)));
+        app
+    }
+
+    fn reset_config_file(app: &AppHandle<tauri::test::MockRuntime>) -> PathBuf {
+        let path = get_config_path(app).expect("resolve config path");
+        let _ = fs::remove_file(&path);
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent).expect("create config dir");
+        }
+        path
     }
 
     #[test]
@@ -203,6 +221,83 @@ mod tests {
         let missing_cache = cache_dir.path().join("missing");
         let missing_app = app_with_cache_dir(&missing_cache);
         assert_eq!(get_configured_cache_dir(missing_app.handle()), None);
+    }
+
+    #[test]
+    fn get_loads_valid_disk_config_and_ignores_invalid_json() {
+        let _guard = CONFIG_FILE_LOCK.lock().expect("lock config file");
+        let cache_dir = tempfile::tempdir().expect("create cache dir");
+        let app = tauri::test::mock_app();
+        let config_path = reset_config_file(app.handle());
+
+        fs::write(
+            &config_path,
+            serde_json::json!({ "cache_dir": cache_dir.path() }).to_string(),
+        )
+        .expect("write config file");
+
+        assert_eq!(
+            get(app.handle()).cache_dir,
+            Some(cache_dir.path().to_string_lossy().into_owned())
+        );
+
+        fs::write(&config_path, "{ invalid json").expect("write invalid config file");
+        assert_eq!(get(app.handle()).cache_dir, None);
+
+        let _ = fs::remove_file(config_path);
+    }
+
+    #[test]
+    fn init_loads_disk_config_into_managed_state() {
+        let _guard = CONFIG_FILE_LOCK.lock().expect("lock config file");
+        let cache_dir = tempfile::tempdir().expect("create cache dir");
+        let mut app = tauri::test::mock_app();
+        let config_path = reset_config_file(app.handle());
+        fs::write(
+            &config_path,
+            serde_json::json!({ "cache_dir": cache_dir.path() }).to_string(),
+        )
+        .expect("write config file");
+
+        init(&mut app).expect("init config state");
+
+        assert_eq!(
+            get(app.handle()).cache_dir,
+            Some(cache_dir.path().to_string_lossy().into_owned())
+        );
+
+        fs::write(&config_path, "{}").expect("overwrite config file");
+        assert_eq!(
+            get(app.handle()).cache_dir,
+            Some(cache_dir.path().to_string_lossy().into_owned())
+        );
+
+        let _ = fs::remove_file(config_path);
+    }
+
+    #[test]
+    fn save_config_writes_to_disk_and_updates_managed_state() {
+        let _guard = CONFIG_FILE_LOCK.lock().expect("lock config file");
+        let cache_dir = tempfile::tempdir().expect("create cache dir");
+        let app = app_with_config(Config::default());
+        let config_path = reset_config_file(app.handle());
+        let config = Config {
+            cache_dir: Some(cache_dir.path().to_string_lossy().into_owned()),
+        };
+
+        save_config(app.handle(), &config).expect("save config");
+
+        assert_eq!(get(app.handle()).cache_dir, config.cache_dir);
+        assert_eq!(
+            serde_json::from_str::<Config>(
+                &fs::read_to_string(&config_path).expect("read config file")
+            )
+            .expect("parse config")
+            .cache_dir,
+            Some(cache_dir.path().to_string_lossy().into_owned())
+        );
+
+        let _ = fs::remove_file(config_path);
     }
 
     #[test]

@@ -1,8 +1,18 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { BookLibrary } from '@/components/layout/book-library'
 import { ComicLibrary } from '@/components/layout/comic-library'
-import { Sidebar } from '@/components/layout/sidebar'
+import {
+  reorderLibraryIdsAfterDrag,
+  Sidebar,
+} from '@/components/layout/sidebar'
 import { useLibraryStore } from '@/store/library'
 import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
@@ -19,7 +29,7 @@ import {
 vi.mock('@dnd-kit/core', () => ({
   closestCenter: vi.fn(),
   DndContext: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="dnd-context">{children}</div>
+    <div>{children}</div>
   ),
   PointerSensor: vi.fn(),
   useSensor: vi.fn(() => ({})),
@@ -32,7 +42,7 @@ vi.mock('@dnd-kit/modifiers', () => ({
 
 vi.mock('@dnd-kit/sortable', () => ({
   SortableContext: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="sortable-context">{children}</div>
+    <div>{children}</div>
   ),
   useSortable: vi.fn(() => ({
     attributes: {},
@@ -53,7 +63,7 @@ vi.mock('react-virtuoso', () => ({
     data: unknown[]
     itemContent: (index: number, item: unknown) => React.ReactNode
   }) => (
-    <div data-testid="virtuoso-grid">
+    <div>
       {data.map((item, index) => (
         <div key={(item as { id?: string; filename?: string }).id ?? index}>
           {itemContent(index, item)}
@@ -74,97 +84,13 @@ vi.mock('@/components/layout/theme-switcher', () => ({
 }))
 
 vi.mock('@/components/ui/comic-strip', () => ({
-  ComicStrip: ({
-    images,
-    onCurrentIndexChange,
-  }: {
-    images: Image[]
-    onCurrentIndexChange?: (index: number) => void
-  }) => (
+  ComicStrip: ({ images }: { images: Image[] }) => (
     <div data-testid="comic-strip">
-      {images.map((image, index) => (
-        <button
-          key={image.filename}
-          type="button"
-          onClick={() => onCurrentIndexChange?.(index)}
-        >
-          strip:{image.filename}
-        </button>
+      {images.map((image) => (
+        <span key={image.filename}>strip:{image.filename}</span>
       ))}
     </div>
   ),
-}))
-
-vi.mock('@/components/ui/grid-item', () => ({
-  GridItem: ({
-    title,
-    isSelected,
-    onClick,
-    onDoubleClick,
-    onStar,
-    onDelete,
-  }: {
-    title: string
-    isSelected?: boolean
-    onClick?: () => void
-    onDoubleClick?: () => void
-    onStar?: () => void
-    onDelete?: () => void
-  }) => (
-    <div data-selected={isSelected ? 'true' : 'false'}>
-      <button type="button" onClick={onClick} onDoubleClick={onDoubleClick}>
-        {title}
-      </button>
-      <button type="button" aria-label={`star ${title}`} onClick={onStar}>
-        star
-      </button>
-      <button type="button" aria-label={`delete ${title}`} onClick={onDelete}>
-        delete
-      </button>
-    </div>
-  ),
-}))
-
-vi.mock('@/components/ui/image-view', () => ({
-  GridImage: ({
-    comicId,
-    image,
-    onDoubleClick,
-    onTags,
-  }: {
-    comicId: string
-    image: Image
-    onDoubleClick?: (index: number) => void
-    onTags?: (
-      comicId: string,
-      filename: string,
-      tags: { starred?: boolean },
-    ) => void
-  }) => (
-    <button
-      type="button"
-      onClick={() =>
-        onTags?.(comicId, image.filename, { starred: !image.starred })
-      }
-      onDoubleClick={() => onDoubleClick?.(image.index)}
-    >
-      image:{image.filename}
-    </button>
-  ),
-  ImagePreviewOverlay: ({
-    images,
-    index,
-    onClose,
-  }: {
-    images: Image[]
-    index: number
-    onClose: () => void
-  }) =>
-    index >= 0 ? (
-      <button type="button" onClick={onClose}>
-        preview:{images[index]?.filename}
-      </button>
-    ) : null,
 }))
 
 vi.mock('@/hooks/use-native-open', () => ({
@@ -238,6 +164,20 @@ function image(index: number, overrides: Partial<Image> = {}): Image {
   }
 }
 
+function texts(elements: HTMLElement[]) {
+  return elements.map((element) => element.textContent ?? '')
+}
+
+function tap(surface: HTMLElement) {
+  fireEvent.pointerDown(surface, { clientX: 10, clientY: 10 })
+  fireEvent.pointerUp(surface, { clientX: 10, clientY: 10 })
+}
+
+function doubleTap(surface: HTMLElement) {
+  tap(surface)
+  tap(surface)
+}
+
 describe('library flow components', () => {
   beforeEach(() => {
     useLibraryStore.setState(useLibraryStore.getInitialState(), true)
@@ -245,17 +185,32 @@ describe('library flow components', () => {
     useTabsStore.setState(useTabsStore.getInitialState(), true)
     useUIStore.setState(useUIStore.getInitialState(), true)
     vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
-    vi.stubGlobal(
       'confirm',
       vi.fn(() => true),
     )
     vi.stubGlobal('alert', vi.fn())
   })
 
-  it('selects, refreshes and removes libraries from the sidebar', async () => {
+  it('derives library order for valid drag transitions only', () => {
+    expect(
+      reorderLibraryIdsAfterDrag(
+        ['books', 'comics', 'archive'],
+        'archive',
+        'books',
+      ),
+    ).toEqual(['archive', 'books', 'comics'])
+    expect(
+      reorderLibraryIdsAfterDrag(['books', 'comics'], 'books', 'books'),
+    ).toBeNull()
+    expect(
+      reorderLibraryIdsAfterDrag(['books', 'comics'], 'missing', 'books'),
+    ).toBeNull()
+    expect(
+      reorderLibraryIdsAfterDrag(['books', 'comics'], 'books', null),
+    ).toBeNull()
+  })
+
+  it('selects a library and confirms destructive sidebar actions', async () => {
     const refreshLibrary = vi.fn().mockResolvedValue(undefined)
     const removeLibrary = vi.fn().mockResolvedValue(undefined)
 
@@ -278,29 +233,34 @@ describe('library flow components', () => {
       removeLibrary,
     })
 
-    const { container } = render(<Sidebar />)
+    render(<Sidebar />)
 
-    expect(screen.getByText('Books')).toBeInTheDocument()
-    expect(screen.getByText('Comics')).toBeInTheDocument()
+    const libraryList = screen.getByLabelText('库列表')
+    expect(
+      texts(within(libraryList).getAllByRole('button')).filter(Boolean),
+    ).toEqual(['Books', 'Comics'])
 
-    fireEvent.click(screen.getByRole('button', { name: /Comics/ }))
+    fireEvent.click(within(libraryList).getByRole('button', { name: 'Comics' }))
     expect(useUIStore.getState().selectedLibraryId).toBe('comics')
 
-    fireEvent.click(screen.getAllByTitle('刷新库')[1])
+    fireEvent.click(
+      within(libraryList).getByRole('button', { name: '刷新库 Comics' }),
+    )
     await waitFor(() => {
       expect(refreshLibrary).toHaveBeenCalledWith('comics')
     })
     expect(window.confirm).toHaveBeenCalledWith('确认刷新库 "Comics"?')
 
-    fireEvent.click(screen.getAllByTitle('删除库')[0])
+    fireEvent.click(
+      within(libraryList).getByRole('button', { name: '删除库 Books' }),
+    )
     await waitFor(() => {
       expect(removeLibrary).toHaveBeenCalledWith('books')
     })
-
-    expect(container.firstElementChild).toHaveClass('flex')
+    expect(window.confirm).toHaveBeenCalledWith('确认删除库 "Books"?')
   })
 
-  it('renders book authors, sorts book states and opens the selected book reader', () => {
+  it('navigates authors, orders books by reader state and opens the reader', () => {
     const selectedLibrary = library({
       id: 'books',
       name: 'Books',
@@ -327,21 +287,22 @@ describe('library flow components', () => {
 
     render(<BookLibrary selectedLibrary={selectedLibrary} />)
 
-    expect(screen.getByText('AUTHORS (1)')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Writer/ }))
-
-    expect(screen.getByText('BOOKS (3)')).toBeInTheDocument()
-    const bookButtons = screen
-      .getAllByRole('button')
-      .map((button) => button.textContent)
-    expect(bookButtons.indexOf('Starred Book')).toBeLessThan(
-      bookButtons.indexOf('Normal Book33%'),
-    )
-    expect(bookButtons.indexOf('Deleted Book')).toBeGreaterThan(
-      bookButtons.indexOf('Normal Book33%'),
+    fireEvent.click(
+      within(screen.getByLabelText('作者列表')).getByRole('button', {
+        name: /Writer/,
+      }),
     )
 
-    fireEvent.click(screen.getByRole('button', { name: /Normal Book/ }))
+    const bookList = screen.getByLabelText('书籍列表')
+    expect(texts(within(bookList).getAllByRole('button'))).toEqual([
+      'Starred Book',
+      'Normal Book33%',
+      'Deleted Book',
+    ])
+
+    fireEvent.click(
+      within(bookList).getByRole('button', { name: /Normal Book/ }),
+    )
     expect(useUIStore.getState().navStatus.books).toEqual({
       authorId: 'author',
       bookId: 'normal',
@@ -351,37 +312,12 @@ describe('library flow components', () => {
     )
   })
 
-  it('loads selected comic images and opens the comic as an active tab', async () => {
-    const getComicImages = vi.fn().mockResolvedValue([image(0), image(1)])
-    const selectedLibrary = library({ id: 'comics', name: 'Comics' })
+  it('uses real comic cards, image tags, preview progress and tab actions', () => {
+    vi.useFakeTimers()
 
-    useUIStore.setState({ navStatus: { comics: { comicId: 'selected' } } })
-    useLibraryStore.setState({
-      comics: {
-        selected: comic({ id: 'selected', title: 'Selected Comic' }),
-      },
-      libraryComics: { comics: ['selected'] },
-      getComicImages,
-    })
-
-    render(<ComicLibrary selectedLibrary={selectedLibrary} />)
-
-    await waitFor(() => {
-      expect(getComicImages).toHaveBeenCalledWith('selected')
-    })
-    expect(screen.getAllByText('Selected Comic')).toHaveLength(2)
-
-    fireEvent.click(screen.getByTitle('继续阅读'))
-    expect(useTabsStore.getState().tabs).toEqual([
-      { type: LibraryType.comic, id: 'selected', title: 'Selected Comic' },
-    ])
-    expect(useTabsStore.getState().activeTab).toBe('selected')
-  })
-
-  it('handles comic selection, tags, view mode and image preview progress', () => {
+    const getComicImages = vi.fn().mockResolvedValue([])
     const updateComicTags = vi.fn().mockResolvedValue(undefined)
     const updateComicImageTags = vi.fn().mockResolvedValue(undefined)
-    const getComicImages = vi.fn().mockResolvedValue([])
     const selectedLibrary = library({ id: 'comics', name: 'Comics' })
 
     useUIStore.setState({ navStatus: { comics: { comicId: 'normal' } } })
@@ -419,34 +355,48 @@ describe('library flow components', () => {
 
     render(<ComicLibrary selectedLibrary={selectedLibrary} />)
 
-    expect(screen.getByText('2 / 2')).toBeInTheDocument()
-    const comicButtons = screen
-      .getAllByRole('button')
-      .map((button) => button.textContent)
-    expect(comicButtons.indexOf('Starred Comic')).toBeLessThan(
-      comicButtons.indexOf('Normal Comic'),
-    )
-    expect(comicButtons.indexOf('Deleted Comic')).toBeGreaterThan(
-      comicButtons.indexOf('Normal Comic'),
-    )
+    expect(
+      within(screen.getByLabelText('漫画列表'))
+        .getAllByRole('img')
+        .map((img) => img.getAttribute('alt')),
+    ).toEqual(['Starred Comic', 'Normal Comic', 'Deleted Comic'])
+    expect(screen.getAllByText('2 / 2').length).toBeGreaterThan(0)
 
     fireEvent.click(screen.getByTitle('标记收藏'))
     expect(updateComicTags).toHaveBeenCalledWith('normal', { starred: true })
 
-    fireEvent.click(screen.getByText('image:1.jpg'))
+    const imageFigure = within(screen.getByLabelText('图片列表'))
+      .getByRole('img', { name: '1.jpg' })
+      .closest('figure')!
+    tap(imageFigure)
+    act(() => {
+      vi.advanceTimersByTime(350)
+    })
+    fireEvent.click(within(imageFigure).getByLabelText('标记收藏'))
     expect(updateComicImageTags).toHaveBeenCalledWith('normal', '1.jpg', {
       starred: true,
     })
 
-    fireEvent.doubleClick(screen.getByText('image:1.jpg'))
-    fireEvent.click(screen.getByText('preview:1.jpg'))
+    doubleTap(imageFigure)
+    const previewFigure = within(
+      screen.getByRole('dialog', { name: '图片预览' }),
+    )
+      .getByRole('img', { name: '1.jpg' })
+      .closest('figure')!
+    doubleTap(previewFigure)
     expect(useProgressStore.getState().comics.normal.percent).toBe(100)
 
     fireEvent.click(screen.getByTitle('原图预览'))
     expect(screen.getByTitle('网格模式')).toBeInTheDocument()
     expect(screen.getByTestId('comic-strip')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Starred Comic' }))
+    fireEvent.click(screen.getByTitle('继续阅读'))
+    expect(useTabsStore.getState().tabs).toEqual([
+      { type: LibraryType.comic, id: 'normal', title: 'Normal Comic' },
+    ])
+    expect(useTabsStore.getState().activeTab).toBe('normal')
+
+    fireEvent.click(screen.getByRole('img', { name: 'Starred Comic' }))
     expect(useUIStore.getState().navStatus.comics.comicId).toBe('starred')
   })
 })

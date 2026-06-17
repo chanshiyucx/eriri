@@ -249,6 +249,8 @@ export function ImagePreviewOverlay({
 }: ImagePreviewOverlayProps) {
   return (
     <div
+      role="dialog"
+      aria-label="图片预览"
       className={cn(
         'bg-base fixed inset-0 z-100 flex items-center justify-center',
         index >= 0 ? 'visible' : 'hidden',

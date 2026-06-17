@@ -49,6 +49,7 @@ export function TagOverlay({
 
   const trash = (open || deleted) && onDelete && (
     <TagButton
+      aria-label="标记删除"
       className={cn(size.button, corner ? 'absolute top-0 left-0' : 'shrink-0')}
       onClick={toggle(onDelete)}
     >
@@ -57,6 +58,7 @@ export function TagOverlay({
   )
   const star = (open || starred) && onStar && (
     <TagButton
+      aria-label="标记收藏"
       className={cn(
         size.button,
         corner ? 'absolute top-0 right-0' : 'shrink-0',

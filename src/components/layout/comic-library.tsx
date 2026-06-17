@@ -276,13 +276,15 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
         <div className="bg-base text-subtle flex h-8 items-center justify-end border-b px-3 text-xs">
           <span>COMICS ({comics.length})</span>
         </div>
-        <VirtuosoGrid
-          className="flex-1"
-          data={comics}
-          itemContent={renderComicItem}
-          listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
-          increaseViewportBy={600}
-        />
+        <div aria-label="漫画列表" className="contents">
+          <VirtuosoGrid
+            className="flex-1"
+            data={comics}
+            itemContent={renderComicItem}
+            listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
+            increaseViewportBy={600}
+          />
+        </div>
       </div>
 
       <div className={cn('min-h-0 flex-1 flex-col', readerClass)}>
@@ -346,14 +348,16 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
           </span>
         </div>
         {viewMode === 'grid' ? (
-          <VirtuosoGrid
-            key={comicId}
-            className="flex-1"
-            data={images}
-            itemContent={renderGridImage}
-            listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
-            increaseViewportBy={600}
-          />
+          <div aria-label="图片列表" className="contents">
+            <VirtuosoGrid
+              key={comicId}
+              className="flex-1"
+              data={images}
+              itemContent={renderGridImage}
+              listClassName="grid grid-cols-[repeat(auto-fill,minmax(128px,1fr))]"
+              increaseViewportBy={600}
+            />
+          </div>
         ) : (
           <ComicStrip
             key={comicId}

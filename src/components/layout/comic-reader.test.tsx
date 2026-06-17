@@ -114,10 +114,6 @@ describe('ComicReader', () => {
   const updateComicProgress = vi.fn()
 
   beforeEach(() => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
-    )
     vi.mocked(useIsPhone).mockReturnValue(false)
     useLibraryStore.setState(useLibraryStore.getInitialState(), true)
     useProgressStore.setState(useProgressStore.getInitialState(), true)
