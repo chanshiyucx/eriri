@@ -245,11 +245,17 @@ mod tests {
         let library_dir = tempfile::tempdir().expect("create temp library");
         let author_dir = library_dir.path().join("Unreadable Author");
         fs::create_dir(&author_dir).expect("create unreadable author dir");
+        fs::write(author_dir.join("Book 1.txt"), "第一章\n正文").expect("write book");
         let original_permissions = fs::metadata(&author_dir)
             .expect("read author metadata")
             .permissions();
         fs::set_permissions(&author_dir, fs::Permissions::from_mode(0o000))
             .expect("make author dir unreadable");
+
+        assert!(
+            fs::read_dir(&author_dir).is_err(),
+            "test requires an unprivileged user that cannot read mode-000 directories"
+        );
 
         let authors = scan_book_library(
             library_dir.path().to_str().expect("library path is utf-8"),

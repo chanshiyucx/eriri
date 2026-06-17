@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom/vitest'
+import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
 if (!window.matchMedia) {
@@ -18,6 +19,7 @@ if (!window.matchMedia) {
 }
 
 afterEach(() => {
+  cleanup()
   vi.useRealTimers()
   vi.unstubAllGlobals()
 })

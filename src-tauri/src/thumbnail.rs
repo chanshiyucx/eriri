@@ -473,3 +473,114 @@ pub fn set_cache_dir(app: AppHandle, path: String) -> Result<(), String> {
     fs::create_dir_all(&thumb_dir).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::{Rgb, RgbImage};
+
+    fn write_image(path: &Path, width: u32, height: u32) {
+        RgbImage::from_pixel(width, height, Rgb([120, 80, 40]))
+            .save(path)
+            .expect("write test image");
+    }
+
+    #[test]
+    fn recognizes_supported_images_and_encodes_file_urls() {
+        assert!(is_image_file(Path::new("page.JPG")));
+        assert!(is_image_file(Path::new("page.jpeg")));
+        assert!(is_image_file(Path::new("page.png")));
+        assert!(!is_image_file(Path::new("page.webp")));
+        assert!(!is_image_file(Path::new("page")));
+
+        assert!(is_jpeg(&[0xff, 0xd8, 0xff, 0x00]));
+        assert!(!is_jpeg(&[0xff, 0xd8]));
+        assert_eq!(
+            file_url("/漫画/Page 1.jpg"),
+            "/file?path=%2F%E6%BC%AB%E7%94%BB%2FPage%201.jpg"
+        );
+    }
+
+    #[test]
+    fn chooses_cover_by_explicit_name_page_zero_then_natural_order() {
+        let dir = tempfile::tempdir().expect("create cover dir");
+        write_image(&dir.path().join("10.jpg"), 10, 20);
+        write_image(&dir.path().join("2.jpg"), 10, 20);
+
+        assert_eq!(
+            find_cover_image(dir.path())
+                .expect("find naturally first cover")
+                .file_name()
+                .and_then(|name| name.to_str()),
+            Some("2.jpg")
+        );
+
+        write_image(&dir.path().join("series_p0.png"), 10, 20);
+        assert_eq!(
+            find_cover_image(dir.path())
+                .expect("find page-zero cover")
+                .file_name()
+                .and_then(|name| name.to_str()),
+            Some("series_p0.png")
+        );
+
+        write_image(&dir.path().join("1001.JPG"), 10, 20);
+        let explicit_cover = find_cover_image(dir.path()).expect("find explicit cover");
+        assert!(
+            explicit_cover
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.eq_ignore_ascii_case("1001.jpg"))
+        );
+    }
+
+    #[test]
+    fn generates_and_reuses_png_and_jpeg_thumbnails() {
+        for extension in ["png", "jpg"] {
+            let dir = tempfile::tempdir().expect("create thumbnail dir");
+            let source = dir.path().join(format!("source.{extension}"));
+            let thumbnail = dir.path().join("thumbnail.jpg");
+            write_image(&source, 32, 16);
+
+            assert_eq!(
+                get_image_dimensions_fast(&source).expect("read dimensions"),
+                (32, 16)
+            );
+
+            let mut decompressor = Decompressor::new().expect("create JPEG decompressor");
+            let mut resizer = fr::Resizer::new();
+            let (width, height, created_size) =
+                process_and_get_dimensions(&source, &thumbnail, &mut decompressor, &mut resizer)
+                    .expect("generate thumbnail");
+            assert_eq!((width, height), (32, 16));
+            assert!(created_size > 0);
+            assert_eq!(
+                get_image_dimensions_fast(&thumbnail).expect("read thumbnail dimensions"),
+                (THUMB_WIDTH, THUMB_WIDTH / 2)
+            );
+
+            let (_, _, reused_size) =
+                process_and_get_dimensions(&source, &thumbnail, &mut decompressor, &mut resizer)
+                    .expect("reuse thumbnail");
+            assert_eq!(reused_size, 0);
+        }
+    }
+
+    #[test]
+    fn hashes_metadata_and_scans_only_cache_files() {
+        let dir = tempfile::tempdir().expect("create stats dir");
+        let first = dir.path().join("first.jpg");
+        fs::write(&first, [1, 2, 3]).expect("write first cache file");
+        fs::write(dir.path().join("second.jpg"), [4, 5]).expect("write second cache file");
+        fs::create_dir(dir.path().join("nested")).expect("create nested directory");
+
+        let before = get_thumbnail_hash(&fs::metadata(&first).expect("read metadata"));
+        fs::write(&first, [1, 2, 3, 4]).expect("change cache file length");
+        let after = get_thumbnail_hash(&fs::metadata(&first).expect("read changed metadata"));
+        assert_ne!(before, after);
+
+        let stats = scan_thumbnail_stats(dir.path());
+        assert_eq!(stats.count, 2);
+        assert_eq!(stats.size, 6);
+    }
+}
