@@ -44,6 +44,27 @@ pub struct Snapshot {
     pub favorite_chapters: HashMap<String, Vec<i64>>,
 }
 
+const PROGRESS_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS comic_progress (
+        comic_id   TEXT PRIMARY KEY,
+        current    INTEGER NOT NULL,
+        total      INTEGER NOT NULL,
+        percent    REAL    NOT NULL,
+        last_read  INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS book_progress (
+        book_id               TEXT PRIMARY KEY,
+        current               INTEGER NOT NULL,
+        total                 INTEGER NOT NULL,
+        percent               REAL    NOT NULL,
+        last_read             INTEGER NOT NULL,
+        current_chapter_title TEXT
+    );
+    CREATE TABLE IF NOT EXISTS favorite_chapters (
+        book_id    TEXT NOT NULL,
+        line_index INTEGER NOT NULL,
+        PRIMARY KEY (book_id, line_index)
+    );";
+
 // --- Setup ---
 
 pub fn init(app: &AppHandle) -> rusqlite::Result<()> {
@@ -53,28 +74,7 @@ pub fn init(app: &AppHandle) -> rusqlite::Result<()> {
 
     let conn = Connection::open(&db_path)?;
     conn.pragma_update(None, "journal_mode", "WAL")?;
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS comic_progress (
-            comic_id   TEXT PRIMARY KEY,
-            current    INTEGER NOT NULL,
-            total      INTEGER NOT NULL,
-            percent    REAL    NOT NULL,
-            last_read  INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS book_progress (
-            book_id               TEXT PRIMARY KEY,
-            current               INTEGER NOT NULL,
-            total                 INTEGER NOT NULL,
-            percent               REAL    NOT NULL,
-            last_read             INTEGER NOT NULL,
-            current_chapter_title TEXT
-        );
-        CREATE TABLE IF NOT EXISTS favorite_chapters (
-            book_id    TEXT NOT NULL,
-            line_index INTEGER NOT NULL,
-            PRIMARY KEY (book_id, line_index)
-        );",
-    )?;
+    conn.execute_batch(PROGRESS_SCHEMA)?;
 
     migrate_from_json(app, &conn);
 
@@ -289,30 +289,30 @@ mod tests {
 
     fn test_conn() -> Connection {
         let conn = Connection::open_in_memory().expect("open in-memory progress db");
-        conn.execute_batch(
-            "CREATE TABLE comic_progress (
-                comic_id   TEXT PRIMARY KEY,
-                current    INTEGER NOT NULL,
-                total      INTEGER NOT NULL,
-                percent    REAL    NOT NULL,
-                last_read  INTEGER NOT NULL
-            );
-            CREATE TABLE book_progress (
-                book_id               TEXT PRIMARY KEY,
-                current               INTEGER NOT NULL,
-                total                 INTEGER NOT NULL,
-                percent               REAL    NOT NULL,
-                last_read             INTEGER NOT NULL,
-                current_chapter_title TEXT
-            );
-            CREATE TABLE favorite_chapters (
-                book_id    TEXT NOT NULL,
-                line_index INTEGER NOT NULL,
-                PRIMARY KEY (book_id, line_index)
-            );",
-        )
-        .expect("create progress schema");
+        conn.execute_batch(PROGRESS_SCHEMA)
+            .expect("create progress schema");
         conn
+    }
+
+    #[test]
+    fn production_schema_creates_progress_tables() {
+        let conn = test_conn();
+        let names = conn
+            .prepare(
+                "SELECT name FROM sqlite_master
+                 WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+                 ORDER BY name",
+            )
+            .expect("prepare schema query")
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("query schema")
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .expect("collect schema names");
+
+        assert_eq!(
+            names,
+            vec!["book_progress", "comic_progress", "favorite_chapters"]
+        );
     }
 
     #[test]

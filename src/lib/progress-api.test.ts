@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   fetchProgress,
   removeBookFavorites,
@@ -10,10 +10,6 @@ import {
 } from '@/lib/progress-api'
 
 describe('progress API', () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-  })
-
   it('fetches the reading progress snapshot from the backend', async () => {
     const snapshot = {
       comics: {
@@ -129,6 +125,7 @@ describe('progress API', () => {
   })
 
   it('logs failed writes without throwing back to the store', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(null, { status: 500 })),

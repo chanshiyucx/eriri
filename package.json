@@ -21,6 +21,7 @@
     "test:coverage": "vitest run --coverage",
     "test:rust": "cd src-tauri && cargo test",
     "test:rust:coverage": "node scripts/check-rust-core-coverage.mjs",
+    "test:all": "pnpm run test:coverage && pnpm run test:rust:coverage",
     "lint": "pnpm run lint:frontend && pnpm run lint:rust",
     "lint:frontend": "eslint . --max-warnings 0",
     "lint:frontend:fix": "pnpm run lint:frontend --fix",
@@ -29,6 +30,7 @@
     "format:check": "prettier --check . && cargo fmt --manifest-path src-tauri/Cargo.toml --all -- --check",
     "type-check": "tsc --noEmit && tsc --project tsconfig.node.json --noEmit",
     "check": "pnpm run format:check && pnpm run lint && pnpm run type-check",
+    "verify": "pnpm run check && pnpm run test:all && pnpm run build",
     "prepare": "husky"
   },
   "lint-staged": {

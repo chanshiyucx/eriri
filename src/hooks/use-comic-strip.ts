@@ -185,12 +185,10 @@ function getVisibleRange(
     scrollOffset + layout.viewportSize + overscanPx,
   )
 
+  // createLayout produces contiguous pages and a positive viewport, so the
+  // first intersecting page cannot come after the last intersecting page.
   let start = findFirstPageEndingAfter(layout.pages, visibleStart)
   let end = findLastPageStartingBefore(layout.pages, visibleEnd)
-
-  if (end < start) {
-    end = start
-  }
 
   if (end - start + 1 > maxRenderedPages) {
     const center = Math.floor((start + end) / 2)

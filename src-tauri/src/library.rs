@@ -50,6 +50,46 @@ pub struct Catalog {
     pub books: Vec<Book>,
 }
 
+const LIBRARY_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS libraries (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        path       TEXT NOT NULL,
+        type       TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        sort_order INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS comics (
+        id         TEXT PRIMARY KEY,
+        title      TEXT NOT NULL,
+        path       TEXT NOT NULL,
+        cover      TEXT NOT NULL,
+        library_id TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        starred    INTEGER NOT NULL,
+        deleted    INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS authors (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        path       TEXT NOT NULL,
+        library_id TEXT NOT NULL,
+        book_count INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS books (
+        id         TEXT PRIMARY KEY,
+        title      TEXT NOT NULL,
+        path       TEXT NOT NULL,
+        author_id  TEXT NOT NULL,
+        library_id TEXT NOT NULL,
+        size       INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        starred    INTEGER NOT NULL,
+        deleted    INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_comics_library ON comics(library_id);
+    CREATE INDEX IF NOT EXISTS idx_authors_library ON authors(library_id);
+    CREATE INDEX IF NOT EXISTS idx_books_author ON books(author_id);";
+
 // --- Setup ---
 
 pub fn init(app: &AppHandle) -> rusqlite::Result<()> {
@@ -79,47 +119,7 @@ fn open_db(app: &AppHandle) -> rusqlite::Result<Connection> {
 
     let conn = Connection::open(&db_path)?;
     conn.pragma_update(None, "journal_mode", "WAL")?;
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS libraries (
-            id         TEXT PRIMARY KEY,
-            name       TEXT NOT NULL,
-            path       TEXT NOT NULL,
-            type       TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            sort_order INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS comics (
-            id         TEXT PRIMARY KEY,
-            title      TEXT NOT NULL,
-            path       TEXT NOT NULL,
-            cover      TEXT NOT NULL,
-            library_id TEXT NOT NULL,
-            created_at INTEGER NOT NULL,
-            starred    INTEGER NOT NULL,
-            deleted    INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS authors (
-            id         TEXT PRIMARY KEY,
-            name       TEXT NOT NULL,
-            path       TEXT NOT NULL,
-            library_id TEXT NOT NULL,
-            book_count INTEGER NOT NULL
-        );
-        CREATE TABLE IF NOT EXISTS books (
-            id         TEXT PRIMARY KEY,
-            title      TEXT NOT NULL,
-            path       TEXT NOT NULL,
-            author_id  TEXT NOT NULL,
-            library_id TEXT NOT NULL,
-            size       INTEGER NOT NULL,
-            created_at INTEGER NOT NULL,
-            starred    INTEGER NOT NULL,
-            deleted    INTEGER NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_comics_library ON comics(library_id);
-        CREATE INDEX IF NOT EXISTS idx_authors_library ON authors(library_id);
-        CREATE INDEX IF NOT EXISTS idx_books_author ON books(author_id);",
-    )?;
+    conn.execute_batch(LIBRARY_SCHEMA)?;
 
     // Migrate legacy `asset://localhost/<enc>` covers to `/file?path=<enc>`
     // (the encoded path is identical, only the prefix changed).
@@ -612,46 +612,38 @@ mod tests {
 
     fn test_conn() -> Connection {
         let conn = Connection::open_in_memory().expect("open in-memory library db");
-        conn.execute_batch(
-            "CREATE TABLE libraries (
-                id         TEXT PRIMARY KEY,
-                name       TEXT NOT NULL,
-                path       TEXT NOT NULL,
-                type       TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                sort_order INTEGER NOT NULL
-            );
-            CREATE TABLE comics (
-                id         TEXT PRIMARY KEY,
-                title      TEXT NOT NULL,
-                path       TEXT NOT NULL,
-                cover      TEXT NOT NULL,
-                library_id TEXT NOT NULL,
-                created_at INTEGER NOT NULL,
-                starred    INTEGER NOT NULL,
-                deleted    INTEGER NOT NULL
-            );
-            CREATE TABLE authors (
-                id         TEXT PRIMARY KEY,
-                name       TEXT NOT NULL,
-                path       TEXT NOT NULL,
-                library_id TEXT NOT NULL,
-                book_count INTEGER NOT NULL
-            );
-            CREATE TABLE books (
-                id         TEXT PRIMARY KEY,
-                title      TEXT NOT NULL,
-                path       TEXT NOT NULL,
-                author_id  TEXT NOT NULL,
-                library_id TEXT NOT NULL,
-                size       INTEGER NOT NULL,
-                created_at INTEGER NOT NULL,
-                starred    INTEGER NOT NULL,
-                deleted    INTEGER NOT NULL
-            );",
-        )
-        .expect("create library schema");
+        conn.execute_batch(LIBRARY_SCHEMA)
+            .expect("create library schema");
         conn
+    }
+
+    #[test]
+    fn production_schema_creates_catalog_tables_and_indexes() {
+        let conn = test_conn();
+        let names = conn
+            .prepare(
+                "SELECT name FROM sqlite_master
+                 WHERE type IN ('table', 'index') AND name NOT LIKE 'sqlite_%'
+                 ORDER BY name",
+            )
+            .expect("prepare schema query")
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("query schema")
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .expect("collect schema names");
+
+        assert_eq!(
+            names,
+            vec![
+                "authors",
+                "books",
+                "comics",
+                "idx_authors_library",
+                "idx_books_author",
+                "idx_comics_library",
+                "libraries",
+            ]
+        );
     }
 
     #[test]

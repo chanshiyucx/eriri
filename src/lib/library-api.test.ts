@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   fetchCatalog,
   refreshLibrary,
@@ -9,10 +9,6 @@ import {
 } from '@/lib/library-api'
 
 describe('library API', () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-  })
-
   it('posts comic tags as JSON to the backend', async () => {
     const fetchMock = vi
       .fn()
@@ -31,6 +27,7 @@ describe('library API', () => {
   })
 
   it('reports failed comic tag writes without throwing', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(null, { status: 500 })),
@@ -38,6 +35,10 @@ describe('library API', () => {
 
     await expect(setComicTags('comic-1', { starred: true })).resolves.toBe(
       false,
+    )
+    expect(console.error).toHaveBeenCalledWith(
+      'Failed to set comic tags:',
+      expect.any(Error),
     )
   })
 
@@ -84,6 +85,7 @@ describe('library API', () => {
   })
 
   it('persists library order and logs failures without throwing', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
@@ -107,6 +109,7 @@ describe('library API', () => {
   })
 
   it('reports book tag writes as success or failure', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(null, { status: 204 }))

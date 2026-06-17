@@ -1,11 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createServerStorage } from '@/lib/storage'
 
 describe('server storage', () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-  })
-
   it('reads persisted data from the named backend store', async () => {
     const fetchMock = vi
       .fn()
@@ -52,6 +48,7 @@ describe('server storage', () => {
   })
 
   it('falls back and logs when backend persistence fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(null, { status: 500 })),

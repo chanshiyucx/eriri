@@ -170,6 +170,24 @@ mod tests {
     }
 
     #[test]
+    fn filesystem_timestamps_are_milliseconds_since_epoch() {
+        let file = tempfile::NamedTempFile::new().expect("create temporary file");
+        let metadata = file.as_file().metadata().expect("read file metadata");
+        let before = current_time_millis();
+        let created = get_created_time(&metadata);
+        let after = current_time_millis();
+
+        const MIN_REASONABLE_EPOCH_MILLIS: u64 = 1_000_000_000_000;
+        const MAX_CLOCK_DRIFT_MILLIS: u64 = 60_000;
+
+        assert!(before > MIN_REASONABLE_EPOCH_MILLIS);
+        assert!(created > MIN_REASONABLE_EPOCH_MILLIS);
+        assert!(created <= after);
+        assert!(after.saturating_sub(created) < MAX_CLOCK_DRIFT_MILLIS);
+        assert!(after >= before);
+    }
+
+    #[test]
     fn detects_book_libraries_from_nested_text_files() {
         let dir = tempfile::tempdir().expect("create library dir");
         let author = dir.path().join("Author");

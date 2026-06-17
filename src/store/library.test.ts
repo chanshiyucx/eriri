@@ -33,7 +33,6 @@ const emptyCatalog = {
 
 describe('library store', () => {
   beforeEach(() => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue(new Response(null, { status: 204 })),
@@ -153,6 +152,7 @@ describe('library store', () => {
   })
 
   it('keeps existing catalog state when hydration fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
     mockedApi.fetchCatalog.mockRejectedValueOnce(new Error('offline'))
     useLibraryStore.setState({
       libraries: {
