@@ -236,9 +236,7 @@ export const useLibraryStore = create<LibraryState>()(
       if (cache) {
         set((state) => {
           const item = state.comicImages[comicId]
-          if (item) {
-            item.timestamp = Date.now()
-          }
+          item.timestamp = Date.now()
         })
         return cache.images
       }

@@ -604,3 +604,285 @@ pub fn library_path(app: &AppHandle, id: &str) -> Option<String> {
     )
     .ok()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::models::{Author, Book, Comic};
+
+    fn test_conn() -> Connection {
+        let conn = Connection::open_in_memory().expect("open in-memory library db");
+        conn.execute_batch(
+            "CREATE TABLE libraries (
+                id         TEXT PRIMARY KEY,
+                name       TEXT NOT NULL,
+                path       TEXT NOT NULL,
+                type       TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                sort_order INTEGER NOT NULL
+            );
+            CREATE TABLE comics (
+                id         TEXT PRIMARY KEY,
+                title      TEXT NOT NULL,
+                path       TEXT NOT NULL,
+                cover      TEXT NOT NULL,
+                library_id TEXT NOT NULL,
+                created_at INTEGER NOT NULL,
+                starred    INTEGER NOT NULL,
+                deleted    INTEGER NOT NULL
+            );
+            CREATE TABLE authors (
+                id         TEXT PRIMARY KEY,
+                name       TEXT NOT NULL,
+                path       TEXT NOT NULL,
+                library_id TEXT NOT NULL,
+                book_count INTEGER NOT NULL
+            );
+            CREATE TABLE books (
+                id         TEXT PRIMARY KEY,
+                title      TEXT NOT NULL,
+                path       TEXT NOT NULL,
+                author_id  TEXT NOT NULL,
+                library_id TEXT NOT NULL,
+                size       INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                starred    INTEGER NOT NULL,
+                deleted    INTEGER NOT NULL
+            );",
+        )
+        .expect("create library schema");
+        conn
+    }
+
+    #[test]
+    fn catalog_returns_flat_rows_with_libraries_in_sort_order() {
+        let conn = test_conn();
+        let later = Library {
+            id: "library-2".to_string(),
+            name: "Books".to_string(),
+            path: "/library/books".to_string(),
+            type_: "book".to_string(),
+            created_at: 2,
+            sort_order: 1,
+        };
+        let earlier = Library {
+            id: "library-1".to_string(),
+            name: "Comics".to_string(),
+            path: "/library/comics".to_string(),
+            type_: "comic".to_string(),
+            created_at: 1,
+            sort_order: 0,
+        };
+        upsert_library(&conn, &later).expect("insert later library");
+        upsert_library(&conn, &earlier).expect("insert earlier library");
+        upsert_comic(
+            &conn,
+            &Comic {
+                id: "comic-1".to_string(),
+                title: "Comic 1".to_string(),
+                path: "/library/comics/Comic 1".to_string(),
+                cover: "/file?path=cover".to_string(),
+                library_id: "library-1".to_string(),
+                created_at: 10,
+                starred: true,
+                deleted: false,
+            },
+        )
+        .expect("insert comic");
+        upsert_author(
+            &conn,
+            &Author {
+                id: "author-1".to_string(),
+                name: "Author 1".to_string(),
+                path: "/library/books/Author 1".to_string(),
+                library_id: "library-2".to_string(),
+                book_count: 1,
+                books: Vec::new(),
+            },
+        )
+        .expect("insert author");
+        upsert_book(
+            &conn,
+            &Book {
+                id: "book-1".to_string(),
+                title: "Book 1".to_string(),
+                path: "/library/books/Author 1/Book 1.txt".to_string(),
+                author_id: "author-1".to_string(),
+                library_id: "library-2".to_string(),
+                size: 128,
+                created_at: 20,
+                starred: false,
+                deleted: true,
+            },
+        )
+        .expect("insert book");
+
+        let catalog = get_catalog(&conn).expect("read catalog");
+
+        assert_eq!(
+            catalog
+                .libraries
+                .iter()
+                .map(|library| library.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["library-1", "library-2"]
+        );
+        assert_eq!(catalog.comics[0].title, "Comic 1");
+        assert!(catalog.comics[0].starred);
+        assert_eq!(catalog.authors[0].book_count, 1);
+        assert_eq!(catalog.books[0].author_id, "author-1");
+        assert!(catalog.books[0].deleted);
+    }
+
+    #[test]
+    fn reorder_updates_only_the_requested_library_order() {
+        let conn = test_conn();
+        for (id, sort_order) in [("library-1", 0), ("library-2", 1), ("library-3", 2)] {
+            upsert_library(
+                &conn,
+                &Library {
+                    id: id.to_string(),
+                    name: id.to_string(),
+                    path: format!("/library/{id}"),
+                    type_: "comic".to_string(),
+                    created_at: 1,
+                    sort_order,
+                },
+            )
+            .expect("insert library");
+        }
+
+        reorder(&conn, &["library-3".to_string(), "library-1".to_string()])
+            .expect("reorder libraries");
+
+        let sort_order = |id: &str| {
+            conn.query_row(
+                "SELECT sort_order FROM libraries WHERE id = ?1",
+                params![id],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("read library sort order")
+        };
+        assert_eq!(sort_order("library-3"), 0);
+        assert_eq!(sort_order("library-1"), 1);
+        assert_eq!(sort_order("library-2"), 1);
+    }
+
+    #[test]
+    fn replacing_library_content_removes_stale_rows_and_persists_nested_books() {
+        let conn = test_conn();
+        let library = Library {
+            id: "library-1".to_string(),
+            name: "Library".to_string(),
+            path: "/library".to_string(),
+            type_: "book".to_string(),
+            created_at: 1,
+            sort_order: 0,
+        };
+        upsert_library(&conn, &library).expect("insert library");
+        upsert_comic(
+            &conn,
+            &Comic {
+                id: "stale-comic".to_string(),
+                title: "Stale Comic".to_string(),
+                path: "/library/stale".to_string(),
+                cover: "/file?path=stale".to_string(),
+                library_id: "library-1".to_string(),
+                created_at: 1,
+                starred: false,
+                deleted: false,
+            },
+        )
+        .expect("insert stale comic");
+
+        replace_library_content(
+            &conn,
+            "library-1",
+            &[],
+            &[Author {
+                id: "author-1".to_string(),
+                name: "Author".to_string(),
+                path: "/library/Author".to_string(),
+                library_id: "library-1".to_string(),
+                book_count: 1,
+                books: vec![Book {
+                    id: "book-1".to_string(),
+                    title: "Book".to_string(),
+                    path: "/library/Author/Book.txt".to_string(),
+                    author_id: "author-1".to_string(),
+                    library_id: "library-1".to_string(),
+                    size: 10,
+                    created_at: 2,
+                    starred: true,
+                    deleted: false,
+                }],
+            }],
+        )
+        .expect("replace library content");
+
+        let catalog = get_catalog(&conn).expect("read catalog");
+        assert!(catalog.comics.is_empty());
+        assert_eq!(catalog.authors[0].id, "author-1");
+        assert_eq!(catalog.books[0].id, "book-1");
+        assert!(catalog.books[0].starred);
+    }
+
+    #[test]
+    fn remove_deletes_library_and_all_catalog_rows_for_it() {
+        let conn = test_conn();
+        let library = Library {
+            id: "library-1".to_string(),
+            name: "Library".to_string(),
+            path: "/library".to_string(),
+            type_: "comic".to_string(),
+            created_at: 1,
+            sort_order: 0,
+        };
+        upsert_library(&conn, &library).expect("insert library");
+        replace_library_content(
+            &conn,
+            "library-1",
+            &[Comic {
+                id: "comic-1".to_string(),
+                title: "Comic".to_string(),
+                path: "/library/Comic".to_string(),
+                cover: "/file?path=cover".to_string(),
+                library_id: "library-1".to_string(),
+                created_at: 1,
+                starred: false,
+                deleted: true,
+            }],
+            &[],
+        )
+        .expect("insert comic content");
+
+        remove(&conn, "library-1").expect("remove library");
+
+        let catalog = get_catalog(&conn).expect("read catalog after remove");
+        assert!(catalog.libraries.is_empty());
+        assert!(catalog.comics.is_empty());
+    }
+
+    #[test]
+    fn upserting_existing_rows_replaces_catalog_fields() {
+        let conn = test_conn();
+        let mut library = Library {
+            id: "library-1".to_string(),
+            name: "Old".to_string(),
+            path: "/old".to_string(),
+            type_: "comic".to_string(),
+            created_at: 1,
+            sort_order: 0,
+        };
+        upsert_library(&conn, &library).expect("insert library");
+        library.name = "New".to_string();
+        library.path = "/new".to_string();
+        library.sort_order = 2;
+        upsert_library(&conn, &library).expect("replace library");
+
+        let catalog = get_catalog(&conn).expect("read catalog");
+        assert_eq!(catalog.libraries[0].name, "New");
+        assert_eq!(catalog.libraries[0].path, "/new");
+        assert_eq!(catalog.libraries[0].sort_order, 2);
+    }
+}

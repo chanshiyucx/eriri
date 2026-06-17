@@ -30,7 +30,7 @@ type LegacyTabsState = Omit<Partial<TabsState>, 'tabs'> & {
   tabs?: LegacyTab[]
 }
 
-function migrateTabsState(persistedState: unknown) {
+export function migrateTabsState(persistedState: unknown) {
   if (!persistedState || typeof persistedState !== 'object') {
     return persistedState
   }

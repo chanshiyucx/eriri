@@ -573,11 +573,8 @@ fn session_locked() -> bool {
         if dict.is_null() {
             return false;
         }
-        let key = CFStringCreateWithCString(
-            std::ptr::null(),
-            c"CGSSessionScreenIsLocked".as_ptr(),
-            UTF8,
-        );
+        let key =
+            CFStringCreateWithCString(std::ptr::null(), c"CGSSessionScreenIsLocked".as_ptr(), UTF8);
         let mut locked = false;
         if !key.is_null() {
             let value = CFDictionaryGetValue(dict, key);
@@ -631,7 +628,9 @@ fn spawn_idle_sleep_manager(activity: Activity) {
                         .spawn()
                     {
                         Ok(child) => {
-                            info!("Active client; holding idle-sleep assertion (display may still sleep)");
+                            info!(
+                                "Active client; holding idle-sleep assertion (display may still sleep)"
+                            );
                             guard = Some(child);
                         }
                         Err(e) => {
@@ -642,7 +641,10 @@ fn spawn_idle_sleep_manager(activity: Activity) {
             } else if let Some(mut child) = guard.take() {
                 let _ = child.kill();
                 let _ = child.wait();
-                info!(idle_secs = idle, "Idle past the timeout; releasing assertion so the Mac can sleep");
+                info!(
+                    idle_secs = idle,
+                    "Idle past the timeout; releasing assertion so the Mac can sleep"
+                );
             }
             tokio::time::sleep(Duration::from_secs(30)).await;
         }

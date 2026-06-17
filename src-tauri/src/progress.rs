@@ -282,3 +282,143 @@ pub fn delete_favorites(conn: &Connection, book_id: &str) -> rusqlite::Result<()
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn test_conn() -> Connection {
+        let conn = Connection::open_in_memory().expect("open in-memory progress db");
+        conn.execute_batch(
+            "CREATE TABLE comic_progress (
+                comic_id   TEXT PRIMARY KEY,
+                current    INTEGER NOT NULL,
+                total      INTEGER NOT NULL,
+                percent    REAL    NOT NULL,
+                last_read  INTEGER NOT NULL
+            );
+            CREATE TABLE book_progress (
+                book_id               TEXT PRIMARY KEY,
+                current               INTEGER NOT NULL,
+                total                 INTEGER NOT NULL,
+                percent               REAL    NOT NULL,
+                last_read             INTEGER NOT NULL,
+                current_chapter_title TEXT
+            );
+            CREATE TABLE favorite_chapters (
+                book_id    TEXT NOT NULL,
+                line_index INTEGER NOT NULL,
+                PRIMARY KEY (book_id, line_index)
+            );",
+        )
+        .expect("create progress schema");
+        conn
+    }
+
+    #[test]
+    fn snapshot_reflects_upserts_and_deletes() {
+        let conn = test_conn();
+        let comic = ComicProgress {
+            current: 2,
+            total: 5,
+            percent: 50.0,
+            last_read: 100,
+        };
+        let book = BookProgress {
+            current: 10,
+            total: 100,
+            percent: 10.0,
+            last_read: 200,
+            current_chapter_title: Some("第一章".to_string()),
+        };
+
+        upsert_comic(&conn, "comic-1", &comic).expect("upsert comic progress");
+        upsert_book(&conn, "book-1", &book).expect("upsert book progress");
+
+        let snapshot = get_snapshot(&conn).expect("read progress snapshot");
+        assert_eq!(snapshot.comics["comic-1"].current, 2);
+        assert_eq!(
+            snapshot.books["book-1"].current_chapter_title.as_deref(),
+            Some("第一章")
+        );
+
+        delete_comic(&conn, "comic-1").expect("delete comic progress");
+        let snapshot = get_snapshot(&conn).expect("read progress snapshot after delete");
+        assert!(!snapshot.comics.contains_key("comic-1"));
+        assert!(snapshot.books.contains_key("book-1"));
+    }
+
+    #[test]
+    fn favorite_chapters_replace_previous_values_and_snapshot_sorted() {
+        let conn = test_conn();
+
+        set_favorites(&conn, "book-1", &[20, 10, 10]).expect("set favorites");
+        set_favorites(&conn, "book-1", &[30, 0]).expect("replace favorites");
+
+        let snapshot = get_snapshot(&conn).expect("read progress snapshot");
+        assert_eq!(snapshot.favorite_chapters["book-1"], vec![0, 30]);
+
+        delete_favorites(&conn, "book-1").expect("delete favorites");
+        let snapshot = get_snapshot(&conn).expect("read progress snapshot after delete");
+        assert!(!snapshot.favorite_chapters.contains_key("book-1"));
+    }
+
+    #[test]
+    fn snapshot_starts_empty_and_book_progress_can_be_deleted() {
+        let conn = test_conn();
+
+        let snapshot = get_snapshot(&conn).expect("read empty progress snapshot");
+        assert!(snapshot.comics.is_empty());
+        assert!(snapshot.books.is_empty());
+        assert!(snapshot.favorite_chapters.is_empty());
+
+        upsert_book(
+            &conn,
+            "book-1",
+            &BookProgress {
+                current: 1,
+                total: 10,
+                percent: 10.0,
+                last_read: 100,
+                current_chapter_title: None,
+            },
+        )
+        .expect("upsert book progress without chapter");
+        delete_book(&conn, "book-1").expect("delete book progress");
+
+        let snapshot = get_snapshot(&conn).expect("read progress snapshot after book delete");
+        assert!(!snapshot.books.contains_key("book-1"));
+    }
+
+    #[test]
+    fn upserts_replace_existing_progress_fields() {
+        let conn = test_conn();
+
+        upsert_comic(
+            &conn,
+            "comic-1",
+            &ComicProgress {
+                current: 1,
+                total: 5,
+                percent: 25.0,
+                last_read: 100,
+            },
+        )
+        .expect("insert comic progress");
+        upsert_comic(
+            &conn,
+            "comic-1",
+            &ComicProgress {
+                current: 4,
+                total: 5,
+                percent: 100.0,
+                last_read: 200,
+            },
+        )
+        .expect("replace comic progress");
+
+        let snapshot = get_snapshot(&conn).expect("read replaced progress snapshot");
+        assert_eq!(snapshot.comics["comic-1"].current, 4);
+        assert_eq!(snapshot.comics["comic-1"].last_read, 200);
+    }
+}

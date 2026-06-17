@@ -137,3 +137,80 @@ pub async fn pick_directory_impl(app: &AppHandle) -> Option<String> {
         .and_then(|p| p.into_path().ok())
         .map(|p| p.to_string_lossy().into_owned())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn file_classifiers_match_reader_inputs() {
+        assert!(is_hidden(Path::new(".DS_Store")));
+        assert!(is_hidden(Path::new("/tmp/.hidden")));
+        assert!(!is_hidden(Path::new("/tmp/visible")));
+
+        assert!(is_book_file(Path::new("Book.TXT")));
+        assert!(!is_book_file(Path::new("Book.md")));
+        assert!(!is_book_file(Path::new("Book")));
+
+        assert_eq!(remove_extension("Book.txt"), "Book");
+        assert_eq!(remove_extension("Archive.tar.gz"), "Archive.tar");
+        assert_eq!(remove_extension("NoExtension"), "NoExtension");
+    }
+
+    #[test]
+    fn generated_ids_are_stable_and_input_sensitive() {
+        assert_eq!(
+            generate_uuid("/library/book"),
+            generate_uuid("/library/book")
+        );
+        assert_ne!(
+            generate_uuid("/library/book"),
+            generate_uuid("/library/other")
+        );
+    }
+
+    #[test]
+    fn detects_book_libraries_from_nested_text_files() {
+        let dir = tempfile::tempdir().expect("create library dir");
+        let author = dir.path().join("Author");
+        fs::create_dir(&author).expect("create author dir");
+        fs::write(author.join(".hidden.txt"), "hidden").expect("write hidden file");
+        fs::write(author.join("Book.txt"), "content").expect("write book");
+
+        assert_eq!(
+            get_library_type(dir.path().to_str().expect("path is utf-8")).expect("detect type"),
+            "book"
+        );
+    }
+
+    #[test]
+    fn detects_comic_or_defaults_to_comic_for_non_book_libraries() {
+        let comic_dir = tempfile::tempdir().expect("create comic library dir");
+        let comic = comic_dir.path().join("Comic");
+        fs::create_dir(&comic).expect("create comic dir");
+        fs::write(comic.join("001.jpg"), "not decoded here").expect("write comic file");
+
+        assert_eq!(
+            get_library_type(comic_dir.path().to_str().expect("path is utf-8"))
+                .expect("detect comic type"),
+            "comic"
+        );
+
+        let empty_dir = tempfile::tempdir().expect("create empty library dir");
+        assert_eq!(
+            get_library_type(empty_dir.path().to_str().expect("path is utf-8"))
+                .expect("default comic type"),
+            "comic"
+        );
+    }
+
+    #[test]
+    fn reports_read_dir_errors_for_missing_libraries() {
+        let missing = tempfile::tempdir()
+            .expect("create temp dir")
+            .path()
+            .join("missing");
+
+        assert!(get_library_type(missing.to_str().expect("path is utf-8")).is_err());
+    }
+}

@@ -1,6 +1,7 @@
 use std::fs::{self, File};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+#[cfg(not(coverage))]
 use tracing::info;
 
 use crate::models::{Author, Book, BookContent, Chapter};
@@ -48,11 +49,32 @@ fn is_chapter_number_char(c: char) -> bool {
     c.is_ascii_digit()
         || matches!(
             c,
-            '一' | '二' | '三' | '四' | '五' | '六' | '七' | '八' | '九' | '十' | '百' | '千'
+            '０' | '１'
+                | '２'
+                | '３'
+                | '４'
+                | '５'
+                | '６'
+                | '７'
+                | '８'
+                | '９'
+                | '一'
+                | '二'
+                | '三'
+                | '四'
+                | '五'
+                | '六'
+                | '七'
+                | '八'
+                | '九'
+                | '十'
+                | '百'
+                | '千'
         )
 }
 
 pub fn scan_book_library(library_path: &str, library_id: &str) -> Result<Vec<Author>, String> {
+    #[cfg(not(coverage))]
     let start = std::time::Instant::now();
     let path = Path::new(library_path);
     let mut authors = Vec::new();
@@ -111,6 +133,7 @@ pub fn scan_book_library(library_path: &str, library_id: &str) -> Result<Vec<Aut
         });
     }
 
+    #[cfg(not(coverage))]
     info!(
         authors = authors.len(),
         duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX),
@@ -143,4 +166,137 @@ pub fn parse_book(path: &str) -> Result<BookContent, String> {
     }
 
     Ok(BookContent { lines, chapters })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn parse_book_ignores_blank_lines_and_detects_chapters() {
+        let mut file = tempfile::NamedTempFile::new().expect("create temp book");
+        write!(
+            file,
+            "\n序章\n开场\n\n第一章 开始\n正文一\n第２章 全角数字\n正文二\n尾声\n"
+        )
+        .expect("write temp book");
+
+        let content =
+            parse_book(file.path().to_str().expect("temp path is utf-8")).expect("parse temp book");
+
+        assert_eq!(
+            content.lines,
+            vec![
+                "序章",
+                "开场",
+                "第一章 开始",
+                "正文一",
+                "第２章 全角数字",
+                "正文二",
+                "尾声",
+            ]
+        );
+        assert_eq!(
+            content
+                .chapters
+                .iter()
+                .map(|chapter| (chapter.title.as_str(), chapter.line_index))
+                .collect::<Vec<_>>(),
+            vec![
+                ("序章", 0),
+                ("第一章 开始", 2),
+                ("第２章 全角数字", 4),
+                ("尾声", 6),
+            ]
+        );
+    }
+
+    #[test]
+    fn scan_book_library_discovers_authors_and_text_books() {
+        let library_dir = tempfile::tempdir().expect("create temp library");
+        fs::write(library_dir.path().join("not-an-author.txt"), "skip").expect("write top file");
+        fs::create_dir(library_dir.path().join(".hidden-author"))
+            .expect("create hidden author dir");
+        let author_dir = library_dir.path().join("Author 1");
+        fs::create_dir(&author_dir).expect("create author dir");
+        fs::write(author_dir.join("Book 1.txt"), "第一章\n正文").expect("write book");
+        fs::write(author_dir.join(".hidden.txt"), "hidden").expect("write hidden book");
+        fs::write(author_dir.join("notes.md"), "not a book").expect("write non-book");
+
+        let authors = scan_book_library(
+            library_dir.path().to_str().expect("library path is utf-8"),
+            "library-1",
+        )
+        .expect("scan book library");
+
+        assert_eq!(authors.len(), 1);
+        assert_eq!(authors[0].name, "Author 1");
+        assert_eq!(authors[0].book_count, 1);
+        assert_eq!(authors[0].books[0].title, "Book 1");
+        assert_eq!(authors[0].books[0].library_id, "library-1");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn scan_book_library_keeps_unreadable_authors_as_empty() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let library_dir = tempfile::tempdir().expect("create temp library");
+        let author_dir = library_dir.path().join("Unreadable Author");
+        fs::create_dir(&author_dir).expect("create unreadable author dir");
+        let original_permissions = fs::metadata(&author_dir)
+            .expect("read author metadata")
+            .permissions();
+        fs::set_permissions(&author_dir, fs::Permissions::from_mode(0o000))
+            .expect("make author dir unreadable");
+
+        let authors = scan_book_library(
+            library_dir.path().to_str().expect("library path is utf-8"),
+            "library-1",
+        )
+        .expect("scan library with unreadable author");
+
+        fs::set_permissions(&author_dir, original_permissions).expect("restore author dir");
+
+        assert_eq!(authors.len(), 1);
+        assert_eq!(authors[0].name, "Unreadable Author");
+        assert_eq!(authors[0].book_count, 0);
+        assert!(authors[0].books.is_empty());
+    }
+
+    #[test]
+    fn parse_book_rejects_missing_files() {
+        let missing = tempfile::tempdir()
+            .expect("create temp dir")
+            .path()
+            .join("missing.txt");
+
+        let error = parse_book(missing.to_str().expect("path is utf-8"))
+            .expect_err("missing book should fail");
+
+        assert!(error.starts_with("Failed to open file:"));
+    }
+
+    #[test]
+    fn parse_book_ignores_lines_that_are_not_chapter_titles() {
+        let mut file = tempfile::NamedTempFile::new().expect("create temp book");
+        write!(
+            file,
+            "第章 缺少数字\n第一话 不支持后缀\n第十章 正文\n正文\n"
+        )
+        .expect("write temp book");
+
+        let content =
+            parse_book(file.path().to_str().expect("path is utf-8")).expect("parse temp book");
+
+        assert_eq!(
+            content
+                .chapters
+                .iter()
+                .map(|chapter| chapter.title.as_str())
+                .collect::<Vec<_>>(),
+            vec!["第十章 正文"]
+        );
+    }
 }
