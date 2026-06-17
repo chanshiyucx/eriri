@@ -50,4 +50,5 @@ strip = true
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(coverage)"] }
 
 [dev-dependencies]
+tauri = { version = "2.11.2", features = ["test"] }
 tempfile = "3.27.0"

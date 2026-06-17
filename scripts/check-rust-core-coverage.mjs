@@ -9,6 +9,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const tauriDir = resolve(root, 'src-tauri')
 const outputPath = resolve(tauriDir, 'target/llvm-cov/all.lcov')
 const coverageTargets = new Map([
+  ['src/config.rs', 70],
   ['src/scanner/book.rs', 100],
   ['src/scanner/comic.rs', 53],
   ['src/tags.rs', 100],
