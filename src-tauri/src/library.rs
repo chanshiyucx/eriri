@@ -489,21 +489,23 @@ fn scan(
 }
 
 pub fn remove(conn: &Connection, id: &str) -> rusqlite::Result<()> {
-    conn.execute("DELETE FROM comics WHERE library_id = ?1", params![id])?;
-    conn.execute("DELETE FROM books WHERE library_id = ?1", params![id])?;
-    conn.execute("DELETE FROM authors WHERE library_id = ?1", params![id])?;
-    conn.execute("DELETE FROM libraries WHERE id = ?1", params![id])?;
-    Ok(())
+    let tx = conn.unchecked_transaction()?;
+    tx.execute("DELETE FROM comics WHERE library_id = ?1", params![id])?;
+    tx.execute("DELETE FROM books WHERE library_id = ?1", params![id])?;
+    tx.execute("DELETE FROM authors WHERE library_id = ?1", params![id])?;
+    tx.execute("DELETE FROM libraries WHERE id = ?1", params![id])?;
+    tx.commit()
 }
 
 pub fn reorder(conn: &Connection, ordered_ids: &[String]) -> rusqlite::Result<()> {
+    let tx = conn.unchecked_transaction()?;
     for (index, id) in ordered_ids.iter().enumerate() {
-        conn.execute(
+        tx.execute(
             "UPDATE libraries SET sort_order = ?2 WHERE id = ?1",
             params![id, index as i64],
         )?;
     }
-    Ok(())
+    tx.commit()
 }
 
 /// Write tags to the file (xattr) and mirror them on the catalog row.

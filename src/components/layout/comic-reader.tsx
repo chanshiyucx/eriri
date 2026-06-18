@@ -11,9 +11,8 @@ import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
 import { GridImage, ImagePreviewOverlay } from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useClickOutside } from '@/hooks/use-click-outside'
+import { useComicReaderControls } from '@/hooks/use-comic-reader-controls'
 import { useIsPhone } from '@/hooks/use-is-phone'
-import { useThrottledProgress } from '@/hooks/use-throttled-progress'
-import { createComicProgress } from '@/lib/progress'
 import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -96,8 +95,6 @@ interface ComicReaderProps {
 export function ComicReader({ comicId }: ComicReaderProps) {
   const stripRef = useRef<ComicStripHandle>(null)
   const [isTocCollapsed, setTocCollapsed] = useState(true)
-  // Index of the page shown in the full-screen preview; -1 = closed.
-  const [previewIndex, setPreviewIndex] = useState(-1)
   const isImmersive = useUIStore((s) => s.isImmersive)
   const isPhone = useIsPhone()
   const activeTab = useTabsStore((s) => s.activeTab)
@@ -114,45 +111,22 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
   const progress = useProgressStore((s) => s.comics[comicId])
   const savedIndex = progress?.current ?? 0
-  const [readerPosition, setReaderPosition] = useState({
+  const {
+    currentIndex,
+    currentIndexRef,
+    previewIndex,
+    setPreviewIndex,
+    jumpTo,
+    trackStripIndex,
+    setHoveredIndex,
+    getTagTargetImage,
+    closePreview,
+  } = useComicReaderControls({
     comicId,
-    index: savedIndex,
+    images,
+    savedIndex,
+    updateComicProgress,
   })
-  const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
-
-  const currentIndex =
-    readerPosition.comicId === comicId ? readerPosition.index : savedIndex
-  const currentIndexRef = useRef(currentIndex)
-  // Page under the cursor in scroll mode (null when not hovering any page), so
-  // N/M tag the hovered page; falls back to the centered page otherwise.
-  const hoveredIndexRef = useRef<number | null>(null)
-
-  // Layout effect (not passive) + declared before the scroll-jump effect below,
-  // so the ref is current when that effect reads it on comic/tab/view changes.
-  useLayoutEffect(() => {
-    currentIndexRef.current = currentIndex
-  }, [currentIndex])
-
-  const setCurrentIndex = (index: number) => {
-    setReaderPosition((prev) =>
-      prev.comicId === comicId && prev.index === index
-        ? prev
-        : { comicId, index },
-    )
-  }
-
-  const jumpTo = (targetIndex?: number) => {
-    if (!comic || !images.length) return
-
-    const index = Math.max(
-      0,
-      Math.min(images.length - 1, targetIndex ?? currentIndexRef.current),
-    )
-    const newProgress = createComicProgress(index, images.length)
-    setCurrentIndex(index)
-    updateComicProgress(comic.id, newProgress)
-    stripRef.current?.jumpTo(index)
-  }
 
   // Gate on `comic`: a tab can mount before the catalog hydrates, where
   // getComicImages bails. Depending on comic.path retries once it's available.
@@ -165,24 +139,10 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   useLayoutEffect(() => {
     if (!images.length) return
     stripRef.current?.jumpTo(currentIndexRef.current)
-  }, [activeTab, comicId, images.length])
+  }, [activeTab, comicId, currentIndexRef, images.length])
 
   const handleStripIndexChange = (index: number) => {
-    if (!comic) return
-    setCurrentIndex(index)
-    const newProgress = createComicProgress(index, images.length)
-    throttledUpdateProgress.current(comic.id, newProgress)
-  }
-
-  const handleHover = (index: number | null) => {
-    hoveredIndexRef.current = index
-  }
-
-  // Target of the N/M page-tag shortcuts: the previewed page when the overlay is
-  // open, else the hovered page, else the centered/current page.
-  const getTagTargetImage = () => {
-    if (previewIndex >= 0) return images[previewIndex]
-    return images[hoveredIndexRef.current ?? currentIndex]
+    trackStripIndex(comic, index)
   }
 
   const handleCloseToc = () => {
@@ -196,8 +156,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   // Closing the preview syncs the scroll position to whatever page the user
   // flipped to, so the strip lands where they left off.
   const handlePreviewClose = () => {
-    if (previewIndex >= 0) jumpTo(previewIndex)
-    setPreviewIndex(-1)
+    closePreview(comic, stripRef, true)
   }
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
@@ -216,7 +175,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         void updateComicTags(comic.id, { starred: !comic.starred })
         break
       case SHORTCUTS.toggleImageDeleted: {
-        const targetImage = getTagTargetImage()
+        const targetImage = getTagTargetImage('preview-first')
         if (!targetImage) return
         void updateComicImageTags(comic.id, targetImage.filename, {
           deleted: !targetImage.deleted,
@@ -224,7 +183,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         break
       }
       case SHORTCUTS.toggleImageStarred: {
-        const targetImage = getTagTargetImage()
+        const targetImage = getTagTargetImage('preview-first')
         if (!targetImage) return
         void updateComicImageTags(comic.id, targetImage.filename, {
           starred: !targetImage.starred,
@@ -250,7 +209,9 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         images={images}
         currentIndex={currentIndex}
         isCollapsed={isTocCollapsed}
-        onSelect={jumpTo}
+        onSelect={(index) => {
+          jumpTo(comic, stripRef, index)
+        }}
         onTags={updateComicImageTags}
         onClose={handleCloseToc}
       />
@@ -323,7 +284,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
           initialIndex={currentIndex}
           orientation={isPhone ? 'vertical' : 'horizontal'}
           onCurrentIndexChange={handleStripIndexChange}
-          onHover={handleHover}
+          onHover={setHoveredIndex}
           onDoubleClick={setPreviewIndex}
           onTags={updateComicImageTags}
         />

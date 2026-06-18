@@ -8,7 +8,7 @@ use crate::models::Config;
 
 pub struct ConfigState(pub Mutex<Config>);
 
-fn validate_store_key(key: &str) -> Result<(), String> {
+pub(crate) fn validate_store_key(key: &str) -> Result<(), String> {
     if !key.is_empty()
         && key
             .bytes()
@@ -23,6 +23,30 @@ fn validate_store_key(key: &str) -> Result<(), String> {
 fn store_file_path(store_dir: &Path, key: &str, extension: &str) -> Result<PathBuf, String> {
     validate_store_key(key)?;
     Ok(store_dir.join(format!("{key}.{extension}")))
+}
+
+fn write_file_atomically(file_path: &Path, data: String) -> Result<(), String> {
+    let parent = file_path
+        .parent()
+        .ok_or_else(|| "Failed to resolve file parent".to_string())?;
+    fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+
+    let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let file_name = file_path
+        .file_name()
+        .ok_or_else(|| "Failed to resolve file name".to_string())?
+        .to_string_lossy();
+    let tmp_path = parent.join(format!(".{file_name}.{}.{seq}.tmp", std::process::id()));
+
+    if let Err(e) = fs::write(&tmp_path, data) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(e.to_string());
+    }
+
+    fs::rename(&tmp_path, file_path).map_err(|e| {
+        let _ = fs::remove_file(&tmp_path);
+        e.to_string()
+    })
 }
 
 fn get_config_path<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
@@ -78,11 +102,8 @@ pub fn get<R: Runtime>(app: &AppHandle<R>) -> Config {
 
 pub fn save_config<R: Runtime>(app: &AppHandle<R>, config: &Config) -> Result<(), String> {
     if let Some(config_path) = get_config_path(app) {
-        if let Some(parent) = config_path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
         let content = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
-        fs::write(config_path, content).map_err(|e| e.to_string())?;
+        write_file_atomically(&config_path, content)?;
 
         // Update in-memory state
         if let Some(state) = app.try_state::<ConfigState>()
@@ -103,8 +124,7 @@ pub fn read_store_data<R: Runtime>(app: AppHandle<R>, key: String) -> Option<Str
     fs::read_to_string(file_path).ok()
 }
 
-/// Monotonic counter giving each in-flight write its own temp file, so
-/// concurrent writes to the same key can't clobber each other's `.tmp`.
+/// Monotonic counter giving each in-flight write its own temp file.
 static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
 
 pub fn write_store_data<R: Runtime>(
@@ -113,26 +133,8 @@ pub fn write_store_data<R: Runtime>(
     data: String,
 ) -> Result<(), String> {
     let store_dir = get_store_dir(&app);
-    fs::create_dir_all(&store_dir).map_err(|e| e.to_string())?;
-
     let file_path = store_file_path(&store_dir, &key, "json")?;
-
-    // Unique temp name per write (pid + sequence) avoids the race where two
-    // concurrent PUTs share one `key.tmp` and the loser's rename hits ENOENT.
-    validate_store_key(&key)?;
-    let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
-    let tmp_path = store_dir.join(format!("{key}.{}.{seq}.tmp", std::process::id()));
-
-    // Write to temp file first, then atomically rename into place. On any
-    // failure, remove the temp file so failed writes don't accumulate.
-    if let Err(e) = fs::write(&tmp_path, data) {
-        let _ = fs::remove_file(&tmp_path);
-        return Err(e.to_string());
-    }
-    fs::rename(&tmp_path, file_path).map_err(|e| {
-        let _ = fs::remove_file(&tmp_path);
-        e.to_string()
-    })
+    write_file_atomically(&file_path, data)
 }
 
 pub fn remove_store_data<R: Runtime>(app: AppHandle<R>, key: String) -> Result<(), String> {

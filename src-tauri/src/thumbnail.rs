@@ -5,11 +5,12 @@ use memmap2::Mmap;
 use percent_encoding::utf8_percent_encode;
 use sha2::{Digest, Sha256};
 use std::fs::{self, File};
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, Write};
 use std::num::NonZeroU32;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::SystemTime;
 use tauri::{AppHandle, Manager};
 use tracing::info;
@@ -19,6 +20,7 @@ use crate::config;
 use crate::models::ThumbnailStats;
 
 const STATS_KEY: &str = "stats";
+static THUMB_TMP_SEQ: AtomicU64 = AtomicU64::new(0);
 
 pub struct ThumbnailStatsState(pub Mutex<ThumbnailStats>);
 
@@ -47,12 +49,15 @@ fn get_stats(app: &AppHandle) -> ThumbnailStats {
 }
 
 fn update_stats(app: &AppHandle, f: impl FnOnce(&mut ThumbnailStats)) {
-    if let Some(state) = app.try_state::<ThumbnailStatsState>()
-        && let Ok(mut stats) = state.0.lock()
-    {
+    let Some(updated_stats) = app.try_state::<ThumbnailStatsState>().and_then(|state| {
+        let mut stats = state.0.lock().ok()?;
         f(&mut stats);
-        save_stats_to_disk(app, &stats);
-    }
+        Some(stats.clone())
+    }) else {
+        return;
+    };
+
+    save_stats_to_disk(app, &updated_stats);
 }
 
 pub fn add_stat(app: &AppHandle, count: usize, size: u64) {
@@ -235,16 +240,33 @@ fn resize_and_save(
         fr::ResizeOptions::new().resize_alg(fr::ResizeAlg::Convolution(fr::FilterType::Bilinear));
     resizer.resize(&src_image, &mut dst_image, &options)?;
 
-    let file = File::create(thumb_path)?;
-    let mut writer = BufWriter::new(file);
-    let mut encoder = JpegEncoder::new_with_quality(&mut writer, THUMB_QUALITY);
-    encoder.encode(
-        dst_image.buffer(),
-        target_width,
-        target_height,
-        ExtendedColorType::Rgb8,
-    )?;
-    drop(writer);
+    let seq = THUMB_TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let tmp_path = thumb_path.with_extension(format!("jpg.{}.{seq}.tmp", std::process::id()));
+
+    let write_result = (|| -> Result<(), Box<dyn std::error::Error>> {
+        let file = File::create(&tmp_path)?;
+        let mut writer = BufWriter::new(file);
+        {
+            let mut encoder = JpegEncoder::new_with_quality(&mut writer, THUMB_QUALITY);
+            encoder.encode(
+                dst_image.buffer(),
+                target_width,
+                target_height,
+                ExtendedColorType::Rgb8,
+            )?;
+        }
+        writer.flush()?;
+        Ok(())
+    })();
+
+    if let Err(e) = write_result {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(e);
+    }
+    if let Err(e) = fs::rename(&tmp_path, thumb_path) {
+        let _ = fs::remove_file(&tmp_path);
+        return Err(Box::new(e));
+    }
 
     let file_size = fs::metadata(thumb_path).map(|m| m.len()).unwrap_or(0);
     Ok((orig_w, orig_h, file_size))

@@ -12,10 +12,9 @@ import { Button } from '@/components/ui/button'
 import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
 import { GridItem } from '@/components/ui/grid-item'
 import { GridImage, ImagePreviewOverlay } from '@/components/ui/image-view'
+import { useComicReaderControls } from '@/hooks/use-comic-reader-controls'
 import { useNativeOpen } from '@/hooks/use-native-open'
 import { usePanelNav } from '@/hooks/use-panel-nav'
-import { useThrottledProgress } from '@/hooks/use-throttled-progress'
-import { createComicProgress } from '@/lib/progress'
 import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
@@ -79,12 +78,8 @@ interface ComicLibraryProps {
 
 export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const stripRef = useRef<ComicStripHandle>(null)
-  const currentIndexRef = useRef(0)
-  // Page under the cursor in scroll mode (null when not hovering any page).
-  const hoveredIndexRef = useRef<number | null>(null)
   const { readerVisible, middleClass, readerClass, openReader } = usePanelNav()
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
-  const [previewIndex, setPreviewIndex] = useState<number>(-1)
 
   const activeTab = useTabsStore((s) => s.activeTab)
   const addTab = useTabsStore((s) => s.addTab)
@@ -118,26 +113,21 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
   const progress = useProgressStore((s) => s.comics[comicId])
   const savedIndex = progress?.current ?? 0
-  const [libraryPosition, setLibraryPosition] = useState({
+  const {
+    currentIndex,
+    currentIndexRef,
+    previewIndex,
+    setPreviewIndex,
+    trackStripIndex,
+    setHoveredIndex,
+    getTagTargetImage: resolveTagTargetImage,
+    closePreview,
+  } = useComicReaderControls({
     comicId,
-    index: savedIndex,
+    images,
+    savedIndex,
+    updateComicProgress,
   })
-  const throttledUpdateProgress = useThrottledProgress(updateComicProgress)
-
-  const currentIndex =
-    libraryPosition.comicId === comicId ? libraryPosition.index : savedIndex
-
-  useEffect(() => {
-    currentIndexRef.current = currentIndex
-  }, [currentIndex])
-
-  const setCurrentIndex = (index: number) => {
-    setLibraryPosition((prev) =>
-      prev.comicId === comicId && prev.index === index
-        ? prev
-        : { comicId, index },
-    )
-  }
 
   // Gate on `comic` so the load retries once the catalog hydrates (see
   // comic-reader.tsx for the same race).
@@ -150,7 +140,14 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   useLayoutEffect(() => {
     if (viewMode !== 'scroll' || !readerVisible || !images.length) return
     stripRef.current?.jumpTo(currentIndexRef.current)
-  }, [activeTab, readerVisible, comicId, images.length, viewMode])
+  }, [
+    activeTab,
+    comicId,
+    currentIndexRef,
+    images.length,
+    readerVisible,
+    viewMode,
+  ])
 
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
@@ -175,36 +172,21 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   }
 
   const handleStripIndexChange = (index: number) => {
-    if (!comic || !images.length || !readerVisible) return
-
-    setCurrentIndex(index)
-    const newProgress = createComicProgress(index, images.length)
-    throttledUpdateProgress.current(comic.id, newProgress)
-  }
-
-  const handleHover = (index: number | null) => {
-    hoveredIndexRef.current = index
+    trackStripIndex(comic, index, readerVisible)
   }
 
   // Closing the preview syncs the reading position to the page the user flipped
   // to, scrolling the strip there when scroll mode is showing.
   const handlePreviewClose = () => {
-    if (comic && previewIndex >= 0) {
-      setCurrentIndex(previewIndex)
-      updateComicProgress(
-        comic.id,
-        createComicProgress(previewIndex, images.length),
-      )
-      if (viewMode === 'scroll') stripRef.current?.jumpTo(previewIndex)
-    }
-    setPreviewIndex(-1)
+    closePreview(comic, stripRef, viewMode === 'scroll')
   }
 
   // Target of the N/M page-tag shortcuts: the previewed image in grid mode, the
   // hovered page in scroll mode, else the centered/current page.
   const getTagTargetImage = () => {
-    if (viewMode === 'grid') return images[previewIndex]
-    return images[hoveredIndexRef.current ?? currentIndex]
+    return resolveTagTargetImage(
+      viewMode === 'grid' ? 'preview-only' : 'hover-first',
+    )
   }
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
@@ -368,7 +350,7 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
             initialIndex={currentIndex}
             orientation="vertical"
             onCurrentIndexChange={handleStripIndexChange}
-            onHover={handleHover}
+            onHover={setHoveredIndex}
             onDoubleClick={setPreviewIndex}
             onTags={updateComicImageTags}
           />

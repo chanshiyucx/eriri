@@ -19,7 +19,7 @@ use axum::http::{StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use serde::Deserialize;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, Runtime};
 use tower::ServiceExt;
 use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
@@ -77,7 +77,7 @@ fn build_router(app: AppHandle, activity: Activity) -> Router {
         .route("/api/parse-book", get(parse_book))
         .route("/api/tag", post(set_tag))
         .route(
-            "/api/store/:key",
+            "/api/store/{key}",
             get(store_get).put(store_put).delete(store_delete),
         )
         .route("/api/libraries", get(get_catalog))
@@ -85,22 +85,22 @@ fn build_router(app: AppHandle, activity: Activity) -> Router {
             "/api/libraries/order",
             axum::routing::put(reorder_libraries),
         )
-        .route("/api/library/:id/refresh", post(refresh_library))
-        .route("/api/library/:id", axum::routing::delete(remove_library))
-        .route("/api/comic/:id/tags", post(set_comic_tags))
-        .route("/api/book/:id/tags", post(set_book_tags))
+        .route("/api/library/{id}/refresh", post(refresh_library))
+        .route("/api/library/{id}", axum::routing::delete(remove_library))
+        .route("/api/comic/{id}/tags", post(set_comic_tags))
+        .route("/api/book/{id}/tags", post(set_book_tags))
         .route("/api/reveal", post(reveal_path))
         .route("/api/progress", get(get_progress))
         .route(
-            "/api/progress/comic/:id",
+            "/api/progress/comic/{id}",
             axum::routing::put(put_comic_progress).delete(delete_comic_progress),
         )
         .route(
-            "/api/progress/book/:id",
+            "/api/progress/book/{id}",
             axum::routing::put(put_book_progress).delete(delete_book_progress),
         )
         .route(
-            "/api/progress/book/:id/favorites",
+            "/api/progress/book/{id}/favorites",
             axum::routing::put(put_book_favorites).delete(delete_book_favorites),
         )
         .route("/file", get(serve_file))
@@ -210,41 +210,86 @@ async fn parse_book(Query(q): Query<PathQuery>) -> Result<Response, ApiError> {
 }
 
 async fn set_tag(Json(b): Json<TagBody>) -> Result<StatusCode, ApiError> {
-    let tags = FileTags {
-        starred: b.starred,
-        deleted: b.deleted,
-    };
-    crate::tags::set_file_tag(b.path, tags)
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(ApiError)
+    blocking(move || {
+        let tags = FileTags {
+            starred: b.starred,
+            deleted: b.deleted,
+        };
+        crate::tags::set_file_tag(b.path, tags)
+    })
+    .await?
+    .map(|()| StatusCode::NO_CONTENT)
+    .map_err(ApiError)
+}
+
+fn remove_library_impl(app: &AppHandle, id: &str) -> Result<(), String> {
+    let state = app.state::<library::LibraryDb>();
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    library::remove(&conn, id).map_err(|e| e.to_string())
+}
+
+fn reorder_libraries_impl(app: &AppHandle, ordered_ids: &[String]) -> Result<(), String> {
+    let state = app.state::<library::LibraryDb>();
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    library::reorder(&conn, ordered_ids).map_err(|e| e.to_string())
+}
+
+fn with_progress<T>(
+    app: &AppHandle,
+    f: impl FnOnce(&rusqlite::Connection) -> rusqlite::Result<T>,
+) -> Result<T, String> {
+    let state = app.state::<ProgressDb>();
+    let conn = state.0.lock().map_err(|e| e.to_string())?;
+    f(&conn).map_err(|e| e.to_string())
+}
+
+fn no_content(result: Result<(), String>) -> Result<StatusCode, ApiError> {
+    result.map(|()| StatusCode::NO_CONTENT).map_err(ApiError)
 }
 
 // --- Server store: the single owner of each persisted zustand blob ---
 
-async fn store_get(State(app): State<AppHandle>, AxumPath(key): AxumPath<String>) -> Response {
+async fn store_get<R: Runtime>(
+    State(app): State<AppHandle<R>>,
+    AxumPath(key): AxumPath<String>,
+) -> Response {
+    if let Err(e) = config::validate_store_key(&key) {
+        return (StatusCode::BAD_REQUEST, e).into_response();
+    }
+
     match config::read_store_data(app, key) {
         Some(data) => ([(header::CONTENT_TYPE, "application/json")], data).into_response(),
         None => StatusCode::NOT_FOUND.into_response(),
     }
 }
 
-async fn store_put(
-    State(app): State<AppHandle>,
+async fn store_put<R: Runtime>(
+    State(app): State<AppHandle<R>>,
     AxumPath(key): AxumPath<String>,
     body: String,
-) -> Result<StatusCode, ApiError> {
-    config::write_store_data(app, key, body)
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(ApiError)
+) -> Response {
+    if let Err(e) = config::validate_store_key(&key) {
+        return (StatusCode::BAD_REQUEST, e).into_response();
+    }
+
+    match config::write_store_data(app, key, body) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => ApiError(e).into_response(),
+    }
 }
 
-async fn store_delete(
-    State(app): State<AppHandle>,
+async fn store_delete<R: Runtime>(
+    State(app): State<AppHandle<R>>,
     AxumPath(key): AxumPath<String>,
-) -> Result<StatusCode, ApiError> {
-    config::remove_store_data(app, key)
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(ApiError)
+) -> Response {
+    if let Err(e) = config::validate_store_key(&key) {
+        return (StatusCode::BAD_REQUEST, e).into_response();
+    }
+
+    match config::remove_store_data(app, key) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(e) => ApiError(e).into_response(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -288,12 +333,11 @@ async fn remove_library(
     State(app): State<AppHandle>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<StatusCode, ApiError> {
-    {
-        let state = app.state::<library::LibraryDb>();
-        let conn = state.0.lock().map_err(|e| ApiError(e.to_string()))?;
-        library::remove(&conn, &id).map_err(|e| ApiError(e.to_string()))?;
-    }
-    rebuild_allowed_roots(&app);
+    let roots_app = app.clone();
+    blocking(move || remove_library_impl(&app, &id))
+        .await?
+        .map_err(ApiError)?;
+    rebuild_allowed_roots(&roots_app);
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -301,11 +345,7 @@ async fn reorder_libraries(
     State(app): State<AppHandle>,
     Json(ordered_ids): Json<Vec<String>>,
 ) -> Result<StatusCode, ApiError> {
-    let state = app.state::<library::LibraryDb>();
-    let conn = state.0.lock().map_err(|e| ApiError(e.to_string()))?;
-    library::reorder(&conn, &ordered_ids)
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(|e| ApiError(e.to_string()))
+    no_content(blocking(move || reorder_libraries_impl(&app, &ordered_ids)).await?)
 }
 
 async fn set_comic_tags(
@@ -313,9 +353,7 @@ async fn set_comic_tags(
     AxumPath(id): AxumPath<String>,
     Json(tags): Json<FileTags>,
 ) -> Result<StatusCode, ApiError> {
-    library::set_comic_tags(&app, &id, &tags)
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(ApiError)
+    no_content(blocking(move || library::set_comic_tags(&app, &id, &tags)).await?)
 }
 
 async fn set_book_tags(
@@ -323,25 +361,16 @@ async fn set_book_tags(
     AxumPath(id): AxumPath<String>,
     Json(tags): Json<FileTags>,
 ) -> Result<StatusCode, ApiError> {
-    library::set_book_tags(&app, &id, &tags)
-        .map(|()| StatusCode::NO_CONTENT)
-        .map_err(ApiError)
+    no_content(blocking(move || library::set_book_tags(&app, &id, &tags)).await?)
 }
 
 // --- Reading progress (single source of truth, field-level) ---
 
-/// Lock the progress DB and run a closure against the connection.
-fn with_progress<T>(
-    app: &AppHandle,
-    f: impl FnOnce(&rusqlite::Connection) -> rusqlite::Result<T>,
-) -> Result<T, ApiError> {
-    let state = app.state::<ProgressDb>();
-    let conn = state.0.lock().map_err(|e| ApiError(e.to_string()))?;
-    f(&conn).map_err(|e| ApiError(e.to_string()))
-}
-
 async fn get_progress(State(app): State<AppHandle>) -> Result<Json<Snapshot>, ApiError> {
-    with_progress(&app, progress::get_snapshot).map(Json)
+    blocking(move || with_progress(&app, progress::get_snapshot))
+        .await?
+        .map(Json)
+        .map_err(ApiError)
 }
 
 async fn put_comic_progress(
@@ -349,14 +378,14 @@ async fn put_comic_progress(
     AxumPath(id): AxumPath<String>,
     Json(p): Json<ComicProgress>,
 ) -> Result<StatusCode, ApiError> {
-    with_progress(&app, |c| progress::upsert_comic(c, &id, &p)).map(|()| StatusCode::NO_CONTENT)
+    no_content(blocking(move || with_progress(&app, |c| progress::upsert_comic(c, &id, &p))).await?)
 }
 
 async fn delete_comic_progress(
     State(app): State<AppHandle>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<StatusCode, ApiError> {
-    with_progress(&app, |c| progress::delete_comic(c, &id)).map(|()| StatusCode::NO_CONTENT)
+    no_content(blocking(move || with_progress(&app, |c| progress::delete_comic(c, &id))).await?)
 }
 
 async fn put_book_progress(
@@ -364,14 +393,14 @@ async fn put_book_progress(
     AxumPath(id): AxumPath<String>,
     Json(p): Json<BookProgress>,
 ) -> Result<StatusCode, ApiError> {
-    with_progress(&app, |c| progress::upsert_book(c, &id, &p)).map(|()| StatusCode::NO_CONTENT)
+    no_content(blocking(move || with_progress(&app, |c| progress::upsert_book(c, &id, &p))).await?)
 }
 
 async fn delete_book_progress(
     State(app): State<AppHandle>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<StatusCode, ApiError> {
-    with_progress(&app, |c| progress::delete_book(c, &id)).map(|()| StatusCode::NO_CONTENT)
+    no_content(blocking(move || with_progress(&app, |c| progress::delete_book(c, &id))).await?)
 }
 
 async fn put_book_favorites(
@@ -379,15 +408,16 @@ async fn put_book_favorites(
     AxumPath(id): AxumPath<String>,
     Json(lines): Json<Vec<i64>>,
 ) -> Result<StatusCode, ApiError> {
-    with_progress(&app, |c| progress::set_favorites(c, &id, &lines))
-        .map(|()| StatusCode::NO_CONTENT)
+    no_content(
+        blocking(move || with_progress(&app, |c| progress::set_favorites(c, &id, &lines))).await?,
+    )
 }
 
 async fn delete_book_favorites(
     State(app): State<AppHandle>,
     AxumPath(id): AxumPath<String>,
 ) -> Result<StatusCode, ApiError> {
-    with_progress(&app, |c| progress::delete_favorites(c, &id)).map(|()| StatusCode::NO_CONTENT)
+    no_content(blocking(move || with_progress(&app, |c| progress::delete_favorites(c, &id))).await?)
 }
 
 // --- File streaming (covers, thumbnails, full-size images) ---
@@ -727,4 +757,148 @@ fn lan_ip() -> Option<IpAddr> {
     let socket = UdpSocket::bind("0.0.0.0:0").ok()?;
     socket.connect("8.8.8.8:80").ok()?;
     socket.local_addr().ok().map(|addr| addr.ip())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::{Body, to_bytes};
+    use axum::http::{Method, Request};
+    use serde_json::Value;
+    use std::sync::Mutex;
+
+    use crate::config::ConfigState;
+    use crate::models::Config;
+
+    fn app_with_cache_dir(cache_dir: &Path) -> tauri::App<tauri::test::MockRuntime> {
+        let app = tauri::test::mock_app();
+        app.manage(ConfigState(Mutex::new(Config {
+            cache_dir: Some(cache_dir.to_string_lossy().into_owned()),
+        })));
+        app
+    }
+
+    fn store_test_router(app: AppHandle<tauri::test::MockRuntime>) -> Router {
+        Router::new()
+            .route(
+                "/api/store/{key}",
+                get(store_get::<tauri::test::MockRuntime>)
+                    .put(store_put::<tauri::test::MockRuntime>)
+                    .delete(store_delete::<tauri::test::MockRuntime>),
+            )
+            .layer(axum::middleware::from_fn(no_store_dynamic))
+            .with_state(app)
+    }
+
+    fn api_request(method: Method, uri: &str, body: impl Into<Body>) -> Request<Body> {
+        let mut req = Request::builder()
+            .method(method)
+            .uri(uri)
+            .body(body.into())
+            .expect("build request");
+        req.extensions_mut()
+            .insert(ConnectInfo(SocketAddr::from(([127, 0, 0, 1], 1430))));
+        req
+    }
+
+    async fn send(router: &Router, req: Request<Body>) -> (StatusCode, String, Option<String>) {
+        let res = router.clone().oneshot(req).await.expect("route request");
+        let status = res.status();
+        let cache_control = res
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .map(|value| value.to_str().expect("cache-control is ascii").to_string());
+        let body = to_bytes(res.into_body(), 1024 * 1024)
+            .await
+            .expect("read response body");
+        (
+            status,
+            String::from_utf8(body.to_vec()).expect("response body is utf-8"),
+            cache_control,
+        )
+    }
+
+    #[test]
+    fn store_api_round_trips_persisted_json() {
+        tauri::async_runtime::block_on(async {
+            let cache_dir = tempfile::tempdir().expect("create cache dir");
+            let app = app_with_cache_dir(cache_dir.path());
+            let router = store_test_router(app.handle().clone());
+
+            let (status, body, cache_control) = send(
+                &router,
+                api_request(Method::GET, "/api/store/reader", Body::empty()),
+            )
+            .await;
+            assert_eq!(status, StatusCode::NOT_FOUND);
+            assert_eq!(body, "");
+            assert_eq!(cache_control.as_deref(), Some("no-store"));
+
+            let (status, body, cache_control) = send(
+                &router,
+                api_request(Method::PUT, "/api/store/reader", r#"{"page":42}"#),
+            )
+            .await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            assert_eq!(body, "");
+            assert_eq!(cache_control.as_deref(), Some("no-store"));
+
+            let (status, body, cache_control) = send(
+                &router,
+                api_request(Method::GET, "/api/store/reader", Body::empty()),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(
+                serde_json::from_str::<Value>(&body).expect("store body is json"),
+                serde_json::json!({ "page": 42 })
+            );
+            assert_eq!(cache_control.as_deref(), Some("no-store"));
+
+            let (status, body, cache_control) = send(
+                &router,
+                api_request(Method::DELETE, "/api/store/reader", Body::empty()),
+            )
+            .await;
+            assert_eq!(status, StatusCode::NO_CONTENT);
+            assert_eq!(body, "");
+            assert_eq!(cache_control.as_deref(), Some("no-store"));
+
+            let (status, body, cache_control) = send(
+                &router,
+                api_request(Method::GET, "/api/store/reader", Body::empty()),
+            )
+            .await;
+            assert_eq!(status, StatusCode::NOT_FOUND);
+            assert_eq!(body, "");
+            assert_eq!(cache_control.as_deref(), Some("no-store"));
+        });
+    }
+
+    #[test]
+    fn store_api_rejects_invalid_keys_at_http_boundary() {
+        tauri::async_runtime::block_on(async {
+            let cache_dir = tempfile::tempdir().expect("create cache dir");
+            let app = app_with_cache_dir(cache_dir.path());
+            let router = store_test_router(app.handle().clone());
+
+            for uri in ["/api/store/library.json", "/api/store/with%20space"] {
+                for method in [Method::GET, Method::PUT, Method::DELETE] {
+                    let body = if method == Method::PUT {
+                        Body::from("{}")
+                    } else {
+                        Body::empty()
+                    };
+                    let (status, body, cache_control) =
+                        send(&router, api_request(method, uri, body)).await;
+
+                    assert_eq!(status, StatusCode::BAD_REQUEST);
+                    assert_eq!(body, "Invalid store key");
+                    assert_eq!(cache_control.as_deref(), Some("no-store"));
+                }
+            }
+
+            assert!(!cache_dir.path().join("store").join("library.json").exists());
+        });
+    }
 }

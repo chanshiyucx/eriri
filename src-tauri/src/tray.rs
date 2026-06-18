@@ -197,11 +197,15 @@ fn spawn_clean(app: AppHandle) {
         }
         let app2 = app.clone();
         // (0, 0) => no age/size threshold => clear everything.
-        let _ = tokio::task::spawn_blocking(move || {
+        match tokio::task::spawn_blocking(move || {
             crate::thumbnail::clean_thumbnail_cache(app2, Some(0), Some(0))
         })
-        .await;
-        rebuild(&app);
+        .await
+        {
+            Ok(Ok(_)) => rebuild(&app),
+            Ok(Err(e)) => error!(error = %e, "Failed to clean thumbnail cache"),
+            Err(e) => error!(error = %e, "Clean cache task panicked"),
+        }
     });
 }
 
