@@ -30,6 +30,12 @@ pub struct Library {
     pub sort_order: i64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ImportOutcome {
+    pub id: String,
+    pub created: bool,
+}
+
 /// Flat author row (no nested books) for the catalog snapshot.
 #[derive(Debug, Serialize)]
 pub struct AuthorRow {
@@ -243,6 +249,16 @@ fn upsert_library(conn: &Connection, lib: &Library) -> rusqlite::Result<()> {
     Ok(())
 }
 
+fn library_exists(conn: &Connection, id: &str) -> rusqlite::Result<bool> {
+    conn.query_row("SELECT 1 FROM libraries WHERE id = ?1", params![id], |_| {
+        Ok(true)
+    })
+    .or_else(|e| match e {
+        rusqlite::Error::QueryReturnedNoRows => Ok(false),
+        e => Err(e),
+    })
+}
+
 fn upsert_comic(conn: &Connection, c: &Comic) -> rusqlite::Result<()> {
     conn.execute(
         UPSERT_COMIC_SQL,
@@ -438,21 +454,15 @@ pub fn get_catalog(conn: &Connection) -> rusqlite::Result<Catalog> {
 
 // --- Mutations (scan + persist). These do filesystem + DB work. ---
 
-/// Import a new library at `path`: detect type, scan, and persist. Returns the
-/// new library's id (caller re-hydrates).
-pub fn import(app: &AppHandle, path: &str) -> Result<String, String> {
+/// Import a new library at `path`: detect type, scan, and persist.
+pub fn import(app: &AppHandle, path: &str) -> Result<ImportOutcome, String> {
     let id = crate::scanner::utils::generate_uuid(path);
 
     {
         let state = app.state::<LibraryDb>();
         let conn = state.0.lock().map_err(|e| e.to_string())?;
-        let exists: bool = conn
-            .query_row("SELECT 1 FROM libraries WHERE id = ?1", params![id], |_| {
-                Ok(true)
-            })
-            .unwrap_or(false);
-        if exists {
-            return Ok(id);
+        if library_exists(&conn, &id).map_err(|e| e.to_string())? {
+            return Ok(ImportOutcome { id, created: false });
         }
     }
 
@@ -489,7 +499,7 @@ pub fn import(app: &AppHandle, path: &str) -> Result<String, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?;
     upsert_library(&conn, &library).map_err(|e| e.to_string())?;
     replace_library_content(&conn, &id, &comics, &authors).map_err(|e| e.to_string())?;
-    Ok(id)
+    Ok(ImportOutcome { id, created: true })
 }
 
 /// Re-scan an existing library and replace its content. Bumps `created_at`
@@ -814,6 +824,27 @@ mod tests {
         assert_eq!(sort_order("library-3"), 0);
         assert_eq!(sort_order("library-1"), 1);
         assert_eq!(sort_order("library-2"), 1);
+    }
+
+    #[test]
+    fn library_exists_detects_existing_import_identity() {
+        let conn = test_conn();
+        assert!(!library_exists(&conn, "library-1").expect("check missing library"));
+
+        upsert_library(
+            &conn,
+            &Library {
+                id: "library-1".to_string(),
+                name: "Library".to_string(),
+                path: "/library".to_string(),
+                type_: "comic".to_string(),
+                created_at: 1,
+                sort_order: 0,
+            },
+        )
+        .expect("insert library");
+
+        assert!(library_exists(&conn, "library-1").expect("check existing library"));
     }
 
     #[test]

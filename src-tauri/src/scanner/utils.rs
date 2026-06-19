@@ -143,6 +143,26 @@ pub async fn pick_directory_impl(app: &AppHandle) -> Option<String> {
         .map(|p| p.to_string_lossy().into_owned())
 }
 
+/// Open the native macOS folder picker and return the chosen absolute paths.
+pub async fn pick_directories_impl(app: &AppHandle) -> Option<Vec<String>> {
+    // Surface the app first so the panel appears in front (no Dock-icon flash).
+    #[cfg(target_os = "macos")]
+    let _ = app.run_on_main_thread(activate_foreground);
+
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    app.dialog().file().pick_folders(move |paths| {
+        let _ = tx.send(paths);
+    });
+
+    rx.await.ok().flatten().map(|paths| {
+        paths
+            .into_iter()
+            .filter_map(|p| p.into_path().ok())
+            .map(|p| p.to_string_lossy().into_owned())
+            .collect()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

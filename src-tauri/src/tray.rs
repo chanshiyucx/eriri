@@ -143,17 +143,29 @@ fn handle_event(app: &AppHandle, id: &str) {
 
 fn spawn_import(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
-        let Some(path) = crate::scanner::utils::pick_directory_impl(&app).await else {
+        let Some(paths) = crate::scanner::utils::pick_directories_impl(&app).await else {
             return;
         };
         let app2 = app.clone();
-        match tokio::task::spawn_blocking(move || crate::library::import(&app2, &path)).await {
-            Ok(Ok(_)) => {
-                crate::server::rebuild_allowed_roots(&app);
-                rebuild(&app);
+        let created = tokio::task::spawn_blocking(move || {
+            let mut created = false;
+            for path in paths {
+                match crate::library::import(&app2, &path) {
+                    Ok(outcome) => created |= outcome.created,
+                    Err(e) => error!(path = %path, error = %e, "Import failed"),
+                }
             }
-            Ok(Err(e)) => error!(error = %e, "Import failed"),
-            Err(e) => error!(error = %e, "Import task panicked"),
+            created
+        })
+        .await
+        .unwrap_or_else(|e| {
+            error!(error = %e, "Import task panicked");
+            false
+        });
+
+        if created {
+            crate::server::rebuild_allowed_roots(&app);
+            rebuild(&app);
         }
     });
 }
