@@ -5,14 +5,7 @@ const qs = (params: Record<string, string>): string =>
   new URLSearchParams(params).toString()
 
 export async function scanComicImages(comicPath: string): Promise<Image[]> {
-  try {
-    return await apiGet<Image[]>(
-      `/api/scan-comic-images?${qs({ path: comicPath })}`,
-    )
-  } catch (error) {
-    console.error('Failed to scan comic images:', error)
-    return []
-  }
+  return apiGet<Image[]>(`/api/scan-comic-images?${qs({ path: comicPath })}`)
 }
 
 export async function parseBook(

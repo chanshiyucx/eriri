@@ -29,15 +29,10 @@ describe('scanner API', () => {
     )
   })
 
-  it('returns an empty scan when the request fails', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+  it('rejects when the image scan request fails', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')))
 
-    await expect(scanComicImages('/comic')).resolves.toEqual([])
-    expect(console.error).toHaveBeenCalledWith(
-      'Failed to scan comic images:',
-      expect.any(Error),
-    )
+    await expect(scanComicImages('/comic')).rejects.toThrow('offline')
   })
 
   it('parses a normal JSON response without progress reporting', async () => {

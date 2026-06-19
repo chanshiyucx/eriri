@@ -1,18 +1,12 @@
 import { Grid2x2, Rows2, Star, StepForward, Trash2 } from 'lucide-react'
-import {
-  useEffect,
-  useEffectEvent,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { VirtuosoGrid } from 'react-virtuoso'
 import { useShallow } from 'zustand/react/shallow'
 import { Button } from '@/components/ui/button'
 import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
 import { GridItem } from '@/components/ui/grid-item'
 import { GridImage, ImagePreviewOverlay } from '@/components/ui/image-view'
-import { useComicReaderControls } from '@/hooks/use-comic-reader-controls'
+import { useComicReadingSession } from '@/hooks/use-comic-reading-session'
 import { useNativeOpen } from '@/hooks/use-native-open'
 import { usePanelNav } from '@/hooks/use-panel-nav'
 import { SHORTCUTS } from '@/lib/shortcuts'
@@ -30,8 +24,6 @@ import {
 } from '@/types/library'
 
 type ViewMode = 'grid' | 'scroll'
-
-const EMPTY_ARRAY: Image[] = []
 
 interface ComicItemProps {
   comic: Comic
@@ -87,15 +79,9 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
 
   const setNavStatus = useUIStore((s) => s.setNavStatus)
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
-  const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
-  const getComicImages = useLibraryStore((s) => s.getComicImages)
 
   const comicId = useUIStore(
     (s) => s.navStatus[selectedLibrary.id]?.comicId ?? '',
-  )
-  const comic = useLibraryStore((s) => s.comics[comicId])
-  const images = useLibraryStore(
-    (s) => s.comicImages[comicId]?.images ?? EMPTY_ARRAY,
   )
   const comics = useLibraryStore(
     useShallow((s) => {
@@ -110,44 +96,24 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
     }),
   )
 
-  const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
-  const progress = useProgressStore((s) => s.comics[comicId])
-  const savedIndex = progress?.current ?? 0
   const {
+    comic,
+    images,
     currentIndex,
-    currentIndexRef,
     previewIndex,
     setPreviewIndex,
     trackStripIndex,
     setHoveredIndex,
-    getTagTargetImage: resolveTagTargetImage,
     closePreview,
-  } = useComicReaderControls({
+    updateComicImageTags,
+    toggleTargetImageDeleted,
+    toggleTargetImageStarred,
+  } = useComicReadingSession({
     comicId,
-    images,
-    savedIndex,
-    updateComicProgress,
+    stripRef,
+    stripVisible: readerVisible && viewMode === 'scroll',
+    tagTargetPolicy: viewMode === 'grid' ? 'library-grid' : 'library-scroll',
   })
-
-  // Gate on `comic` so the load retries once the catalog hydrates (see
-  // comic-reader.tsx for the same race).
-  const comicPath = comic?.path
-  useEffect(() => {
-    if (!comicPath || images.length) return
-    void getComicImages(comicId)
-  }, [comicId, comicPath, images.length, getComicImages])
-
-  useLayoutEffect(() => {
-    if (viewMode !== 'scroll' || !readerVisible || !images.length) return
-    stripRef.current?.jumpTo(currentIndexRef.current)
-  }, [
-    activeTab,
-    comicId,
-    currentIndexRef,
-    images.length,
-    readerVisible,
-    viewMode,
-  ])
 
   const toggleViewMode = () => {
     setViewMode((prev) => (prev === 'grid' ? 'scroll' : 'grid'))
@@ -172,21 +138,13 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
   }
 
   const handleStripIndexChange = (index: number) => {
-    trackStripIndex(comic, index, readerVisible)
+    trackStripIndex(index)
   }
 
   // Closing the preview syncs the reading position to the page the user flipped
   // to, scrolling the strip there when scroll mode is showing.
   const handlePreviewClose = () => {
-    closePreview(comic, stripRef, viewMode === 'scroll')
-  }
-
-  // Target of the N/M page-tag shortcuts: the previewed image in grid mode, the
-  // hovered page in scroll mode, else the centered/current page.
-  const getTagTargetImage = () => {
-    return resolveTagTargetImage(
-      viewMode === 'grid' ? 'preview-only' : 'hover-first',
-    )
+    closePreview()
   }
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
@@ -207,22 +165,12 @@ export function ComicLibrary({ selectedLibrary }: ComicLibraryProps) {
       case SHORTCUTS.toggleItemStarred:
         void updateComicTags(comic.id, { starred: !comic.starred })
         break
-      case SHORTCUTS.toggleImageDeleted: {
-        const targetImage = getTagTargetImage()
-        if (!targetImage) return
-        void updateComicImageTags(comic.id, targetImage.filename, {
-          deleted: !targetImage.deleted,
-        })
+      case SHORTCUTS.toggleImageDeleted:
+        toggleTargetImageDeleted()
         break
-      }
-      case SHORTCUTS.toggleImageStarred: {
-        const targetImage = getTagTargetImage()
-        if (!targetImage) return
-        void updateComicImageTags(comic.id, targetImage.filename, {
-          starred: !targetImage.starred,
-        })
+      case SHORTCUTS.toggleImageStarred:
+        toggleTargetImageStarred()
         break
-      }
     }
   })
 

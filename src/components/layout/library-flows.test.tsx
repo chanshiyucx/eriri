@@ -339,6 +339,7 @@ describe('library flow components', () => {
       comicImages: {
         normal: {
           comicId: 'normal',
+          status: 'ready',
           images: [image(0), image(1)],
           timestamp: 1,
         },

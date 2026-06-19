@@ -76,10 +76,14 @@ export interface Image {
   index: number
 }
 
+export type ComicImageStatus = 'idle' | 'loading' | 'ready' | 'empty' | 'failed'
+
 export interface ComicImage {
   comicId: string
+  status: ComicImageStatus
   images: Image[]
   timestamp: number
+  error?: string
 }
 
 export interface FileTags {

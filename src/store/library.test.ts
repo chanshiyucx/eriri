@@ -179,8 +179,18 @@ describe('library store', () => {
     useLibraryStore.setState({
       libraryComics: { 'library-1': ['comic-1'] },
       comicImages: {
-        'comic-1': { comicId: 'comic-1', images: [], timestamp: 100 },
-        'comic-2': { comicId: 'comic-2', images: [], timestamp: 200 },
+        'comic-1': {
+          comicId: 'comic-1',
+          status: 'empty',
+          images: [],
+          timestamp: 100,
+        },
+        'comic-2': {
+          comicId: 'comic-2',
+          status: 'empty',
+          images: [],
+          timestamp: 200,
+        },
       },
     })
 
@@ -476,6 +486,12 @@ describe('library store', () => {
     await expect(
       useLibraryStore.getState().getComicImages('comic-1'),
     ).resolves.toEqual([image])
+    expect(useLibraryStore.getState().comicImages['comic-1']).toMatchObject({
+      status: 'ready',
+    })
+    expect(
+      useLibraryStore.getState().comicImages['comic-1'],
+    ).not.toHaveProperty('error')
     expect(useLibraryStore.getState().comics['comic-1']?.pageCount).toBe(1)
     expect(useUIStore.getState().isScanning).toBe(false)
 
@@ -499,11 +515,180 @@ describe('library store', () => {
     expect(mockedScanner.scanComicImages).toHaveBeenCalledTimes(1)
   })
 
+  it('marks comic image readiness as empty after a successful empty scan', async () => {
+    useLibraryStore.setState({
+      comics: {
+        'comic-1': {
+          id: 'comic-1',
+          title: 'Comic 1',
+          path: '/comics/Comic 1',
+          cover: '/file?path=cover',
+          libraryId: 'library-1',
+          starred: false,
+          deleted: false,
+          createdAt: 1,
+        },
+      },
+    })
+
+    await expect(
+      useLibraryStore.getState().getComicImages('comic-1'),
+    ).resolves.toEqual([])
+
+    expect(useLibraryStore.getState().comicImages['comic-1']).toMatchObject({
+      status: 'empty',
+      images: [],
+    })
+    expect(
+      useLibraryStore.getState().comicImages['comic-1'],
+    ).not.toHaveProperty('error')
+  })
+
+  it('marks comic image readiness as failed when the scan rejects', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    mockedScanner.scanComicImages.mockRejectedValueOnce(new Error('offline'))
+    useLibraryStore.setState({
+      comics: {
+        'comic-1': {
+          id: 'comic-1',
+          title: 'Comic 1',
+          path: '/comics/Comic 1',
+          cover: '/file?path=cover',
+          libraryId: 'library-1',
+          starred: false,
+          deleted: false,
+          createdAt: 1,
+        },
+      },
+    })
+
+    await expect(
+      useLibraryStore.getState().getComicImages('comic-1'),
+    ).resolves.toEqual([])
+
+    expect(useLibraryStore.getState().comicImages['comic-1']).toMatchObject({
+      status: 'failed',
+      images: [],
+      error: 'offline',
+    })
+    expect(console.error).toHaveBeenCalledWith(
+      'Failed to scan comic images:',
+      expect.any(Error),
+    )
+  })
+
+  it('dedupes in-flight comic image scans for the same comic', async () => {
+    const image = {
+      path: '/comics/Comic 1/1.jpg',
+      url: '/file?path=1',
+      thumbnail: '/file?path=thumb1',
+      filename: '1.jpg',
+      starred: false,
+      deleted: false,
+      width: 100,
+      height: 200,
+      index: 0,
+    }
+    let resolveScan!: (images: (typeof image)[]) => void
+    mockedScanner.scanComicImages.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveScan = resolve
+      }),
+    )
+    useLibraryStore.setState({
+      comics: {
+        'comic-1': {
+          id: 'comic-1',
+          title: 'Comic 1',
+          path: '/comics/Comic 1',
+          cover: '/file?path=cover',
+          libraryId: 'library-1',
+          starred: false,
+          deleted: false,
+          createdAt: 1,
+        },
+      },
+    })
+
+    const first = useLibraryStore.getState().getComicImages('comic-1')
+    const second = useLibraryStore.getState().getComicImages('comic-1')
+
+    expect(mockedScanner.scanComicImages).toHaveBeenCalledTimes(1)
+    expect(useLibraryStore.getState().comicImages['comic-1']).toMatchObject({
+      status: 'loading',
+      images: [],
+    })
+    expect(useUIStore.getState().isScanning).toBe(true)
+
+    resolveScan([image])
+
+    await expect(first).resolves.toEqual([image])
+    await expect(second).resolves.toEqual([image])
+    expect(useLibraryStore.getState().comicImages['comic-1']).toMatchObject({
+      status: 'ready',
+      images: [image],
+    })
+    expect(useUIStore.getState().isScanning).toBe(false)
+  })
+
+  it('keeps global scanning active until all comic image scans finish', async () => {
+    let resolveFirst!: (images: []) => void
+    let resolveSecond!: (images: []) => void
+    mockedScanner.scanComicImages
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveFirst = resolve
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveSecond = resolve
+        }),
+      )
+    useLibraryStore.setState({
+      comics: {
+        'comic-1': {
+          id: 'comic-1',
+          title: 'Comic 1',
+          path: '/comics/Comic 1',
+          cover: '/file?path=cover',
+          libraryId: 'library-1',
+          starred: false,
+          deleted: false,
+          createdAt: 1,
+        },
+        'comic-2': {
+          id: 'comic-2',
+          title: 'Comic 2',
+          path: '/comics/Comic 2',
+          cover: '/file?path=cover',
+          libraryId: 'library-1',
+          starred: false,
+          deleted: false,
+          createdAt: 2,
+        },
+      },
+    })
+
+    const first = useLibraryStore.getState().getComicImages('comic-1')
+    const second = useLibraryStore.getState().getComicImages('comic-2')
+    expect(useUIStore.getState().isScanning).toBe(true)
+
+    resolveFirst([])
+    await first
+    expect(useUIStore.getState().isScanning).toBe(true)
+
+    resolveSecond([])
+    await second
+    expect(useUIStore.getState().isScanning).toBe(false)
+  })
+
   it('ignores comic image tag updates when the image is missing or the backend rejects it', async () => {
     useLibraryStore.setState({
       comicImages: {
         'comic-1': {
           comicId: 'comic-1',
+          status: 'ready',
           timestamp: 100,
           images: [
             {
@@ -547,6 +732,7 @@ describe('library store', () => {
       comicImages: {
         'comic-1': {
           comicId: 'comic-1',
+          status: 'ready',
           timestamp: 100,
           images: [
             {
@@ -585,6 +771,7 @@ describe('library store', () => {
       comicImages: {
         'comic-1': {
           comicId: 'comic-1',
+          status: 'ready',
           timestamp: 100,
           images: [
             {
@@ -619,6 +806,7 @@ describe('library store', () => {
       comicImages: {
         'comic-1': {
           comicId: 'comic-1',
+          status: 'ready',
           timestamp: 100,
           images: [
             {
@@ -639,7 +827,12 @@ describe('library store', () => {
     mockedScanner.setFileTag.mockImplementationOnce(() => {
       useLibraryStore.setState({
         comicImages: {
-          'comic-1': { comicId: 'comic-1', timestamp: 100, images: [] },
+          'comic-1': {
+            comicId: 'comic-1',
+            status: 'empty',
+            timestamp: 100,
+            images: [],
+          },
         },
       })
       return Promise.resolve(true)
@@ -658,7 +851,12 @@ describe('library store', () => {
     const cachedImages = Object.fromEntries(
       Array.from({ length: 31 }, (_, index) => [
         `comic-${index}`,
-        { comicId: `comic-${index}`, images: [], timestamp: index },
+        {
+          comicId: `comic-${index}`,
+          status: 'empty' as const,
+          images: [],
+          timestamp: index,
+        },
       ]),
     )
     useLibraryStore.setState({

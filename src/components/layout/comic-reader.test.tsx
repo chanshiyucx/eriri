@@ -124,6 +124,7 @@ describe('ComicReader', () => {
       comicImages: {
         'comic-1': {
           comicId: 'comic-1',
+          status: 'ready',
           images: [image(0), image(1)],
           timestamp: 1,
         },

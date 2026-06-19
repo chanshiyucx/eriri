@@ -10,12 +10,15 @@ import {
   type Book,
   type Comic,
   type ComicImage,
+  type ComicImageStatus,
   type FileTags,
   type Image,
   type Library,
 } from '@/types/library'
 
 const MAX_CACHE_SIZE = 30
+const comicImageLoads = new Map<string, Promise<Image[]>>()
+let activeComicImageLoads = 0
 
 // Natural ordering (so "10" sorts after "2"), matching the backend scan order.
 const collator = new Intl.Collator(undefined, {
@@ -44,6 +47,24 @@ interface LibraryState {
     filename: string,
     tags: FileTags,
   ) => Promise<void>
+}
+
+function terminalComicImageStatus(images: Image[]): ComicImageStatus {
+  return images.length ? 'ready' : 'empty'
+}
+
+function describeError(error: unknown) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function beginComicImageScan() {
+  activeComicImageLoads += 1
+  useUIStore.getState().setIsScanning(true)
+}
+
+function endComicImageScan() {
+  activeComicImageLoads = Math.max(0, activeComicImageLoads - 1)
+  if (activeComicImageLoads === 0) useUIStore.getState().setIsScanning(false)
 }
 
 interface CatalogMaps {
@@ -129,7 +150,10 @@ export const useLibraryStore = create<LibraryState>()(
         const comicIds = get().libraryComics[id] ?? []
         await api.refreshLibrary(id)
         set((state) => {
-          for (const comicId of comicIds) delete state.comicImages[comicId]
+          for (const comicId of comicIds) {
+            comicImageLoads.delete(comicId)
+            delete state.comicImages[comicId]
+          }
         })
         await get().hydrate()
       } finally {
@@ -235,41 +259,78 @@ export const useLibraryStore = create<LibraryState>()(
     getComicImages: async (comicId) => {
       const cache = get().comicImages[comicId]
 
-      if (cache) {
+      if (cache && cache.status !== 'failed' && cache.status !== 'loading') {
         set((state) => {
           const item = state.comicImages[comicId]
           item.timestamp = Date.now()
         })
         return cache.images
       }
+      if (cache?.status === 'loading') {
+        const loading = comicImageLoads.get(comicId)
+        if (loading) return loading
+      }
+      const existingLoad = comicImageLoads.get(comicId)
+      if (existingLoad) return existingLoad
 
       const comic = get().comics[comicId]
       if (!comic) return []
 
-      const setScanning = useUIStore.getState().setIsScanning
-      setScanning(true)
-      let images: Image[] = []
-      try {
-        images = await scanComicImages(comic.path)
-      } finally {
-        setScanning(false)
-      }
-
       set((state) => {
-        state.comicImages[comicId] = { comicId, images, timestamp: Date.now() }
-        const c = state.comics[comicId]
-        if (c) c.pageCount = images.length
-
-        const entries = Object.values(state.comicImages)
-        if (entries.length > MAX_CACHE_SIZE) {
-          entries
-            .sort((a, b) => a.timestamp - b.timestamp)
-            .slice(0, entries.length - MAX_CACHE_SIZE + 5)
-            .forEach((item) => delete state.comicImages[item.comicId])
+        state.comicImages[comicId] = {
+          comicId,
+          status: 'loading',
+          images: [],
+          timestamp: Date.now(),
         }
       })
 
-      return images
+      const load = (async () => {
+        beginComicImageScan()
+        try {
+          const images = await scanComicImages(comic.path)
+          set((state) => {
+            state.comicImages[comicId] = {
+              comicId,
+              status: terminalComicImageStatus(images),
+              images,
+              timestamp: Date.now(),
+            }
+            const c = state.comics[comicId]
+            if (c) c.pageCount = images.length
+
+            const entries = Object.values(state.comicImages).filter(
+              (item) => item.status !== 'loading',
+            )
+            if (entries.length > MAX_CACHE_SIZE) {
+              entries
+                .sort((a, b) => a.timestamp - b.timestamp)
+                .slice(0, entries.length - MAX_CACHE_SIZE + 5)
+                .forEach((item) => delete state.comicImages[item.comicId])
+            }
+          })
+          return images
+        } catch (error) {
+          const message = describeError(error)
+          console.error('Failed to scan comic images:', error)
+          set((state) => {
+            state.comicImages[comicId] = {
+              comicId,
+              status: 'failed',
+              images: [],
+              timestamp: Date.now(),
+              error: message,
+            }
+          })
+          return []
+        } finally {
+          comicImageLoads.delete(comicId)
+          endComicImageScan()
+        }
+      })()
+
+      comicImageLoads.set(comicId, load)
+      return load
     },
   })),
 )

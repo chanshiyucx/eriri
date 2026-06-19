@@ -1,27 +1,18 @@
 import { SquareMenu, Star, Trash2 } from 'lucide-react'
-import {
-  useEffect,
-  useEffectEvent,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from 'react'
+import { useEffect, useEffectEvent, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { ComicStrip, type ComicStripHandle } from '@/components/ui/comic-strip'
 import { GridImage, ImagePreviewOverlay } from '@/components/ui/image-view'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useClickOutside } from '@/hooks/use-click-outside'
-import { useComicReaderControls } from '@/hooks/use-comic-reader-controls'
+import { useComicReadingSession } from '@/hooks/use-comic-reading-session'
 import { useIsPhone } from '@/hooks/use-is-phone'
 import { SHORTCUTS } from '@/lib/shortcuts'
 import { cn } from '@/lib/style'
 import { useLibraryStore } from '@/store/library'
-import { useProgressStore } from '@/store/progress'
 import { useTabsStore } from '@/store/tabs'
 import { useUIStore } from '@/store/ui'
 import type { FileTags, Image } from '@/types/library'
-
-const EMPTY_ARRAY: Image[] = []
 
 interface TableOfContentsProps {
   comicId: string
@@ -100,49 +91,28 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   const activeTab = useTabsStore((s) => s.activeTab)
 
   const updateComicTags = useLibraryStore((s) => s.updateComicTags)
-  const updateComicImageTags = useLibraryStore((s) => s.updateComicImageTags)
-  const getComicImages = useLibraryStore((s) => s.getComicImages)
-
-  const comic = useLibraryStore((s) => s.comics[comicId])
-  const images = useLibraryStore(
-    (s) => s.comicImages[comicId]?.images ?? EMPTY_ARRAY,
-  )
-
-  const updateComicProgress = useProgressStore((s) => s.updateComicProgress)
-  const progress = useProgressStore((s) => s.comics[comicId])
-  const savedIndex = progress?.current ?? 0
   const {
+    comic,
+    images,
     currentIndex,
-    currentIndexRef,
     previewIndex,
     setPreviewIndex,
     jumpTo,
     trackStripIndex,
     setHoveredIndex,
-    getTagTargetImage,
     closePreview,
-  } = useComicReaderControls({
+    updateComicImageTags,
+    toggleTargetImageDeleted,
+    toggleTargetImageStarred,
+  } = useComicReadingSession({
     comicId,
-    images,
-    savedIndex,
-    updateComicProgress,
+    stripRef,
+    stripVisible: activeTab === comicId,
+    tagTargetPolicy: 'reader',
   })
 
-  // Gate on `comic`: a tab can mount before the catalog hydrates, where
-  // getComicImages bails. Depending on comic.path retries once it's available.
-  const comicPath = comic?.path
-  useEffect(() => {
-    if (!comicPath || images.length) return
-    void getComicImages(comicId)
-  }, [comicId, comicPath, images.length, getComicImages])
-
-  useLayoutEffect(() => {
-    if (!images.length) return
-    stripRef.current?.jumpTo(currentIndexRef.current)
-  }, [activeTab, comicId, currentIndexRef, images.length])
-
   const handleStripIndexChange = (index: number) => {
-    trackStripIndex(comic, index)
+    trackStripIndex(index)
   }
 
   const handleCloseToc = () => {
@@ -156,7 +126,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
   // Closing the preview syncs the scroll position to whatever page the user
   // flipped to, so the strip lands where they left off.
   const handlePreviewClose = () => {
-    closePreview(comic, stripRef, true)
+    closePreview()
   }
 
   const handleKeyDown = useEffectEvent((e: KeyboardEvent) => {
@@ -174,22 +144,12 @@ export function ComicReader({ comicId }: ComicReaderProps) {
       case SHORTCUTS.toggleItemStarred:
         void updateComicTags(comic.id, { starred: !comic.starred })
         break
-      case SHORTCUTS.toggleImageDeleted: {
-        const targetImage = getTagTargetImage('preview-first')
-        if (!targetImage) return
-        void updateComicImageTags(comic.id, targetImage.filename, {
-          deleted: !targetImage.deleted,
-        })
+      case SHORTCUTS.toggleImageDeleted:
+        toggleTargetImageDeleted()
         break
-      }
-      case SHORTCUTS.toggleImageStarred: {
-        const targetImage = getTagTargetImage('preview-first')
-        if (!targetImage) return
-        void updateComicImageTags(comic.id, targetImage.filename, {
-          starred: !targetImage.starred,
-        })
+      case SHORTCUTS.toggleImageStarred:
+        toggleTargetImageStarred()
         break
-      }
     }
   })
 
@@ -210,7 +170,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
         currentIndex={currentIndex}
         isCollapsed={isTocCollapsed}
         onSelect={(index) => {
-          jumpTo(comic, stripRef, index)
+          jumpTo(index)
         }}
         onTags={updateComicImageTags}
         onClose={handleCloseToc}
