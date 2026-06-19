@@ -88,7 +88,8 @@ const LIBRARY_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS libraries (
     );
     CREATE INDEX IF NOT EXISTS idx_comics_library ON comics(library_id);
     CREATE INDEX IF NOT EXISTS idx_authors_library ON authors(library_id);
-    CREATE INDEX IF NOT EXISTS idx_books_author ON books(author_id);";
+    CREATE INDEX IF NOT EXISTS idx_books_author ON books(author_id);
+    CREATE INDEX IF NOT EXISTS idx_books_library ON books(library_id);";
 
 const UPSERT_LIBRARY_SQL: &str =
     "INSERT INTO libraries (id, name, path, type, created_at, sort_order)
@@ -694,6 +695,7 @@ mod tests {
                 "comics",
                 "idx_authors_library",
                 "idx_books_author",
+                "idx_books_library",
                 "idx_comics_library",
                 "libraries",
             ]

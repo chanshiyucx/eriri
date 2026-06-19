@@ -25,7 +25,7 @@ fn store_file_path(store_dir: &Path, key: &str, extension: &str) -> Result<PathB
     Ok(store_dir.join(format!("{key}.{extension}")))
 }
 
-fn write_file_atomically(file_path: &Path, data: String) -> Result<(), String> {
+fn write_file_atomically(file_path: &Path, data: &str) -> Result<(), String> {
     let parent = file_path
         .parent()
         .ok_or_else(|| "Failed to resolve file parent".to_string())?;
@@ -103,7 +103,7 @@ pub fn get<R: Runtime>(app: &AppHandle<R>) -> Config {
 pub fn save_config<R: Runtime>(app: &AppHandle<R>, config: &Config) -> Result<(), String> {
     if let Some(config_path) = get_config_path(app) {
         let content = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
-        write_file_atomically(&config_path, content)?;
+        write_file_atomically(&config_path, &content)?;
 
         // Update in-memory state
         if let Some(state) = app.try_state::<ConfigState>()
@@ -134,7 +134,7 @@ pub fn write_store_data<R: Runtime>(
 ) -> Result<(), String> {
     let store_dir = get_store_dir(&app);
     let file_path = store_file_path(&store_dir, &key, "json")?;
-    write_file_atomically(&file_path, data)
+    write_file_atomically(&file_path, &data)
 }
 
 pub fn remove_store_data<R: Runtime>(app: AppHandle<R>, key: String) -> Result<(), String> {
