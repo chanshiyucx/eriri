@@ -25,21 +25,18 @@ fn extract_chapter_title(line: &str) -> Option<String> {
         return None;
     }
 
-    let chars: Vec<char> = trimmed.chars().collect();
-    let mut i = 1;
-
-    // Skip numeric characters (Arabic, fullwidth, or Chinese numerals)
-    while i < chars.len() && is_chapter_number_char(chars[i]) {
-        i += 1;
-    }
-
-    if i == 1 || i >= chars.len() {
-        return None;
-    }
-
+    let mut chars = trimmed.chars();
+    let _ = chars.next();
+    let mut has_number = false;
     const CHAPTER_SUFFIXES: &[char] = &['章', '回', '节', '卷', '集', '幕'];
-    if CHAPTER_SUFFIXES.contains(&chars[i]) {
-        return Some(trimmed.to_string());
+
+    for c in chars {
+        if is_chapter_number_char(c) {
+            has_number = true;
+            continue;
+        }
+
+        return (has_number && CHAPTER_SUFFIXES.contains(&c)).then(|| trimmed.to_string());
     }
 
     None
@@ -289,7 +286,7 @@ mod tests {
         let mut file = tempfile::NamedTempFile::new().expect("create temp book");
         write!(
             file,
-            "第章 缺少数字\n第一话 不支持后缀\n第十章 正文\n正文\n"
+            "第章 缺少数字\n第一话 不支持后缀\n第十\n第十章 正文\n正文\n"
         )
         .expect("write temp book");
 

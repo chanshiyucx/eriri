@@ -90,6 +90,35 @@ const LIBRARY_SCHEMA: &str = "CREATE TABLE IF NOT EXISTS libraries (
     CREATE INDEX IF NOT EXISTS idx_authors_library ON authors(library_id);
     CREATE INDEX IF NOT EXISTS idx_books_author ON books(author_id);";
 
+const UPSERT_LIBRARY_SQL: &str =
+    "INSERT INTO libraries (id, name, path, type, created_at, sort_order)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+         ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name, path = excluded.path, type = excluded.type,
+            created_at = excluded.created_at, sort_order = excluded.sort_order";
+
+const UPSERT_COMIC_SQL: &str =
+    "INSERT INTO comics (id, title, path, cover, library_id, created_at, starred, deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title, path = excluded.path, cover = excluded.cover,
+            library_id = excluded.library_id, created_at = excluded.created_at,
+            starred = excluded.starred, deleted = excluded.deleted";
+
+const UPSERT_AUTHOR_SQL: &str = "INSERT INTO authors (id, name, path, library_id, book_count)
+         VALUES (?1, ?2, ?3, ?4, ?5)
+         ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name, path = excluded.path,
+            library_id = excluded.library_id, book_count = excluded.book_count";
+
+const UPSERT_BOOK_SQL: &str =
+    "INSERT INTO books (id, title, path, author_id, library_id, size, created_at, starred, deleted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+         ON CONFLICT(id) DO UPDATE SET
+            title = excluded.title, path = excluded.path, author_id = excluded.author_id,
+            library_id = excluded.library_id, size = excluded.size,
+            created_at = excluded.created_at, starred = excluded.starred, deleted = excluded.deleted";
+
 // --- Setup ---
 
 pub fn init(app: &AppHandle) -> rusqlite::Result<()> {
@@ -200,11 +229,7 @@ fn migrate_from_json(app: &AppHandle, conn: &Connection) {
 
 fn upsert_library(conn: &Connection, lib: &Library) -> rusqlite::Result<()> {
     conn.execute(
-        "INSERT INTO libraries (id, name, path, type, created_at, sort_order)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-         ON CONFLICT(id) DO UPDATE SET
-            name = excluded.name, path = excluded.path, type = excluded.type,
-            created_at = excluded.created_at, sort_order = excluded.sort_order",
+        UPSERT_LIBRARY_SQL,
         params![
             lib.id,
             lib.name,
@@ -219,12 +244,7 @@ fn upsert_library(conn: &Connection, lib: &Library) -> rusqlite::Result<()> {
 
 fn upsert_comic(conn: &Connection, c: &Comic) -> rusqlite::Result<()> {
     conn.execute(
-        "INSERT INTO comics (id, title, path, cover, library_id, created_at, starred, deleted)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-         ON CONFLICT(id) DO UPDATE SET
-            title = excluded.title, path = excluded.path, cover = excluded.cover,
-            library_id = excluded.library_id, created_at = excluded.created_at,
-            starred = excluded.starred, deleted = excluded.deleted",
+        UPSERT_COMIC_SQL,
         params![
             c.id,
             c.title,
@@ -241,11 +261,7 @@ fn upsert_comic(conn: &Connection, c: &Comic) -> rusqlite::Result<()> {
 
 fn upsert_author(conn: &Connection, a: &Author) -> rusqlite::Result<()> {
     conn.execute(
-        "INSERT INTO authors (id, name, path, library_id, book_count)
-         VALUES (?1, ?2, ?3, ?4, ?5)
-         ON CONFLICT(id) DO UPDATE SET
-            name = excluded.name, path = excluded.path,
-            library_id = excluded.library_id, book_count = excluded.book_count",
+        UPSERT_AUTHOR_SQL,
         params![a.id, a.name, a.path, a.library_id, a.book_count as i64],
     )?;
     Ok(())
@@ -253,12 +269,7 @@ fn upsert_author(conn: &Connection, a: &Author) -> rusqlite::Result<()> {
 
 fn upsert_book(conn: &Connection, b: &Book) -> rusqlite::Result<()> {
     conn.execute(
-        "INSERT INTO books (id, title, path, author_id, library_id, size, created_at, starred, deleted)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
-         ON CONFLICT(id) DO UPDATE SET
-            title = excluded.title, path = excluded.path, author_id = excluded.author_id,
-            library_id = excluded.library_id, size = excluded.size,
-            created_at = excluded.created_at, starred = excluded.starred, deleted = excluded.deleted",
+        UPSERT_BOOK_SQL,
         params![
             b.id,
             b.title,
@@ -295,15 +306,49 @@ fn replace_library_content(
         params![library_id],
     )?;
 
-    for comic in comics {
-        upsert_comic(&tx, comic)?;
-    }
-    for author in authors {
-        upsert_author(&tx, author)?;
-        for book in &author.books {
-            upsert_book(&tx, book)?;
+    {
+        let mut stmt = tx.prepare_cached(UPSERT_COMIC_SQL)?;
+        for c in comics {
+            stmt.execute(params![
+                c.id,
+                c.title,
+                c.path,
+                c.cover,
+                c.library_id,
+                c.created_at as i64,
+                c.starred as i64,
+                c.deleted as i64
+            ])?;
         }
     }
+
+    {
+        let mut author_stmt = tx.prepare_cached(UPSERT_AUTHOR_SQL)?;
+        let mut book_stmt = tx.prepare_cached(UPSERT_BOOK_SQL)?;
+        for a in authors {
+            author_stmt.execute(params![
+                a.id,
+                a.name,
+                a.path,
+                a.library_id,
+                a.book_count as i64
+            ])?;
+            for b in &a.books {
+                book_stmt.execute(params![
+                    b.id,
+                    b.title,
+                    b.path,
+                    b.author_id,
+                    b.library_id,
+                    b.size as i64,
+                    b.created_at as i64,
+                    b.starred as i64,
+                    b.deleted as i64
+                ])?;
+            }
+        }
+    }
+
     tx.commit()
 }
 
@@ -508,6 +553,39 @@ pub fn reorder(conn: &Connection, ordered_ids: &[String]) -> rusqlite::Result<()
     tx.commit()
 }
 
+enum CatalogTagTable {
+    Comics,
+    Books,
+}
+
+fn update_catalog_tags(
+    conn: &Connection,
+    table: CatalogTagTable,
+    id: &str,
+    tags: &FileTags,
+) -> rusqlite::Result<()> {
+    if tags.starred.is_none() && tags.deleted.is_none() {
+        return Ok(());
+    }
+
+    let starred = tags.starred.map(i64::from);
+    let deleted = tags.deleted.map(i64::from);
+    let sql = match table {
+        CatalogTagTable::Comics => {
+            "UPDATE comics
+             SET starred = COALESCE(?2, starred), deleted = COALESCE(?3, deleted)
+             WHERE id = ?1"
+        }
+        CatalogTagTable::Books => {
+            "UPDATE books
+             SET starred = COALESCE(?2, starred), deleted = COALESCE(?3, deleted)
+             WHERE id = ?1"
+        }
+    };
+    conn.execute(sql, params![id, starred, deleted])?;
+    Ok(())
+}
+
 /// Write tags to the file (xattr) and mirror them on the catalog row.
 pub fn set_comic_tags(app: &AppHandle, id: &str, tags: &FileTags) -> Result<(), String> {
     let path: String = {
@@ -524,20 +602,7 @@ pub fn set_comic_tags(app: &AppHandle, id: &str, tags: &FileTags) -> Result<(), 
 
     let state = app.state::<LibraryDb>();
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(starred) = tags.starred {
-        conn.execute(
-            "UPDATE comics SET starred = ?2 WHERE id = ?1",
-            params![id, starred as i64],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    if let Some(deleted) = tags.deleted {
-        conn.execute(
-            "UPDATE comics SET deleted = ?2 WHERE id = ?1",
-            params![id, deleted as i64],
-        )
-        .map_err(|e| e.to_string())?;
-    }
+    update_catalog_tags(&conn, CatalogTagTable::Comics, id, tags).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -556,20 +621,7 @@ pub fn set_book_tags(app: &AppHandle, id: &str, tags: &FileTags) -> Result<(), S
 
     let state = app.state::<LibraryDb>();
     let conn = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(starred) = tags.starred {
-        conn.execute(
-            "UPDATE books SET starred = ?2 WHERE id = ?1",
-            params![id, starred as i64],
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    if let Some(deleted) = tags.deleted {
-        conn.execute(
-            "UPDATE books SET deleted = ?2 WHERE id = ?1",
-            params![id, deleted as i64],
-        )
-        .map_err(|e| e.to_string())?;
-    }
+    update_catalog_tags(&conn, CatalogTagTable::Books, id, tags).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -878,5 +930,63 @@ mod tests {
         assert_eq!(catalog.libraries[0].name, "New");
         assert_eq!(catalog.libraries[0].path, "/new");
         assert_eq!(catalog.libraries[0].sort_order, 2);
+    }
+
+    #[test]
+    fn catalog_tag_updates_preserve_unspecified_fields() {
+        let conn = test_conn();
+        let library = Library {
+            id: "library-1".to_string(),
+            name: "Library".to_string(),
+            path: "/library".to_string(),
+            type_: "comic".to_string(),
+            created_at: 1,
+            sort_order: 0,
+        };
+        upsert_library(&conn, &library).expect("insert library");
+        upsert_comic(
+            &conn,
+            &Comic {
+                id: "comic-1".to_string(),
+                title: "Comic".to_string(),
+                path: "/library/Comic".to_string(),
+                cover: "/file?path=cover".to_string(),
+                library_id: "library-1".to_string(),
+                created_at: 1,
+                starred: false,
+                deleted: true,
+            },
+        )
+        .expect("insert comic");
+
+        update_catalog_tags(
+            &conn,
+            CatalogTagTable::Comics,
+            "comic-1",
+            &FileTags {
+                starred: Some(true),
+                deleted: None,
+            },
+        )
+        .expect("update comic tags");
+
+        let catalog = get_catalog(&conn).expect("read catalog");
+        assert!(catalog.comics[0].starred);
+        assert!(catalog.comics[0].deleted);
+
+        update_catalog_tags(
+            &conn,
+            CatalogTagTable::Comics,
+            "comic-1",
+            &FileTags {
+                starred: None,
+                deleted: Some(false),
+            },
+        )
+        .expect("update comic delete tag");
+
+        let catalog = get_catalog(&conn).expect("read catalog");
+        assert!(catalog.comics[0].starred);
+        assert!(!catalog.comics[0].deleted);
     }
 }

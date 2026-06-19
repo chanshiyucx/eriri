@@ -68,6 +68,7 @@ pub fn generate_uuid(input: &str) -> String {
 pub fn get_library_type(library_path: &str) -> Result<String, String> {
     let path = Path::new(library_path);
     let entries = fs::read_dir(path).map_err(|e| e.to_string())?;
+    let mut saw_comic_candidate = false;
 
     for entry in entries.flatten() {
         let entry_path = entry.path();
@@ -88,10 +89,14 @@ pub fn get_library_type(library_path: &str) -> Result<String, String> {
                     info!(path = %library_path, "Detected book library");
                     return Ok("book".to_string());
                 }
-                info!(path = %library_path, "Detected comic library");
-                return Ok("comic".to_string());
+                saw_comic_candidate = true;
             }
         }
+    }
+
+    if saw_comic_candidate {
+        info!(path = %library_path, "Detected comic library");
+        return Ok("comic".to_string());
     }
 
     info!(path = %library_path, "Defaulting to comic library");
@@ -193,6 +198,20 @@ mod tests {
         let author = dir.path().join("Author");
         fs::create_dir(&author).expect("create author dir");
         fs::write(author.join(".hidden.txt"), "hidden").expect("write hidden file");
+        fs::write(author.join("Book.txt"), "content").expect("write book");
+
+        assert_eq!(
+            get_library_type(dir.path().to_str().expect("path is utf-8")).expect("detect type"),
+            "book"
+        );
+    }
+
+    #[test]
+    fn detects_book_libraries_even_when_author_has_non_book_files_first() {
+        let dir = tempfile::tempdir().expect("create library dir");
+        let author = dir.path().join("Author");
+        fs::create_dir(&author).expect("create author dir");
+        fs::write(author.join("000-cover.jpg"), "cover").expect("write cover file");
         fs::write(author.join("Book.txt"), "content").expect("write book");
 
         assert_eq!(

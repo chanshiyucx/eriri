@@ -220,7 +220,7 @@ fn resize_and_save(
     resizer: &mut fr::Resizer,
 ) -> Result<(u32, u32, u64), Box<dyn std::error::Error>> {
     let target_width = THUMB_WIDTH;
-    let target_height = (orig_h as f64 * (target_width as f64 / orig_w as f64)).max(1.0) as u32;
+    let target_height = thumbnail_height(orig_w, orig_h)?;
 
     let src_width = NonZeroU32::new(src_w).ok_or("Src width is 0")?;
     let src_height = NonZeroU32::new(src_h).ok_or("Src height is 0")?;
@@ -270,6 +270,15 @@ fn resize_and_save(
 
     let file_size = fs::metadata(thumb_path).map(|m| m.len()).unwrap_or(0);
     Ok((orig_w, orig_h, file_size))
+}
+
+fn thumbnail_height(orig_w: u32, orig_h: u32) -> Result<u32, Box<dyn std::error::Error>> {
+    if orig_w == 0 {
+        return Err("Original width is 0".into());
+    }
+
+    let scaled = u64::from(orig_h).saturating_mul(u64::from(THUMB_WIDTH)) / u64::from(orig_w);
+    Ok(u32::try_from(scaled.max(1)).unwrap_or(u32::MAX))
 }
 
 pub fn find_cover_image(folder_path: &Path) -> Option<PathBuf> {
@@ -586,6 +595,13 @@ mod tests {
                     .expect("reuse thumbnail");
             assert_eq!(reused_size, 0);
         }
+    }
+
+    #[test]
+    fn computes_thumbnail_height_without_float_rounding_or_zero_height() {
+        assert_eq!(thumbnail_height(32, 16).expect("scale 2:1"), 128);
+        assert_eq!(thumbnail_height(1000, 1).expect("minimum height"), 1);
+        assert!(thumbnail_height(0, 100).is_err());
     }
 
     #[test]
