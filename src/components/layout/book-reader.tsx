@@ -305,7 +305,7 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
       )}
 
       <div className="bg-base text-subtle relative flex h-8 items-center justify-between border-b px-3 text-xs">
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Button
             className="hover:bg-overlay h-6 w-6 bg-transparent"
             onClick={toggleToc}
@@ -356,16 +356,11 @@ export function BookReader({ bookId, showReading = false }: BookReaderProps) {
           </Button>
         </div>
 
-        <h3
-          className={cn(
-            'mx-2 min-w-0 flex-1 truncate text-left',
-            'md:absolute md:top-1/2 md:left-1/2 md:mx-0 md:max-w-[60%] md:flex-none md:-translate-1/2 md:text-center',
-          )}
-        >
+        <h3 className="mx-2 min-w-0 flex-1 truncate text-left">
           {currentChapterTitle || book.title}
         </h3>
 
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 gap-2 whitespace-nowrap">
           {progress?.percent > 0 && (
             <span>{Math.round(progress.percent)}%</span>
           )}

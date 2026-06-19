@@ -132,6 +132,20 @@ describe('BookReader', () => {
     )
   })
 
+  it('keeps the toolbar title in the flex row so it cannot overlap controls', async () => {
+    render(<BookReader bookId="book-1" showReading />)
+    await screen.findByText('Body')
+
+    const title = screen.getByRole('heading', { name: 'Chapter 1' })
+    expect(title).toHaveClass('min-w-0', 'flex-1', 'truncate')
+    expect(title).not.toHaveClass('md:absolute')
+    expect(screen.getByTitle('展开目录').parentElement).toHaveClass('shrink-0')
+    expect(screen.getByText('50%').parentElement).toHaveClass(
+      'shrink-0',
+      'whitespace-nowrap',
+    )
+  })
+
   it('handles toolbar, chapter, progress and continue-reading actions', async () => {
     render(<BookReader bookId="book-1" showReading />)
     await screen.findByText('Body')

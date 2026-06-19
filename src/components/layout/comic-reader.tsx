@@ -221,7 +221,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
           isImmersive && 'hidden',
         )}
       >
-        <div className="flex gap-2">
+        <div className="flex shrink-0 gap-2">
           <Button
             className="hover:bg-overlay mx-1 h-6 w-6 bg-transparent"
             onClick={toggleToc}
@@ -260,12 +260,7 @@ export function ComicReader({ comicId }: ComicReaderProps) {
           </Button>
         </div>
 
-        <h3
-          className={cn(
-            'mx-2 min-w-0 flex-1 truncate text-left',
-            'md:absolute md:top-1/2 md:left-1/2 md:mx-0 md:max-w-[60%] md:flex-none md:-translate-1/2 md:text-center',
-          )}
-        >
+        <h3 className="mx-2 min-w-0 flex-1 truncate text-left">
           {comic.title}
         </h3>
 

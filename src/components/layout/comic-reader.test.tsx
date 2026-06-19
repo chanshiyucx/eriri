@@ -176,6 +176,19 @@ describe('ComicReader', () => {
     )
   })
 
+  it('keeps the toolbar title in the flex row so it cannot overlap controls', () => {
+    render(<ComicReader comicId="comic-1" />)
+
+    const title = screen.getByRole('heading', { name: 'Comic One' })
+    expect(title).toHaveClass('min-w-0', 'flex-1', 'truncate')
+    expect(title).not.toHaveClass('md:absolute')
+    expect(screen.getByTitle('标记删除').parentElement).toHaveClass('shrink-0')
+    expect(screen.getByText('1 / 2')).toHaveClass(
+      'shrink-0',
+      'whitespace-nowrap',
+    )
+  })
+
   it('handles item and hovered-page tag shortcuts for the active tab', () => {
     render(<ComicReader comicId="comic-1" />)
 
